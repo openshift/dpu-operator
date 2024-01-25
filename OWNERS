@@ -1,0 +1,8 @@
+reviewers:
+  - bn222
+  - wizhaoredhat
+approvers:
+  - bn222
+  - wizhaoredhat
+component: "Networking"
+subcomponent: "DPU"
