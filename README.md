@@ -1,5 +1,6 @@
 # dpu-operator
-// TODO(user): Add simple overview of use/purpose
+
+This operator will manage and configure data processing unit (DPUs) to be used in accelerating/offloading k8s networking functions
 
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
@@ -91,4 +92,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
