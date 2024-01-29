@@ -28,8 +28,8 @@ type DpuOperatorConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of DpuOperatorConfig. Edit dpuoperatorconfig_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Set log level of the operator. Edit dpuoperatorconfig_types.go to remove/update
+	LogLevel int `json:"logLevel,omitempty"`
 }
 
 // DpuOperatorConfigStatus defines the observed state of DpuOperatorConfig
