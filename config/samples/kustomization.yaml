@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- config_v1_dpuconfig.yaml
+- config_v1_dpuoperatorconfig.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -1,20 +1,20 @@
-# permissions for end users to view dpuconfigs.
+# permissions for end users to view dpuoperatorconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: dpuconfig-viewer-role
+    app.kubernetes.io/instance: dpuoperatorconfig-viewer-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: dpu-operator
     app.kubernetes.io/part-of: dpu-operator
     app.kubernetes.io/managed-by: kustomize
-  name: dpuconfig-viewer-role
+  name: dpuoperatorconfig-viewer-role
 rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs
+  - dpuoperatorconfigs
   verbs:
   - get
   - list
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs/status
+  - dpuoperatorconfigs/status
   verbs:
   - get

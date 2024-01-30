@@ -89,11 +89,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.DpuConfigReconciler{
+	if err = (&controller.DpuOperatorConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DpuConfig")
+		setupLog.Error(err, "unable to create controller", "controller", "DpuOperatorConfig")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

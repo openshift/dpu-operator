@@ -1,12 +1,12 @@
 apiVersion: config.openshift.io/v1
-kind: DpuConfig
+kind: DpuOperatorConfig
 metadata:
   labels:
-    app.kubernetes.io/name: dpuconfig
-    app.kubernetes.io/instance: dpuconfig-sample
+    app.kubernetes.io/name: dpuoperatorconfig
+    app.kubernetes.io/instance: dpuoperatorconfig-sample
     app.kubernetes.io/part-of: dpu-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: dpu-operator
-  name: dpuconfig-sample
+  name: dpuoperatorconfig-sample
 spec:
   # TODO(user): Add fields here

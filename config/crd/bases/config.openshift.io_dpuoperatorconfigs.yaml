@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.0
-  name: dpuconfigs.config.openshift.io
+  name: dpuoperatorconfigs.config.openshift.io
 spec:
   group: config.openshift.io
   names:
-    kind: DpuConfig
-    listKind: DpuConfigList
-    plural: dpuconfigs
-    singular: dpuconfig
+    kind: DpuOperatorConfig
+    listKind: DpuOperatorConfigList
+    plural: dpuoperatorconfigs
+    singular: dpuoperatorconfig
   scope: Namespaced
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: DpuConfig is the Schema for the dpuconfigs API
+        description: DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -32,15 +32,15 @@ spec:
           metadata:
             type: object
           spec:
-            description: DpuConfigSpec defines the desired state of DpuConfig
+            description: DpuOperatorConfigSpec defines the desired state of DpuOperatorConfig
             properties:
               logLevel:
-                description: Set log level of the operator. Edit dpuconfig_types.go
+                description: Set log level of the operator. Edit dpuoperatorconfig_types.go
                   to remove/update
                 type: integer
             type: object
           status:
-            description: DpuConfigStatus defines the observed state of DpuConfig
+            description: DpuOperatorConfigStatus defines the observed state of DpuOperatorConfig
             type: object
         type: object
     served: true

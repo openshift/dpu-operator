@@ -27,26 +27,26 @@ import (
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 )
 
-// DpuConfigReconciler reconciles a DpuConfig object
-type DpuConfigReconciler struct {
+// DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
+type DpuOperatorConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=config.openshift.io,resources=dpuconfigs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,resources=dpuconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=config.openshift.io,resources=dpuconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the DpuConfig object against the actual cluster state, and then
+// the DpuOperatorConfig object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
-func (r *DpuConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
@@ -55,8 +55,8 @@ func (r *DpuConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *DpuConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DpuOperatorConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&configv1.DpuConfig{}).
+		For(&configv1.DpuOperatorConfig{}).
 		Complete(r)
 }

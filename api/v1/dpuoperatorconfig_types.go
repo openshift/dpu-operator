@@ -23,17 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// DpuConfigSpec defines the desired state of DpuConfig
-type DpuConfigSpec struct {
+// DpuOperatorConfigSpec defines the desired state of DpuOperatorConfig
+type DpuOperatorConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Set log level of the operator. Edit dpuconfig_types.go to remove/update
+	// Set log level of the operator. Edit dpuoperatorconfig_types.go to remove/update
 	LogLevel int `json:"logLevel,omitempty"`
 }
 
-// DpuConfigStatus defines the observed state of DpuConfig
-type DpuConfigStatus struct {
+// DpuOperatorConfigStatus defines the observed state of DpuOperatorConfig
+type DpuOperatorConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +41,24 @@ type DpuConfigStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// DpuConfig is the Schema for the dpuconfigs API
-type DpuConfig struct {
+// DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
+type DpuOperatorConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   DpuConfigSpec   `json:"spec,omitempty"`
-	Status DpuConfigStatus `json:"status,omitempty"`
+	Spec   DpuOperatorConfigSpec   `json:"spec,omitempty"`
+	Status DpuOperatorConfigStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// DpuConfigList contains a list of DpuConfig
-type DpuConfigList struct {
+// DpuOperatorConfigList contains a list of DpuOperatorConfig
+type DpuOperatorConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []DpuConfig `json:"items"`
+	Items           []DpuOperatorConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&DpuConfig{}, &DpuConfigList{})
+	SchemeBuilder.Register(&DpuOperatorConfig{}, &DpuOperatorConfigList{})
 }

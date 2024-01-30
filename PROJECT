@@ -17,7 +17,7 @@ resources:
   controller: true
   domain: openshift.io
   group: config
-  kind: DpuConfig
+  kind: DpuOperatorConfig
   path: github.com/openshift/dpu-operator/api/v1
   version: v1
 version: "3"

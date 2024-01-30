@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs
+  - dpuoperatorconfigs
   verbs:
   - create
   - delete
@@ -19,13 +19,13 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs/finalizers
+  - dpuoperatorconfigs/finalizers
   verbs:
   - update
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs/status
+  - dpuoperatorconfigs/status
   verbs:
   - get
   - patch

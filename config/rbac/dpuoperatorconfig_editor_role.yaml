@@ -1,20 +1,20 @@
-# permissions for end users to edit dpuconfigs.
+# permissions for end users to edit dpuoperatorconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: dpuconfig-editor-role
+    app.kubernetes.io/instance: dpuoperatorconfig-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: dpu-operator
     app.kubernetes.io/part-of: dpu-operator
     app.kubernetes.io/managed-by: kustomize
-  name: dpuconfig-editor-role
+  name: dpuoperatorconfig-editor-role
 rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs
+  - dpuoperatorconfigs
   verbs:
   - create
   - delete
@@ -26,6 +26,6 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - dpuconfigs/status
+  - dpuoperatorconfigs/status
   verbs:
   - get
