@@ -1,0 +1,12 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14 AS builder
+
+COPY . /usr/src/dpu-cni
+
+WORKDIR /usr/src/dpu-cni
+RUN go build -a -o dpucni ./dpu-cni/dpu-cni.go
+
+FROM registry.ci.openshift.org/ocp/4.15:base-rhel9
+COPY --from=builder /usr/src/dpu-cni/dpucni /usr/bin/
+WORKDIR /
+
+LABEL io.k8s.display-name="DPU-CNI"
