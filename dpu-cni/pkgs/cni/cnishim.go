@@ -18,17 +18,17 @@ import (
 // Plugin is the data structure to hold the endpoint information and the corresponding
 // functions that use it
 type Plugin struct {
-	socketPath string
+	SocketPath string
 }
 
 // NewCNIPlugin creates the internal Plugin object
 func NewCNIPlugin() *Plugin {
-	return &Plugin{socketPath: cnitypes.ServerSocketPath}
+	return &Plugin{SocketPath: cnitypes.ServerSocketPath}
 }
 
 // postRequest reads the cni config args and forwards it via an HTTP post request. The response.
 // if any, is passed back to this CNI's plugin.
-func (p *Plugin) postRequest(args *skel.CmdArgs) (*cnitypes.Response, string, error) {
+func (p *Plugin) PostRequest(args *skel.CmdArgs) (*cnitypes.Response, string, error) {
 	cniRequest := cnihelper.NewCNIRequest(args)
 
 	// Read the cni config stdin args to obtain cniVersion
@@ -65,7 +65,7 @@ func (p *Plugin) doCNI(url string, req interface{}) ([]byte, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			Dial: func(proto, addr string) (net.Conn, error) {
-				return net.Dial("unix", p.socketPath)
+				return net.Dial("unix", p.SocketPath)
 			},
 		},
 	}
@@ -109,7 +109,7 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 		"func", "cmdAdd",
 		"args.Path", args.Path, "args.StdinData", string(args.StdinData), "args.Args", args.Args)
 
-	resp, cniVersion, err := p.postRequest(args)
+	resp, cniVersion, err := p.PostRequest(args)
 	if err != nil {
 		return fmt.Errorf("failed to post request for cmdAdd: %v", err)
 	}
@@ -126,7 +126,7 @@ func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 		"func", "cmdDel",
 		"args.Path", args.Path, "args.StdinData", string(args.StdinData), "args.Args", args.Args)
 
-	_, _, err := p.postRequest(args)
+	_, _, err := p.PostRequest(args)
 	if err != nil {
 		return fmt.Errorf("failed to post request for cmdAdd: %v", err)
 	}
