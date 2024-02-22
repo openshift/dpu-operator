@@ -113,7 +113,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 // HttpCNIPost is a callback functions to handle "/cni" requests.
 func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
