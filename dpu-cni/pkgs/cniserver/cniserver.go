@@ -60,16 +60,16 @@ func ensureRunDirExists(runDir string, socketPath string) error {
 }
 
 // getListener creates a listener to a unix socket located in `socketPath`
-func getListener() (net.Listener, error) {
-	err := ensureRunDirExists(cnitypes.ServerRunDir, cnitypes.ServerSocketPath)
+func getListener(runDir string, serverSocketPath string) (net.Listener, error) {
+	err := ensureRunDirExists(runDir, serverSocketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run directory for DPU CNI socket: %v", err)
 	}
-	listener, err := net.Listen("unix", cnitypes.ServerSocketPath)
+	listener, err := net.Listen("unix", serverSocketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on DPU CNI socket: %v", err)
 	}
-	if err := os.Chmod(cnitypes.ServerSocketPath, 0o600); err != nil {
+	if err := os.Chmod(serverSocketPath, 0o600); err != nil {
 		_ = listener.Close()
 		return nil, fmt.Errorf("failed to set file permissions on DPU CNI socket: %v", err)
 	}
@@ -113,7 +113,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 // HttpCNIPost is a callback functions to handle "/cni" requests.
 func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -133,15 +133,21 @@ func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // Start starts the server and begins serving on the given listener
-func (s *Server) Start(listener net.Listener) {
+func (s *Server) Start(runDir string, serverSocketPath string) {
+	klog.Infof("DPU CNI Server getting listener.")
+	listener, err := getListener(runDir, serverSocketPath)
+	if err != nil {
+		klog.Errorf("Failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
+	}
+
 	klog.Infof("DPU CNI Server is now serving requests.")
 	if err := s.Serve(listener); err != nil {
 		klog.Errorf("DPU CNI server Serve() failed: %v", err)
 	}
 }
 
-// newCNIServer creates a new HTTP router instances to handle the CNI server requests.
-func newCNIServer(rqFunc processRequestFunc) (*Server, error) {
+// NewCNIServer creates a new HTTP router instances to handle the CNI server requests.
+func NewCNIServer(rqFunc processRequestFunc) (*Server, error) {
 	klog.Infof("DPU CNI Server creating new router.")
 	router := mux.NewRouter()
 	s := &Server{
@@ -160,19 +166,13 @@ func newCNIServer(rqFunc processRequestFunc) (*Server, error) {
 // startCNIServer is the entry point to start the HTTP "unix" socket to listen for DPU CNI shim requests.
 func StartCNIServer() (*Server, error) {
 	klog.Infof("DPU CNI Server creating new CNI server.")
-	cniServer, err := newCNIServer(processRequest)
+	cniServer, err := NewCNIServer(processRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Infof("DPU CNI Server getting listener.")
-	listener, err := getListener()
-	if err != nil {
-		return nil, fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
-	}
-
 	klog.Infof("DPU CNI Server starting listener.")
-	cniServer.Start(listener)
+	cniServer.Start(cnitypes.ServerRunDir, cnitypes.ServerSocketPath)
 
 	return cniServer, nil
 }
