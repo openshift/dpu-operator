@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option go_package = "github.com/openshift/dpu-operator/api/dpu-api";
+
+package Vendor;
+
+service LifeCycleService {
+  rpc Init(InitRequest) returns (IpPort);
+}
+
+message InitRequest {
+  bool dpu_mode = 1;
+}
+
+message IpPort {
+  string ip = 1;
+  int32 port = 2;
+}
