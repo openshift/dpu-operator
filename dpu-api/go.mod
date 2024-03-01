@@ -1,4 +1,4 @@
-module github.com/openshift/dpu-operator/api
+module github.com/openshift/dpu-operator/dpu-api
 
 go 1.21
 
