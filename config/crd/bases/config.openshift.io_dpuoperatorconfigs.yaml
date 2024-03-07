@@ -38,6 +38,10 @@ spec:
                 description: Set log level of the operator. Edit dpuoperatorconfig_types.go
                   to remove/update
                 type: integer
+              mode:
+                description: 'Mode can be "host" or "dpu" and it defines on which
+                  side we are TODO: add support for auto'
+                type: string
             type: object
           status:
             description: DpuOperatorConfigStatus defines the observed state of DpuOperatorConfig
