@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/go-logr/logr"
+	"github.com/openshift/dpu-operator/daemon/plugin"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -14,7 +15,7 @@ import (
 
 type DpuDaemon struct {
 	pb.UnimplementedBridgePortServiceServer
-	vsp VendorPlugin
+	vsp plugin.VendorPlugin
 	log logr.Logger
 }
 
@@ -28,7 +29,7 @@ func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBrid
 	return nil, nil
 }
 
-func NewDpuDaemon(vsp VendorPlugin) *DpuDaemon {
+func NewDpuDaemon(vsp plugin.VendorPlugin) *DpuDaemon {
 	return &DpuDaemon{
 		vsp: vsp,
 		log: ctrl.Log.WithName("DpuDaemon"),

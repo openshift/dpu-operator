@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 
+	"github.com/openshift/dpu-operator/daemon/plugin"
 	"go.uber.org/zap/zapcore"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,11 +29,11 @@ func isDpuMode(mode string) (bool, error) {
 }
 
 func createDaemon(dpuMode bool) (Daemon, error) {
-	var vsp VendorPlugin = NewGrpcPlugin(dpuMode)
+	plugin := plugin.NewGrpcPlugin(dpuMode)
 	if dpuMode {
-		return NewDpuDaemon(vsp), nil
+		return NewDpuDaemon(plugin), nil
 	} else {
-		return NewHostDaemon(vsp), nil
+		return NewHostDaemon(plugin), nil
 	}
 }
 
