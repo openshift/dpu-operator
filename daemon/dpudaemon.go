@@ -17,6 +17,7 @@ type DpuDaemon struct {
 	pb.UnimplementedBridgePortServiceServer
 	vsp plugin.VendorPlugin
 	log logr.Logger
+	server *grpc.Server
 }
 
 func (s *DpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
@@ -37,20 +38,33 @@ func NewDpuDaemon(vsp plugin.VendorPlugin) *DpuDaemon {
 }
 
 func (d *DpuDaemon) Start() {
-	var err error
 	d.log.Info("starting DpuDaemon")
 	addr, port, err := d.vsp.Start()
+	if err != nil {
+		d.log.Error(err, "Failed to get addr:port from VendorPlugin")
+	}
+	d.server = grpc.NewServer()
+	pb.RegisterBridgePortServiceServer(d.server, d)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		d.log.Error(err, "Failed to start listening")
 	}
-	server := grpc.NewServer()
-	pb.RegisterBridgePortServiceServer(server, d)
-	d.log.Info("server listening", "address", lis.Addr())
 
-	if err := server.Serve(lis); err != nil {
-		d.log.Error(err, "Failed to start serving")
+	go func() {
+		d.log.Info("server listening", "address", lis.Addr())
+
+		if err := d.server.Serve(lis); err != nil {
+			d.log.Error(err, "Failed to start serving")
+			panic("Failed to listen")
+		}
+	}()
+}
+
+func (d *DpuDaemon) Stop() {
+	if d.server != nil {
+		d.server.GracefulStop()
+		d.server = nil
 	}
 }
 

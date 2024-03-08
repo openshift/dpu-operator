@@ -3,7 +3,6 @@ package plugin
 import (
 	"context"
 	"net"
-	"runtime"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
@@ -13,7 +12,7 @@ import (
 )
 
 const (
-	VendorPluginDir        string = "/var/run/daemon"
+	VendorPluginDir        string = "/var/run/daemon/vendor-plugin"
 	VendorPluginSocketPath string = VendorPluginDir + "/vendor-plugin.sock"
 )
 
@@ -26,18 +25,14 @@ type DummyPlugin struct {
 	log logr.Logger
 }
 
-func NewDummyPlugin(isDpuMode bool) *DummyPlugin {
+func NewDummyPlugin() *DummyPlugin {
 	return &DummyPlugin{
 		log: ctrl.Log.WithName("VSP"),
 	}
 }
 
-func (v *DummyPlugin) Start() (string, string) {
-	if runtime.GOARCH == "amd64" {
-		return "127.0.0.1", "50051"
-	} else {
-		return "127.0.0.1", "50051"
-	}
+func (v *DummyPlugin) Start() (string, int32, error) {
+	return "127.0.0.1", 50051, nil
 }
 
 func (v *DummyPlugin) Stop() {
