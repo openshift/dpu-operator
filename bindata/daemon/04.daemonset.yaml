@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dpu-operator-daemon
+  namespace: {{.Namespace}}
+spec:
+  selector:
+    matchLabels:
+      app: dpu-operator-daemon
+  template:
+    metadata:
+      labels:
+        app: dpu-operator-daemon
+        component: network
+        type: infra
+    spec:
+      serviceAccountName: dpu-operator-daemon-sa
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        dpu: "true"
+      securityContext:
+        privileged: true
+      containers:
+      - name: dpu-operator-daemon
+        image: {{.DpuOperatorDaemonImage}}
+        securityContext:
+          privileged: true
+        env:
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          value: {{.Namespace}}
+        args:
+        - --mode
+        - {{.Mode}}
