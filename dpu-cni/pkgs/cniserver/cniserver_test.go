@@ -8,6 +8,7 @@ import (
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnihelper"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 
@@ -17,10 +18,20 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func processRequest(request *cnitypes.Request) error {
+func processRequest(request *cnitypes.Request) (*current.Result, error) {
 	// FIXME: Do actual work here.
 	klog.Infof("DEBUG: %v", request)
-	return nil
+
+	conf, err := cnihelper.ReadCNIConfig(request.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &current.Result{
+		CNIVersion: conf.CNIVersion,
+	}
+
+	return result, nil
 }
 
 var _ = g.Describe("Cniserver", func() {

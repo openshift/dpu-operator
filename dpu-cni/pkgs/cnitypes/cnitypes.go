@@ -1,6 +1,9 @@
 package cnitypes
 
 import (
+	"context"
+	"time"
+
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	nadapi "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -24,6 +27,44 @@ type Request struct {
 // Response sent to this DPU CNI plugin by the Server
 type Response struct {
 	Result *current.Result
+}
+
+const CNIAdd string = "ADD"
+const CNIUpdate string = "UPDATE"
+const CNIDel string = "DEL"
+const CNICheck string = "CHECK"
+
+// PodRequest structure built from Request which is passed to the
+// handler function given to the Server at creation time
+type PodRequest struct {
+	// The CNI command of the operation
+	Command string
+	// kubernetes namespace name
+	PodNamespace string
+	// kubernetes pod name
+	PodName string
+	// kubernetes pod UID
+	PodUID string
+	// kubernetes container ID
+	SandboxID string
+	// kernel network namespace path
+	Netns string
+	// Interface name to be configured
+	IfName string
+	// CNI conf obtained from stdin conf
+	CNIConf *NetConf
+	// Timestamp when the request was started
+	Timestamp time.Time
+	// ctx is a context tracking this request's lifetime
+	Ctx context.Context
+	// cancel should be called to cancel this request
+	Cancel context.CancelFunc
+
+	// network name, for default network, this will be types.DefaultNetworkName
+	NetName string
+
+	// the DeviceInfo struct
+	DeviceInfo nadapi.DeviceInfo
 }
 
 // FIXME: This file is copied from sriov-cni intentionally. We plan to trim this down once
