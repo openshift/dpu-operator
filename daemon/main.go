@@ -29,7 +29,7 @@ func isDpuMode(mode string) (bool, error) {
 }
 
 func createDaemon(dpuMode bool) (Daemon, error) {
-	plugin := plugin.NewGrpcPlugin(dpuMode)
+	plugin := plugin.NewDummyPlugin() // plugin.NewGrpcPlugin(dpuMode)
 	if dpuMode {
 		return NewDpuDaemon(plugin), nil
 	} else {
