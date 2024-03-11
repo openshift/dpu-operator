@@ -10,7 +10,7 @@ import (
 
 // FIXME: This will disappear in the near future
 func main() {
-	_, err := cniserver.StartCNIServer()
+	err := cniserver.NewCNIServer().Start()
 	if err != nil {
 		klog.Errorf("DPU CNI server Serve() failed: %v", err)
 	}

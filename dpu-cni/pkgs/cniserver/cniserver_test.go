@@ -44,10 +44,11 @@ var _ = g.Describe("Cniserver", func() {
 	defer os.RemoveAll(tmpDir)
 	o.Expect(err).NotTo(o.HaveOccurred())
 	serverSocketPath := filepath.Join(tmpDir, cnitypes.ServerSocketName)
-	cniServer, err := cniserver.NewCNIServer(processRequest)
-	o.Expect(err).NotTo(o.HaveOccurred())
+	cniServer := cniserver.NewCNIServer(
+		cniserver.WithHandler(processRequest),
+		cniserver.WithSocketPath(tmpDir, serverSocketPath))
 	go utilwait.Forever(func() {
-		cniServer.Start(tmpDir, serverSocketPath)
+		cniServer.Start()
 	}, 0)
 
 	plugin = &cni.Plugin{SocketPath: serverSocketPath}
