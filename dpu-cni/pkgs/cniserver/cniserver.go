@@ -28,6 +28,8 @@ type processRequestFunc func(request *cnitypes.Request) (*cni100.Result, error)
 type Server struct {
 	http.Server
 	processRequest processRequestFunc
+	runDir string
+	socketPath string
 }
 
 // ensureRunDirExists makes sure that the socket being created is only accessible to root.
@@ -250,9 +252,9 @@ func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // Start starts the server and begins serving on the given listener
-func (s *Server) Start(runDir string, serverSocketPath string) {
-	klog.Infof("DPU CNI Server getting listener.")
-	listener, err := getListener(runDir, serverSocketPath)
+func (s *Server) Start() error {
+	klog.Infof("Starting DPU CNI Server")
+	listener, err := getListener(s.runDir, s.socketPath)
 	if err != nil {
 		klog.Errorf("Failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
 	}
@@ -260,36 +262,43 @@ func (s *Server) Start(runDir string, serverSocketPath string) {
 	klog.Infof("DPU CNI Server is now serving requests.")
 	if err := s.Serve(listener); err != nil {
 		klog.Errorf("DPU CNI server Serve() failed: %v", err)
+		return err
 	}
+	return nil
 }
 
 // NewCNIServer creates a new HTTP router instances to handle the CNI server requests.
-func NewCNIServer(rqFunc processRequestFunc) (*Server, error) {
+func NewCNIServer(options ...func(*Server)) *Server {
 	klog.Infof("DPU CNI Server creating new router.")
 	router := mux.NewRouter()
 	s := &Server{
 		Server: http.Server{
 			Handler: router,
 		},
-		processRequest: rqFunc,
+		processRequest: processRequest,
+		runDir: cnitypes.ServerRunDir,
+		socketPath: cnitypes.ServerSocketPath,
 	}
 
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
 	router.HandleFunc("/cni", http.HandlerFunc(s.HttpCNIPost))
 
-	return s, nil
-}
-
-// startCNIServer is the entry point to start the HTTP "unix" socket to listen for DPU CNI shim requests.
-func StartCNIServer() (*Server, error) {
-	klog.Infof("DPU CNI Server creating new CNI server.")
-	cniServer, err := NewCNIServer(processRequest)
-	if err != nil {
-		return nil, err
+	for _, o := range options {
+		o(s)
 	}
 
-	klog.Infof("DPU CNI Server starting listener.")
-	cniServer.Start(cnitypes.ServerRunDir, cnitypes.ServerSocketPath)
+	return s
+}
 
-	return cniServer, nil
+func WithHandler(rqFunc processRequestFunc) func(*Server) {
+	return func(s *Server) {
+		s.processRequest = rqFunc
+	}
+}
+
+func WithSocketPath(runDir string, socketPath string) func(*Server) {
+	return func(s *Server) {
+		s.runDir = runDir
+		s.socketPath = socketPath
+	}
 }
