@@ -34,6 +34,26 @@ func processRequest(request *cnitypes.Request) (*current.Result, error) {
 	return result, nil
 }
 
+func PrepArgs(cniVersion string) *skel.CmdArgs {
+	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
+	cmdArgs := &skel.CmdArgs{
+		ContainerID: "fakecontainerid",
+		Netns:       "fakenetns",
+		IfName:      "fakeeth0",
+		Args:        "",
+		Path:        "fakepath",
+		StdinData:   []byte(cniConfig),
+	}
+	os.Clearenv()
+	os.Setenv("CNI_COMMAND", "ADD")
+	os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
+	os.Setenv("CNI_NETNS", cmdArgs.Netns)
+	os.Setenv("CNI_IFNAME", cmdArgs.IfName)
+	os.Setenv("CNI_PATH", cmdArgs.Path)
+
+	return cmdArgs
+}
+
 var _ = g.Describe("Cniserver", func() {
 	var tmpDir string
 	var plugin *cni.Plugin
@@ -56,25 +76,11 @@ var _ = g.Describe("Cniserver", func() {
 	g.Context("CNI Server APIs", func() {
 		g.When("Normal ADD request", func() {
 			cniVersion := "0.4.0"
-			cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
-			cmdArgs := &skel.CmdArgs{
-				ContainerID: "fakecontainerid",
-				Netns:       "fakenetns",
-				IfName:      "fakeeth0",
-				Args:        "",
-				Path:        "fakepath",
-				StdinData:   []byte(cniConfig),
-			}
 			expectedResult := &current.Result{
 				CNIVersion: cniVersion,
 			}
-			os.Setenv("CNI_COMMAND", "ADD")
-			os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
-			os.Setenv("CNI_NETNS", cmdArgs.Netns)
-			os.Setenv("CNI_IFNAME", cmdArgs.IfName)
-			os.Setenv("CNI_PATH", cmdArgs.Path)
 			g.It("should get a correct response from the post request", func() {
-				resp, ver, err := plugin.PostRequest(cmdArgs)
+				resp, ver, err := plugin.PostRequest(PrepArgs(cniVersion))
 				o.Expect(err).NotTo(o.HaveOccurred())
 				o.Expect(ver).To(o.Equal(cniVersion))
 				o.Expect(resp.Result).To(o.Equal(expectedResult))
