@@ -6,6 +6,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/openshift/dpu-operator/daemon/plugin"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,6 +22,8 @@ type HostDaemon struct {
 	vsp plugin.VendorPlugin
 	addr string
 	port int32
+	cniServerPath string
+	cniserver *cniserver.Server
 }
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) (error) {
@@ -53,7 +57,13 @@ func NewHostDaemon(vsp plugin.VendorPlugin) *HostDaemon {
 	return &HostDaemon{
 		vsp: vsp,
 		log: ctrl.Log.WithName("HostDaemon"),
+		cniServerPath: "/var/", // TODO
 	}
+}
+
+func (d *HostDaemon) WithCniServerPath(serverPath string) *HostDaemon {
+	d.cniServerPath = serverPath
+	return d
 }
 
 func (d *HostDaemon) ensureConnected() {
@@ -89,4 +99,20 @@ func (d *HostDaemon) Start() {
 	}
 	d.addr = addr
 	d.port = port
+
+	server := cniserver.NewCNIServer()
+	err = server.Start()
+
+	if err != nil {
+		d.log.Error(err, "Error starting CNI server for shim")
+	}
+
+	d.cniserver = server
+	go func() {	
+		d.cniserver.Start()
+	}()
+}
+
+func (d *HostDaemon) Stop() {
+
 }
