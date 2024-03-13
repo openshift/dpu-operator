@@ -14,7 +14,6 @@ import (
 	. "github.com/openshift/dpu-operator/daemon"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -87,7 +86,3 @@ var _ = g.Describe("Main", func() {
 
 	})
 })
-
-
-
-
