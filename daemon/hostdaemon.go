@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,11 +29,11 @@ type HostDaemon struct {
 	cniserver *cniserver.Server
 }
 
-func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) (error) {
+func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (error) {
 	d.ensureConnected()
 	createRequest := &pb.CreateBridgePortRequest{
 		BridgePort: &pb.BridgePort{
-			Name: fmt.Sprintf("%d-%d-%d", pf, vf, vlan),
+			Name: fmt.Sprintf("%d-%d-%d-%s", pf, vf, vlan, mac),
 			Spec: &pb.BridgePortSpec{
 				Ptype:          1,
 				MacAddress:     []byte{},
@@ -43,10 +46,10 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) (error) {
 	return err
 }
 
-func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int) (error) {
+func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) (error) {
 	d.ensureConnected()
 	req := &pb.DeleteBridgePortRequest{
-		    Name: fmt.Sprintf("%d-%d-%d", pf, vf, vlan),
+		    Name: fmt.Sprintf("%d-%d-%d-%s", pf, vf, vlan, mac),
 	}
 
 	_, err := d.client.DeleteBridgePort(context.TODO(), req)
@@ -90,6 +93,36 @@ func (d *HostDaemon) ensureConnected() {
 	d.client = pb.NewBridgePortServiceClient(conn)
 }
 
+func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {	
+	pf := 0
+	vf := req.CNIConf.VFID
+	mac := req.CNIConf.MAC
+	vlan := 7
+	d.CreateBridgePort(pf, vf, vlan, mac)
+
+	sm := sriov.NewSriovManager()
+	res, err := sm.CmdAdd(req)
+	if err != nil {
+	    return nil, errors.New("SRIOV manager falied in add handler")
+	}
+	return res, nil
+}
+
+func (d *HostDaemon) delHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+	pf := 0
+	vf := req.CNIConf.VFID
+	mac := req.CNIConf.MAC
+	vlan := 7
+	d.DeleteBridgePort(pf, vf, vlan, mac)
+
+	sm := sriov.NewSriovManager()
+	err := sm.CmdDel(req)
+	if err != nil {
+	    return nil, errors.New("SRIOV manager falied in del handler")
+	}
+	return nil, nil
+}
+
 func (d *HostDaemon) Start() {
 	d.log.Info("starting HostDaemon", "devflag", d.dev)
 
@@ -100,7 +133,14 @@ func (d *HostDaemon) Start() {
 	d.addr = addr
 	d.port = port
 
-	server := cniserver.NewCNIServer()
+	add := func(r *cnitypes.PodRequest) (*cni100.Result, error) {
+		return d.addHandler(r)
+	}
+	del := func(r *cnitypes.PodRequest) (*cni100.Result, error) {
+		return d.delHandler(r)
+	}
+
+	server := cniserver.NewCNIServer(add, del)
 	err = server.Start()
 
 	if err != nil {
