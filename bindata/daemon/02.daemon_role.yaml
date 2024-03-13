@@ -12,14 +12,3 @@ rules:
     - securitycontextconstraints
   verbs:
     - use
-- apiGroups:
-  - dpu.openshift.io
-  resources:
-  - dpus
-  verbs:
-  - watch
-  - create
-  - update
-  - patch
-  - list
-  - get
