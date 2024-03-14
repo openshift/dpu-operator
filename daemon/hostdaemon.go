@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -31,25 +32,33 @@ type HostDaemon struct {
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (error) {
 	d.ensureConnected()
+
+	macBytes, err := hex.DecodeString(mac)
+	if err != nil {
+		return err
+	}
+
 	createRequest := &pb.CreateBridgePortRequest{
 		BridgePort: &pb.BridgePort{
-			Name: fmt.Sprintf("%d-%d-%d-%s", pf, vf, vlan, mac),
+			Name: fmt.Sprintf("%d-%d", pf, vf),
 			Spec: &pb.BridgePortSpec{
 				Ptype:          1,
-				MacAddress:     []byte{},
-				LogicalBridges: []string{},
+				MacAddress:     macBytes,
+			    LogicalBridges: []string{
+					fmt.Sprintf("%d", vlan),
+				},
 			},
 		},
 	}
 
-	_, err := d.client.CreateBridgePort(context.TODO(), createRequest)
+	_, err = d.client.CreateBridgePort(context.TODO(), createRequest)
 	return err
 }
 
 func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) (error) {
 	d.ensureConnected()
 	req := &pb.DeleteBridgePortRequest{
-		    Name: fmt.Sprintf("%d-%d-%d-%s", pf, vf, vlan, mac),
+		Name: fmt.Sprintf("%d-%d-%d-%s", pf, vf, vlan, mac),
 	}
 
 	_, err := d.client.DeleteBridgePort(context.TODO(), req)
