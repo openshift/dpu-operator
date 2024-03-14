@@ -54,6 +54,7 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 		g.log.Error(err, "Failed to start serving")
 		return "", 0, err
 	}
+	g.log.Info("Successful call to Init", ipPort.Ip, ipPort.Port)
 
 	return ipPort.Ip, ipPort.Port, nil
 }
