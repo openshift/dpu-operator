@@ -46,13 +46,17 @@ type PodRequest struct {
 	// kubernetes pod UID
 	PodUID string
 	// kubernetes container ID
-	SandboxID string
+	ContainerId string
 	// kernel network namespace path
 	Netns string
 	// Interface name to be configured
 	IfName string
+	// Path to the CNI directory
+	Path string
 	// CNI conf obtained from stdin conf
 	CNIConf *NetConf
+	// Unparsed copy of the request
+	CNIReq *Request
 	// Timestamp when the request was started
 	Timestamp time.Time
 	// ctx is a context tracking this request's lifetime

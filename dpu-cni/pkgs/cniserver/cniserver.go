@@ -28,8 +28,8 @@ type processRequestFunc func(request *cnitypes.Request) (*cni100.Result, error)
 type Server struct {
 	http.Server
 	processRequest processRequestFunc
-	runDir string
-	socketPath string
+	runDir         string
+	socketPath     string
 }
 
 // ensureRunDirExists makes sure that the socket being created is only accessible to root.
@@ -92,6 +92,7 @@ func processRequest(request *cnitypes.Request) (*cni100.Result, error) {
 		return nil, err
 	}
 	defer req.Cancel()
+	defer cniRequestEnvCleanup()
 
 	var res *cni100.Result = nil
 	sm := sriov.NewSriovManager()
@@ -128,6 +129,26 @@ func gatherCNIArgs(env map[string]string) (map[string]string, error) {
 	return mapArgs, nil
 }
 
+// cniRequestSetEnv sets the CNI environment variables. This is needed when delegating IPAM plugins.
+// Please see vendor/github.com/containernetworking/cni/pkg/invoke/delegate.go:delegateCommon()
+func cniRequestSetEnv(req *cnitypes.PodRequest) {
+	os.Setenv("CNI_COMMAND", req.Command)
+	os.Setenv("CNI_CONTAINERID", req.ContainerId)
+	os.Setenv("CNI_NETNS", req.Netns)
+	os.Setenv("CNI_IFNAME", req.IfName)
+	os.Setenv("CNI_PATH", req.Path)
+}
+
+// cniRequestEnvCleanup cleans up the CNI environment variables once delegating IPAM plugins is done.
+func cniRequestEnvCleanup() {
+	os.Unsetenv("CNI_COMMAND")
+	os.Unsetenv("CNI_CONTAINERID")
+	os.Unsetenv("CNI_NETNS")
+	os.Unsetenv("CNI_IFNAME")
+	os.Unsetenv("CNI_PATH")
+}
+
+// cniRequestToPodRequest
 func cniRequestToPodRequest(cr *cnitypes.Request) (*cnitypes.PodRequest, error) {
 	cmd, ok := cr.Env["CNI_COMMAND"]
 	if !ok {
@@ -138,7 +159,7 @@ func cniRequestToPodRequest(cr *cnitypes.Request) (*cnitypes.PodRequest, error) 
 		Command: cmd,
 	}
 
-	req.SandboxID, ok = cr.Env["CNI_CONTAINERID"]
+	req.ContainerId, ok = cr.Env["CNI_CONTAINERID"]
 	if !ok {
 		return nil, fmt.Errorf("missing CNI_CONTAINERID")
 	}
@@ -153,10 +174,17 @@ func cniRequestToPodRequest(cr *cnitypes.Request) (*cnitypes.PodRequest, error) 
 		req.IfName = "eth0"
 	}
 
+	req.Path, ok = cr.Env["CNI_PATH"]
+	if !ok {
+		return nil, fmt.Errorf("missing CNI_PATH")
+	}
+
 	cniArgs, err := gatherCNIArgs(cr.Env)
 	if err != nil {
 		return nil, err
 	}
+
+	cniRequestSetEnv(req)
 
 	req.PodNamespace, ok = cniArgs["K8S_POD_NAMESPACE"]
 	if !ok {
@@ -199,6 +227,7 @@ func cniRequestToPodRequest(cr *cnitypes.Request) (*cnitypes.PodRequest, error) 
 
 	req.CNIConf = conf
 	req.DeviceInfo = cr.DeviceInfo
+	req.CNIReq = cr
 	req.Timestamp = time.Now()
 	// Match the Kubelet default CRI operation timeout of 2m
 	req.Ctx, req.Cancel = context.WithTimeout(context.Background(), 2*time.Minute)
@@ -276,8 +305,8 @@ func NewCNIServer(options ...func(*Server)) *Server {
 			Handler: router,
 		},
 		processRequest: processRequest,
-		runDir: cnitypes.ServerRunDir,
-		socketPath: cnitypes.ServerSocketPath,
+		runDir:         cnitypes.ServerRunDir,
+		socketPath:     cnitypes.ServerSocketPath,
 	}
 
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
