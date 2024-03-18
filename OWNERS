@@ -2,9 +2,11 @@ reviewers:
   - bn222
   - wizhaoredhat
   - SalDaniele
+  - vrindle
 approvers:
   - bn222
   - wizhaoredhat
   - SalDaniele
+  - vrindle
 component: "Networking"
 subcomponent: "DPU"
