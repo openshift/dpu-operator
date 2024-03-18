@@ -112,6 +112,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
+	setupLog.Info(os.Getenv("DPU_DAEMON_IMAGE"))
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
