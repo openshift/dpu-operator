@@ -1,13 +1,16 @@
 package sriov
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"k8s.io/klog/v2"
 
+	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
+	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovconfig"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovutils"
@@ -408,12 +411,71 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 
 	// run the IPAM plugin
 	if netConf.IPAM.Type != "" {
-		klog.Info("CmdAdd IPAM is not supported...")
+		var r types.Result
+		r, err = ipam.ExecAdd(netConf.IPAM.Type, req.CNIReq.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", netConf.IPAM.Type, netConf.Master, err)
+		}
+
+		defer func() {
+			if err != nil {
+				_ = ipam.ExecDel(netConf.IPAM.Type, req.CNIReq.Config)
+			}
+		}()
+
+		// Convert the IPAM result into the current Result type
+		var newResult *current.Result
+		newResult, err = current.NewResultFromResult(r)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(newResult.IPs) == 0 {
+			err = errors.New("IPAM plugin returned missing IP config")
+			return nil, err
+		}
+
+		newResult.Interfaces = result.Interfaces
+
+		for _, ipc := range newResult.IPs {
+			// All addresses apply to the container interface (move from host)
+			ipc.Interface = current.Int(0)
+		}
+
+		if !netConf.DPDKMode {
+			err = netns.Do(func(_ ns.NetNS) error {
+				err := ipam.ConfigureIface(req.IfName, newResult)
+				if err != nil {
+					return err
+				}
+
+				/* After IPAM configuration is done, the following needs to handle the case of an IP address being reused by a different pods.
+				 * This is achieved by sending Gratuitous ARPs and/or Unsolicited Neighbor Advertisements unconditionally.
+				 * Although we set arp_notify and ndisc_notify unconditionally on the interface (please see EnableArpAndNdiscNotify()), the kernel
+				 * only sends GARPs/Unsolicited NA when the interface goes from down to up, or when the link-layer address changes on the interfaces.
+				 * These scenarios are perfectly valid and recommended to be enabled for optimal network performance.
+				 * However for our specific case, which the kernel is unaware of, is the reuse of IP addresses across pods where each pod has a different
+				 * link-layer address for it's SRIOV interface. The ARP/Neighbor cache residing in neighbors would be invalid if an IP address is reused.
+				 * In order to update the cache, the GARP/Unsolicited NA packets should be sent for performance reasons. Otherwise, the neighbors
+				 * may be sending packets with the incorrect link-layer address. Eventually, most network stacks would send ARPs and/or Neighbor
+				 * Solicitation packets when the connection is unreachable. This would correct the invalid cache; however this may take a significant
+				 * amount of time to complete.
+				 *
+				 * The error is ignored here because enabling this feature is only a performance enhancement.
+				 */
+				_ = sriovutils.AnnounceIPs(req.IfName, newResult.IPs)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+		result = newResult
 	}
 
 	// Cache NetConf for CmdDel
 	klog.Infof("Cache NetConf for CmdDel %s %+v", sriovconfig.DefaultCNIDir, netConf)
-	if err = sriovutils.SaveNetConf(req.SandboxID, sriovconfig.DefaultCNIDir, req.IfName, netConf); err != nil {
+	if err = sriovutils.SaveNetConf(req.ContainerId, sriovconfig.DefaultCNIDir, req.IfName, netConf); err != nil {
 		return nil, fmt.Errorf("error saving NetConf %q", err)
 	}
 
@@ -430,7 +492,7 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 	klog.Info("CmdDel called")
 
-	netConf, cRefPath, err := sriovconfig.LoadConfFromCache(req.SandboxID, req.IfName)
+	netConf, cRefPath, err := sriovconfig.LoadConfFromCache(req.ContainerId, req.IfName)
 	if err != nil {
 		// If cmdDel() fails, cached netconf is cleaned up by
 		// the followed defer call. However, subsequence calls
@@ -450,7 +512,10 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 	}()
 
 	if netConf.IPAM.Type != "" {
-		klog.Info("CmdDel IPAM is not supported...")
+		err = ipam.ExecDel(netConf.IPAM.Type, req.CNIReq.Config)
+		if err != nil {
+			return err
+		}
 	}
 
 	// https://github.com/kubernetes/kubernetes/pull/35240
