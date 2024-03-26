@@ -69,7 +69,7 @@ func NewHostDaemon(vsp plugin.VendorPlugin) *HostDaemon {
 	return &HostDaemon{
 		vsp: vsp,
 		log: ctrl.Log.WithName("HostDaemon"),
-		cniServerPath: "/var/", // TODO
+		cniServerPath: cnitypes.ServerSocketPath,
 	}
 }
 
@@ -112,7 +112,7 @@ func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	sm := sriov.NewSriovManager()
 	res, err := sm.CmdAdd(req)
 	if err != nil {
-	    return nil, errors.New("SRIOV manager falied in add handler")
+		return nil, fmt.Errorf("SRIOV manager falied in add handler: %v", err)
 	}
 	return res, nil
 }

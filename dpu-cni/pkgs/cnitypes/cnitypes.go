@@ -10,9 +10,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-const ServerRunDir string = "/var/run/dpu-cni"
-const ServerSocketName string = "dpu-cni-server.sock"
-const ServerSocketPath string = ServerRunDir + "/" + ServerSocketName
+const ServerSocketPath string = "/var/run/dpu-daemon/dpu-cni/dpu-cni-server.sock"
 
 // Request sent to the Server by the DPU CNI plugin
 type Request struct {
