@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,6 +20,8 @@ const (
 type VendorPlugin interface {
 	Start() (string, int32, error)
 	Stop()
+	CreateBridgePort(bpr *opi.CreateBridgePortRequest) error
+	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
 }
 
 type DummyPlugin struct {
@@ -39,9 +42,18 @@ func (v *DummyPlugin) Stop() {
 
 }
 
+func (v *DummyPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
+	return nil
+}
+
+func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
+	return nil
+}
+
 type GrpcPlugin struct {
 	log     logr.Logger
 	client  pb.LifeCycleServiceClient
+	opiClient  opi.BridgePortServiceClient
 	dpuMode bool
 	conn    *grpc.ClientConn
 }
@@ -90,5 +102,17 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.conn = conn
 
 	g.client = pb.NewLifeCycleServiceClient(conn)
+	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	return nil
+}
+
+func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
+	g.ensureConnected()
+	_, err := g.opiClient.CreateBridgePort(context.TODO(), createRequest)
+	return err
+}
+func (g *GrpcPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
+	g.ensureConnected()
+	_, err := g.opiClient.DeleteBridgePort(context.TODO(), deleteRequest)
+	return err
 }
