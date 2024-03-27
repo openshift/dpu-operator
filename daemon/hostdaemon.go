@@ -107,13 +107,19 @@ func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.MAC
 	vlan := 7
-	d.CreateBridgePort(pf, vf, vlan, mac)
+	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
+	err := d.CreateBridgePort(pf, vf, vlan, mac)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to call CreateBridgePort: %v", err)
+	}
+	d.log.Info("addHandler CreateBridgePort succeeded")
 
 	sm := sriov.NewSriovManager()
 	res, err := sm.CmdAdd(req)
 	if err != nil {
 		return nil, fmt.Errorf("SRIOV manager falied in add handler: %v", err)
 	}
+	d.log.Info("addHandler sm.CmdAdd succeeded")
 	return res, nil
 }
 
@@ -122,6 +128,7 @@ func (d *HostDaemon) delHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.MAC
 	vlan := 7
+	d.log.Info("delHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
 	d.DeleteBridgePort(pf, vf, vlan, mac)
 
 	sm := sriov.NewSriovManager()
