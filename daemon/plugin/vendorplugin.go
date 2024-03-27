@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	VendorPluginDir        string = "/var/run/daemon"
+	VendorPluginDir        string = "/var/run/daemon/vendor-plugin"
 	VendorPluginSocketPath string = VendorPluginDir + "/vendor-plugin.sock"
 )
 
