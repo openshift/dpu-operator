@@ -68,10 +68,8 @@ var _ = g.Describe("Cniserver", func() {
 	tmpDir, err = utiltesting.MkTmpdir("cniserver")
 	defer os.RemoveAll(tmpDir)
 	o.Expect(err).NotTo(o.HaveOccurred())
-	serverSocketPath := filepath.Join(tmpDir, cnitypes.ServerSocketName)
-	cniServer := cniserver.NewCNIServer(
-		addHandler, delHandler,
-		cniserver.WithSocketPath(tmpDir, serverSocketPath))
+	serverSocketPath := filepath.Join(tmpDir, filepath.Base(cnitypes.ServerSocketPath))
+	cniServer := cniserver.NewCNIServer(addHandler, delHandler)
 	go utilwait.Forever(func() {
 		cniServer.Start()
 	}, 0)
