@@ -19,16 +19,17 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 
-	appsv1 "k8s.io/api/apps/v1"
-	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/render"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
@@ -40,6 +41,12 @@ type DpuOperatorConfigReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=roles,resources=*,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=anyuid;hostnetwork;privileged,verbs=use
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -80,7 +87,13 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Cont
 	// All the CRs will be in the same namespace as the operator config
 	data.Data["Namespace"] = cfg.Namespace
 	data.Data["Mode"] = cfg.Spec.Mode
-	data.Data["DpuOperatorDaemonImage"] = "quay.io/bnemeth/dpu-operator-daemon"
+	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
+	if dpuDaemonImage != "" {
+		data.Data["DpuOperatorDaemonImage"] = dpuDaemonImage
+	} else {
+		data.Data["DpuOperatorDaemonImage"] = "quay.io/bnemeth/dpu-operator-daemon"
+	}
+
 
 	objs, err := render.RenderDir("./bindata/daemon", &data)
 	if err != nil {

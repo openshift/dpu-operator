@@ -8,30 +8,33 @@ import (
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnihelper"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 
 	current "github.com/containernetworking/cni/pkg/types/100"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/klog/v2"
 )
 
-func processRequest(request *cnitypes.Request) (*current.Result, error) {
-	// FIXME: Do actual work here.
-	klog.Infof("DEBUG: %v", request)
-
-	conf, err := cnihelper.ReadCNIConfig(request.Config)
-	if err != nil {
-		return nil, err
+func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
+	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
+	cmdArgs := &skel.CmdArgs{
+		ContainerID: "fakecontainerid",
+		Netns:       "fakenetns",
+		IfName:      "fakeeth0",
+		Args:        "",
+		Path:        "fakepath",
+		StdinData:   []byte(cniConfig),
 	}
+	os.Clearenv()
+	os.Setenv("CNI_COMMAND", command)
+	os.Setenv("CNI_ARGS", "K8S_POD_NAMESPACE=x;K8S_POD_NAME=y;K8S_POD_UID=z")
+	os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
+	os.Setenv("CNI_NETNS", cmdArgs.Netns)
+	os.Setenv("CNI_IFNAME", cmdArgs.IfName)
+	os.Setenv("CNI_PATH", cmdArgs.Path)
 
-	result := &current.Result{
-		CNIVersion: conf.CNIVersion,
-	}
-
-	return result, nil
+	return cmdArgs
 }
 
 var _ = g.Describe("Cniserver", func() {
@@ -39,14 +42,34 @@ var _ = g.Describe("Cniserver", func() {
 	var plugin *cni.Plugin
 
 	var err error
+	var addHandlerCalled bool = false
+	var delHandlerCalled bool = false
+
+	addHandler := func(request *cnitypes.PodRequest) (*current.Result, error) {
+		result := &current.Result{
+			CNIVersion: request.CNIConf.CNIVersion,
+		}
+
+		addHandlerCalled = true
+
+		return result, nil
+	}
+
+	delHandler := func(request *cnitypes.PodRequest) (*current.Result, error) {
+		result := &current.Result{
+			CNIVersion: request.CNIConf.CNIVersion,
+		}
+
+		delHandlerCalled = true
+		return result, nil
+	}
+
 	// Create a tmp directory in the test container
 	tmpDir, err = utiltesting.MkTmpdir("cniserver")
 	defer os.RemoveAll(tmpDir)
 	o.Expect(err).NotTo(o.HaveOccurred())
-	serverSocketPath := filepath.Join(tmpDir, cnitypes.ServerSocketName)
-	cniServer := cniserver.NewCNIServer(
-		cniserver.WithHandler(processRequest),
-		cniserver.WithSocketPath(tmpDir, serverSocketPath))
+	serverSocketPath := filepath.Join(tmpDir, filepath.Base(cnitypes.ServerSocketPath))
+	cniServer := cniserver.NewCNIServer(addHandler, delHandler)
 	go utilwait.Forever(func() {
 		cniServer.Start()
 	}, 0)
@@ -56,29 +79,30 @@ var _ = g.Describe("Cniserver", func() {
 	g.Context("CNI Server APIs", func() {
 		g.When("Normal ADD request", func() {
 			cniVersion := "0.4.0"
-			cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
-			cmdArgs := &skel.CmdArgs{
-				ContainerID: "fakecontainerid",
-				Netns:       "fakenetns",
-				IfName:      "fakeeth0",
-				Args:        "",
-				Path:        "fakepath",
-				StdinData:   []byte(cniConfig),
-			}
 			expectedResult := &current.Result{
 				CNIVersion: cniVersion,
 			}
-			os.Setenv("CNI_COMMAND", "ADD")
-			os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
-			os.Setenv("CNI_NETNS", cmdArgs.Netns)
-			os.Setenv("CNI_IFNAME", cmdArgs.IfName)
-			os.Setenv("CNI_PATH", cmdArgs.Path)
 			g.It("should get a correct response from the post request", func() {
-				resp, ver, err := plugin.PostRequest(cmdArgs)
+				resp, ver, err := plugin.PostRequest(PrepArgs(cniVersion, "ADD"))
 				o.Expect(err).NotTo(o.HaveOccurred())
 				o.Expect(ver).To(o.Equal(cniVersion))
 				o.Expect(resp.Result).To(o.Equal(expectedResult))
 			})
+			g.It("should call add handler when passing in ADD", func() {
+				addHandlerCalled = false
+				delHandlerCalled = false
+				plugin.PostRequest(PrepArgs(cniVersion, "ADD"))
+				o.Expect(addHandlerCalled).To(o.Equal(true))
+				o.Expect(delHandlerCalled).To(o.Equal(false))
+			})
+			g.It("should call add handler when passing in DEL", func() {
+				addHandlerCalled = false
+				delHandlerCalled = false
+				plugin.PostRequest(PrepArgs(cniVersion, "DEL"))
+				o.Expect(addHandlerCalled).To(o.Equal(false))
+				o.Expect(delHandlerCalled).To(o.Equal(true))
+			})
+
 		})
 	})
 })

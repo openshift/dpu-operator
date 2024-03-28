@@ -3,50 +3,57 @@ package plugin
 import (
 	"context"
 	"net"
-	"runtime"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
-	VendorPluginDir        string = "/var/run/daemon"
+	VendorPluginDir        string = "/var/run/daemon/vendor-plugin"
 	VendorPluginSocketPath string = VendorPluginDir + "/vendor-plugin.sock"
 )
 
 type VendorPlugin interface {
 	Start() (string, int32, error)
 	Stop()
+	CreateBridgePort(bpr *opi.CreateBridgePortRequest) error
+	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
 }
 
 type DummyPlugin struct {
 	log logr.Logger
 }
 
-func NewDummyPlugin(isDpuMode bool) *DummyPlugin {
+func NewDummyPlugin() *DummyPlugin {
 	return &DummyPlugin{
 		log: ctrl.Log.WithName("VSP"),
 	}
 }
 
-func (v *DummyPlugin) Start() (string, string) {
-	if runtime.GOARCH == "amd64" {
-		return "127.0.0.1", "50051"
-	} else {
-		return "127.0.0.1", "50051"
-	}
+func (v *DummyPlugin) Start() (string, int32, error) {
+	return "127.0.0.1", 50051, nil
 }
 
 func (v *DummyPlugin) Stop() {
 
 }
 
+func (v *DummyPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
+	return nil
+}
+
+func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
+	return nil
+}
+
 type GrpcPlugin struct {
 	log     logr.Logger
 	client  pb.LifeCycleServiceClient
+	opiClient  opi.BridgePortServiceClient
 	dpuMode bool
 	conn    *grpc.ClientConn
 }
@@ -59,6 +66,7 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 		g.log.Error(err, "Failed to start serving")
 		return "", 0, err
 	}
+	g.log.Info("Successful call to Init", ipPort.Ip, ipPort.Port)
 
 	return ipPort.Ip, ipPort.Port, nil
 }
@@ -94,5 +102,17 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.conn = conn
 
 	g.client = pb.NewLifeCycleServiceClient(conn)
+	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	return nil
+}
+
+func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
+	g.ensureConnected()
+	_, err := g.opiClient.CreateBridgePort(context.TODO(), createRequest)
+	return err
+}
+func (g *GrpcPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
+	g.ensureConnected()
+	_, err := g.opiClient.DeleteBridgePort(context.TODO(), deleteRequest)
+	return err
 }

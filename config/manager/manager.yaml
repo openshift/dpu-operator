@@ -70,6 +70,10 @@ spec:
         - /manager
         args:
         - --leader-elect
+        env:
+        - name: DPU_DAEMON_IMAGE
+          value: wsfd-advnetlab218.anl.eng.bos2.dc.redhat.com:5000/dpu-daemon:002-dev
+        imagePullPolicy: Always
         image: controller:latest
         name: manager
         securityContext:
