@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -66,17 +67,17 @@ func ensureRunDirExists(runDir string, socketPath string) error {
 	return nil
 }
 
-// getListener creates a listener to a unix socket located in `socketPath`
-func getListener(runDir string, serverSocketPath string) (net.Listener, error) {
-	err := ensureRunDirExists(runDir, serverSocketPath)
+// Listen creates a listener to a unix socket located in `socketPath`
+func (s *Server) Listen() (net.Listener, error) {
+	err := ensureRunDirExists(s.runDir, s.socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run directory for DPU CNI socket: %v", err)
 	}
-	listener, err := net.Listen("unix", serverSocketPath)
+	listener, err := net.Listen("unix", filepath.Join(s.runDir, s.socketPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on DPU CNI socket: %v", err)
 	}
-	if err := os.Chmod(serverSocketPath, 0o600); err != nil {
+	if err := os.Chmod(filepath.Join(s.runDir, s.socketPath), 0o600); err != nil {
 		_ = listener.Close()
 		return nil, fmt.Errorf("failed to set file permissions on DPU CNI socket: %v", err)
 	}
@@ -281,9 +282,9 @@ func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // Start starts the server and begins serving on the given listener
-func (s *Server) Start() error {
+func (s *Server) ListenAndServe() error {
 	klog.Infof("Starting DPU CNI Server")
-	listener, err := getListener(s.runDir, s.socketPath)
+	listener, err := s.Listen()
 	if err != nil {
 		klog.Errorf("Failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
 	}
