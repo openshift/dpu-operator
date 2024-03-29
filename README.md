@@ -3,7 +3,7 @@
 This operator will manage and configure data processing unit (DPUs) to be used in accelerating/offloading k8s networking functions
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+// TODO(user): An in-depth paragraph about your project and overview of use.
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
