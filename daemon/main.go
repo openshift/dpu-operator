@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"flag"
+	"io"
+	"os"
 
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"go.uber.org/zap/zapcore"
@@ -36,6 +38,31 @@ func createDaemon(dpuMode bool) (Daemon, error) {
 	}
 }
 
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destinationFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
+
+	_, err = io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyCNI() error {
+	return copyFile("/dpu-cni", "/opt/cni/bin/dpu-cni")
+}
+
 func main() {
 	var mode string
 	var err error
@@ -51,6 +78,12 @@ func main() {
 
 	log := ctrl.Log.WithName("Daemon Init")
 	log.Info("Daemon init")
+
+	err = copyCNI()
+	if err != nil {
+		log.Error(err, "Failed to copy CNI")
+		return
+	}
 
 	dpuMode, err = isDpuMode(mode)
 	if err != nil {
