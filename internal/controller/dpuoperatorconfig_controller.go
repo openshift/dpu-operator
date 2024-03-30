@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -76,17 +77,29 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
+func getImagePullPolicy() string {
+	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
+		return value
+	}
+	return "IfNotPresent"
+}
+
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
-	logger := log.FromContext(ctx)
-	logger.Info("Ensuring that DPU DaemonSet is runinng")
 	var err error
 
+	logger := log.FromContext(ctx)
 	data := render.MakeRenderData()
 	// All the CRs will be in the same namespace as the operator config
 	data.Data["Namespace"] = cfg.Namespace
 	data.Data["Mode"] = cfg.Spec.Mode
-	data.Data["DpuOperatorDaemonImage"] = "quay.io/bnemeth/dpu-operator-daemon"
+	data.Data["ImagePullPolicy"] = getImagePullPolicy()
+	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
+	if dpuDaemonImage == "" {
+		return fmt.Errorf("DPU_DAEMON_IMAGE not set")
+	}
+	data.Data["DpuOperatorDaemonImage"] = dpuDaemonImage
 
+	logger.Info("Ensuring that DPU DaemonSet is running", "image", dpuDaemonImage)
 	objs, err := render.RenderDir("./bindata/daemon", &data)
 	if err != nil {
 		logger.Error(err, "Failed to render dpu daemon manifests")
