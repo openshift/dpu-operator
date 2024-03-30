@@ -21,28 +21,6 @@ type VendorPlugin interface {
 	Stop()
 }
 
-type DummyPlugin struct {
-	log logr.Logger
-}
-
-func NewDummyPlugin(isDpuMode bool) *DummyPlugin {
-	return &DummyPlugin{
-		log: ctrl.Log.WithName("VSP"),
-	}
-}
-
-func (v *DummyPlugin) Start() (string, string) {
-	if runtime.GOARCH == "amd64" {
-		return "127.0.0.1", "50051"
-	} else {
-		return "127.0.0.1", "50051"
-	}
-}
-
-func (v *DummyPlugin) Stop() {
-
-}
-
 type GrpcPlugin struct {
 	log     logr.Logger
 	client  pb.LifeCycleServiceClient
