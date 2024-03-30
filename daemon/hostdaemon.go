@@ -24,7 +24,7 @@ type HostDaemon struct {
 	cniServerPath string
 }
 
-func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) error {
+func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) (*pb.BridgePort, error) {
 	d.connectWithRetry()
 	createRequest := &pb.CreateBridgePortRequest{
 		BridgePort: &pb.BridgePort{
@@ -37,8 +37,7 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) error {
 		},
 	}
 
-	_, err := d.client.CreateBridgePort(context.TODO(), createRequest)
-	return err
+	return d.client.CreateBridgePort(context.TODO(), createRequest)
 }
 
 func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int) error {
