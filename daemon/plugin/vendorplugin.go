@@ -3,7 +3,6 @@ package plugin
 import (
 	"context"
 	"net"
-	"runtime"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
@@ -13,8 +12,8 @@ import (
 )
 
 const (
-	VendorPluginDir        string = "/var/run/daemon"
-	VendorPluginSocketPath string = VendorPluginDir + "/vendor-plugin.sock"
+	DaemonBaseDir          string = "/var/run/daemon/"
+	VendorPluginSocketPath string = DaemonBaseDir + "vendor-plugin/vendor-plugin.sock"
 )
 
 type VendorPlugin interface {
