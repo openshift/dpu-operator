@@ -1,7 +1,9 @@
 package main
 
 import (
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"k8s.io/klog/v2"
 )
 
@@ -10,7 +12,8 @@ import (
 
 // FIXME: This will disappear in the near future
 func main() {
-	err := cniserver.NewCNIServer().ListenAndServe()
+	f := func(request *cnitypes.PodRequest) (*cni100.Result, error) { return nil, nil }
+	err := cniserver.NewCNIServer(f, f).ListenAndServe()
 	if err != nil {
 		klog.Errorf("DPU CNI server Serve() failed: %v", err)
 	}
