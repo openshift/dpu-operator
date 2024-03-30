@@ -25,12 +25,13 @@ import (
 // This server implementations is only temporary for testing when the DPU Daemon
 // code has not been implemented.
 
-type processRequestFunc func(request *cnitypes.Request) (*cni100.Result, error)
+type processRequestFunc func(request *cnitypes.PodRequest) (*cni100.Result, error)
 type Server struct {
 	http.Server
-	processRequest processRequestFunc
-	runDir         string
-	socketPath     string
+	addHandler processRequestFunc
+	delHandler processRequestFunc
+	runDir     string
+	socketPath string
 }
 
 // ensureRunDirExists makes sure that the socket being created is only accessible to root.
@@ -251,14 +252,23 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	result, err := s.processRequest(&cniRq)
+	req, err := cniRequestToPodRequest(&cniRq)
+	if err != nil {
+		return nil, err
+	}
+	defer req.Cancel()
+
+	var result *cni100.Result = nil
+	if req.Command == cnitypes.CNIAdd {
+		result, err = s.addHandler(req)
+	} else if req.Command == cnitypes.CNIDel {
+		result, err = s.delHandler(req)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	response := &cnitypes.Response{}
-	response.Result = result
-
+	response := &cnitypes.Response{Result: result}
 	return json.Marshal(&response)
 }
 
@@ -301,15 +311,16 @@ func (s *Server) ListenAndServe() error {
 }
 
 // NewCNIServer creates a new HTTP router instances to handle the CNI server requests.
-func NewCNIServer(options ...func(*Server)) *Server {
+func NewCNIServer(addHandler processRequestFunc, delHandler processRequestFunc, options ...func(*Server)) *Server {
 	klog.Infof("DPU CNI Server creating new router.")
 	router := mux.NewRouter()
 	s := &Server{
 		Server: http.Server{
 			Handler: router,
 		},
-		processRequest: processRequest,
-		socketPath:     cnitypes.ServerSocketPath,
+		addHandler: addHandler,
+		delHandler: delHandler,
+		socketPath: cnitypes.ServerSocketPath,
 	}
 
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
@@ -320,12 +331,6 @@ func NewCNIServer(options ...func(*Server)) *Server {
 	}
 
 	return s
-}
-
-func WithHandler(rqFunc processRequestFunc) func(*Server) {
-	return func(s *Server) {
-		s.processRequest = rqFunc
-	}
 }
 
 func WithSocketPath(socketPath string) func(*Server) {
