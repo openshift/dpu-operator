@@ -265,6 +265,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 		result, err = s.cniCmdDelHandler(req)
 	}
 	if err != nil {
+		klog.Errorf("Error occured in handler: %v", err)
 		return nil, err
 	}
 
