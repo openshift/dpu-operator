@@ -17,6 +17,11 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const (
+	// TODO: Some vendors have issues with Host VLANs, thus disable the feature for now
+	host_vlans = false
+)
+
 type pciUtils interface {
 	GetSriovNumVfs(ifName string) (int, error)
 	GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
@@ -198,8 +203,10 @@ func (s *sriovManager) ApplyVFConfig(conf *cnitypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 	// 1. Set vlan
-	if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, cnitypes.VlanProtoInt[*conf.VlanProto]); err != nil {
-		return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
+	if host_vlans {
+		if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, cnitypes.VlanProtoInt[*conf.VlanProto]); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
+		}
 	}
 
 	// 2. Set mac address
@@ -297,13 +304,15 @@ func (s *sriovManager) ResetVFConfig(conf *cnitypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
-	// Set 802.1q as default in case cache config does not have a value for vlan proto.
-	if conf.OrigVfState.VlanProto == 0 {
-		conf.OrigVfState.VlanProto = cnitypes.VlanProtoInt[cnitypes.Proto8021q]
-	}
+	if host_vlans {
+		// Set 802.1q as default in case cache config does not have a value for vlan proto.
+		if conf.OrigVfState.VlanProto == 0 {
+			conf.OrigVfState.VlanProto = cnitypes.VlanProtoInt[cnitypes.Proto8021q]
+		}
 
-	if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto); err != nil {
-		return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %d: %v", conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto, err)
+		if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %d: %v", conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto, err)
+		}
 	}
 
 	// Restore spoofchk
@@ -371,10 +380,11 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 	}
 	defer netns.Close()
 
-	err = sm.FillOriginalVfInfo(netConf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get original vf information: %v", err)
-	}
+	// TODO: Some vendors have issues with Netlink, thus disable the feature for now
+	// err = sm.FillOriginalVfInfo(netConf)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get original vf information: %v", err)
+	// }
 	defer func() {
 		if err != nil {
 			err := netns.Do(func(_ ns.NetNS) error {
