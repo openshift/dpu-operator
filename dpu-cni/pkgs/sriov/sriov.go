@@ -198,9 +198,9 @@ func (s *sriovManager) ApplyVFConfig(conf *cnitypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 	// 1. Set vlan
-	if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, cnitypes.VlanProtoInt[*conf.VlanProto]); err != nil {
-		return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
-	}
+	// if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, cnitypes.VlanProtoInt[*conf.VlanProto]); err != nil {
+	// 	return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
+	// }
 
 	// 2. Set mac address
 	if conf.MAC != "" {
@@ -298,13 +298,13 @@ func (s *sriovManager) ResetVFConfig(conf *cnitypes.NetConf) error {
 	}
 
 	// Set 802.1q as default in case cache config does not have a value for vlan proto.
-	if conf.OrigVfState.VlanProto == 0 {
-		conf.OrigVfState.VlanProto = cnitypes.VlanProtoInt[cnitypes.Proto8021q]
-	}
+	// if conf.OrigVfState.VlanProto == 0 {
+	// 	conf.OrigVfState.VlanProto = cnitypes.VlanProtoInt[cnitypes.Proto8021q]
+	// }
 
-	if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto); err != nil {
-		return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %d: %v", conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto, err)
-	}
+	// if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto); err != nil {
+	// 	return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %d: %v", conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto, err)
+	// }
 
 	// Restore spoofchk
 	if conf.SpoofChk != "" {
@@ -371,10 +371,10 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 	}
 	defer netns.Close()
 
-	err = sm.FillOriginalVfInfo(netConf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get original vf information: %v", err)
-	}
+	// err = sm.FillOriginalVfInfo(netConf)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get original vf information: %v", err)
+	// }
 	defer func() {
 		if err != nil {
 			err := netns.Do(func(_ ns.NetNS) error {
