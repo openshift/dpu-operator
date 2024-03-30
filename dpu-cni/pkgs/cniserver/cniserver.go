@@ -34,8 +34,10 @@ type Server struct {
 }
 
 // ensureRunDirExists makes sure that the socket being created is only accessible to root.
-func ensureRunDirExists(runDir string, socketPath string) error {
+func ensureRunDirExists(serverSocketPath string) error {
+	runDir := filepath.Dir(serverSocketPath)
 	// Remove and re-create the socket directory with root-only permissions
+	klog.Infof("Removing %v", runDir)
 	if err := os.RemoveAll(runDir); err != nil && !os.IsNotExist(err) {
 		info, err := os.Stat(runDir)
 		if err != nil {
@@ -55,12 +57,12 @@ func ensureRunDirExists(runDir string, socketPath string) error {
 		if info.Mode()&0o777 != 0o700 {
 			return fmt.Errorf("insecure permissions on pod info socket directory %s: %v", runDir, info.Mode())
 		}
-
 		// Finally remove the socket file so we can re-create it
-		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove old pod info socket %s: %v", socketPath, err)
+		if err := os.Remove(serverSocketPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove old pod info socket %s: %v", serverSocketPath, err)
 		}
 	}
+	klog.Infof("Creating %v", runDir)
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create pod info socket directory %s: %v", runDir, err)
 	}
@@ -69,7 +71,7 @@ func ensureRunDirExists(runDir string, socketPath string) error {
 
 // Listen creates a listener to a unix socket located in `socketPath`
 func (s *Server) Listen() (net.Listener, error) {
-	err := ensureRunDirExists(s.runDir, s.socketPath)
+	err := ensureRunDirExists(s.socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run directory for DPU CNI socket: %v", err)
 	}
@@ -77,7 +79,8 @@ func (s *Server) Listen() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on DPU CNI socket: %v", err)
 	}
-	if err := os.Chmod(filepath.Join(s.runDir, s.socketPath), 0o600); err != nil {
+	klog.Info("Listen on socket path: ", s.socketPath)
+	if err := os.Chmod(s.socketPath, 0o600); err != nil {
 		_ = listener.Close()
 		return nil, fmt.Errorf("failed to set file permissions on DPU CNI socket: %v", err)
 	}
@@ -306,7 +309,6 @@ func NewCNIServer(options ...func(*Server)) *Server {
 			Handler: router,
 		},
 		processRequest: processRequest,
-		runDir:         cnitypes.ServerRunDir,
 		socketPath:     cnitypes.ServerSocketPath,
 	}
 
@@ -326,9 +328,8 @@ func WithHandler(rqFunc processRequestFunc) func(*Server) {
 	}
 }
 
-func WithSocketPath(runDir string, socketPath string) func(*Server) {
+func WithSocketPath(socketPath string) func(*Server) {
 	return func(s *Server) {
-		s.runDir = runDir
 		s.socketPath = socketPath
 	}
 }

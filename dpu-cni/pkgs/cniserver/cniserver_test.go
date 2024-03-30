@@ -71,10 +71,10 @@ var _ = g.Describe("Cniserver", func() {
 			tmpDir, err = utiltesting.MkTmpdir("cniserver")
 			o.Expect(err).NotTo(o.HaveOccurred())
 
-			serverSocketPath = filepath.Join(tmpDir, cnitypes.ServerSocketName)
+			serverSocketPath = filepath.Join(tmpDir, filepath.Base(cnitypes.ServerSocketPath))
 			cniServer = cniserver.NewCNIServer(
 				cniserver.WithHandler(processRequest),
-				cniserver.WithSocketPath(tmpDir, cnitypes.ServerSocketName))
+				cniserver.WithSocketPath(serverSocketPath))
 
 			listener, err = cniServer.Listen()
 			o.Expect(err).NotTo(o.HaveOccurred())
