@@ -11,8 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var (
-)
+var ()
 
 type Daemon interface {
 	Start()

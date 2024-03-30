@@ -13,13 +13,13 @@ import (
 )
 
 type HostDaemon struct {
-	dev bool
-	log logr.Logger
+	dev    bool
+	log    logr.Logger
 	client pb.BridgePortServiceClient
-	vsp plugin.VendorPlugin
+	vsp    plugin.VendorPlugin
 }
 
-func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) (error) {
+func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) error {
 	createRequest := &pb.CreateBridgePortRequest{
 		BridgePort: &pb.BridgePort{
 			Name: fmt.Sprintf("%d-%d-%d", pf, vf, vlan),
@@ -35,9 +35,9 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) (error) {
 	return err
 }
 
-func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int) (error) {
+func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int) error {
 	req := &pb.DeleteBridgePortRequest{
-		    Name: fmt.Sprintf("%d-%d-%d", pf, vf, vlan),
+		Name: fmt.Sprintf("%d-%d-%d", pf, vf, vlan),
 	}
 
 	_, err := d.client.DeleteBridgePort(context.TODO(), req)
@@ -58,14 +58,14 @@ func (d *HostDaemon) Start() {
 	if err != nil {
 		d.log.Error(err, "VSP init returned error")
 	}
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", addr , port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", addr, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		d.log.Error(err, "did not connect")
 	}
 	defer conn.Close()
 	d.client = pb.NewBridgePortServiceClient(conn)
 
-	// TODO: replace this indefinte wait with a service that 
+	// TODO: replace this indefinte wait with a service that
 	// listens to requests coming from the cni shim
 	select {}
 }

@@ -53,4 +53,3 @@ func (d *DpuDaemon) Start() {
 		d.log.Error(err, "Failed to start serving")
 	}
 }
-

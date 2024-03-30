@@ -32,72 +32,71 @@ func processRequest(request *cnitypes.Request) (*current.Result, error) {
 		CNIVersion: conf.CNIVersion,
 	}
 
-    return result, nil
+	return result, nil
 }
 
 var _ = g.Describe("Cniserver", func() {
-    var (
-        tmpDir        string
-        plugin        *cni.Plugin
-        cniServer     *cniserver.Server
-        serverSocketPath string
-        listener      net.Listener
-    )
+	var (
+		tmpDir           string
+		plugin           *cni.Plugin
+		cniServer        *cniserver.Server
+		serverSocketPath string
+		listener         net.Listener
+	)
 
-    g.Context("CNI Server APIs", func() {
-        g.BeforeEach(func() {
-            var err error
-            // Create a tmp directory in the test container
-            tmpDir, err = utiltesting.MkTmpdir("cniserver")
-            o.Expect(err).NotTo(o.HaveOccurred())
+	g.Context("CNI Server APIs", func() {
+		g.BeforeEach(func() {
+			var err error
+			// Create a tmp directory in the test container
+			tmpDir, err = utiltesting.MkTmpdir("cniserver")
+			o.Expect(err).NotTo(o.HaveOccurred())
 
-            serverSocketPath = filepath.Join(tmpDir, cnitypes.ServerSocketName)
-            cniServer = cniserver.NewCNIServer(
-                cniserver.WithHandler(processRequest),
-                cniserver.WithSocketPath(tmpDir, cnitypes.ServerSocketName))
+			serverSocketPath = filepath.Join(tmpDir, cnitypes.ServerSocketName)
+			cniServer = cniserver.NewCNIServer(
+				cniserver.WithHandler(processRequest),
+				cniserver.WithSocketPath(tmpDir, cnitypes.ServerSocketName))
 
-            listener, err = cniServer.Listen()
-            o.Expect(err).NotTo(o.HaveOccurred())
+			listener, err = cniServer.Listen()
+			o.Expect(err).NotTo(o.HaveOccurred())
 
-            go utilwait.Forever(func() {
-                cniServer.Serve(listener)
-            }, 0)
+			go utilwait.Forever(func() {
+				cniServer.Serve(listener)
+			}, 0)
 
-            plugin = &cni.Plugin{SocketPath: serverSocketPath}
-        })
+			plugin = &cni.Plugin{SocketPath: serverSocketPath}
+		})
 
-        g.AfterEach(func() {
-            listener.Close()
-            os.RemoveAll(tmpDir)
-        })
+		g.AfterEach(func() {
+			listener.Close()
+			os.RemoveAll(tmpDir)
+		})
 
+		g.When("Normal ADD request", func() {
+			cniVersion := "0.4.0"
+			cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
+			cmdArgs := &skel.CmdArgs{
+				ContainerID: "fakecontainerid",
+				Netns:       "fakenetns",
+				IfName:      "fakeeth0",
+				Args:        "",
+				Path:        "fakepath",
+				StdinData:   []byte(cniConfig),
+			}
+			expectedResult := &current.Result{
+				CNIVersion: cniVersion,
+			}
+			os.Setenv("CNI_COMMAND", "ADD")
+			os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
+			os.Setenv("CNI_NETNS", cmdArgs.Netns)
+			os.Setenv("CNI_IFNAME", cmdArgs.IfName)
+			os.Setenv("CNI_PATH", cmdArgs.Path)
 
-        g.When("Normal ADD request", func() {
-            cniVersion := "0.4.0"
-            cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
-            cmdArgs := &skel.CmdArgs{
-                ContainerID: "fakecontainerid",
-                Netns:       "fakenetns",
-                IfName:      "fakeeth0",
-                Args:        "",
-                Path:        "fakepath",
-                StdinData:   []byte(cniConfig),
-            }
-            expectedResult := &current.Result{
-                CNIVersion: cniVersion,
-            }
-            os.Setenv("CNI_COMMAND", "ADD")
-            os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
-            os.Setenv("CNI_NETNS", cmdArgs.Netns)
-            os.Setenv("CNI_IFNAME", cmdArgs.IfName)
-            os.Setenv("CNI_PATH", cmdArgs.Path)
-
-            g.It("should get a correct response from the post request", func() {
-                resp, ver, err := plugin.PostRequest(cmdArgs)
-                o.Expect(err).NotTo(o.HaveOccurred())
-                o.Expect(ver).To(o.Equal(cniVersion))
-                o.Expect(resp.Result).To(o.Equal(expectedResult))
-            })
-        })
-    })
+			g.It("should get a correct response from the post request", func() {
+				resp, ver, err := plugin.PostRequest(cmdArgs)
+				o.Expect(err).NotTo(o.HaveOccurred())
+				o.Expect(ver).To(o.Equal(cniVersion))
+				o.Expect(resp.Result).To(o.Equal(expectedResult))
+			})
+		})
+	})
 })
