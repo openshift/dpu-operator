@@ -21,13 +21,13 @@ type DpuDaemon struct {
 }
 
 func (s *DpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
-	s.log.Info("Create Bridge Port", "req", bpr.BridgePort.Name)
-	return &pb.BridgePort{}, nil
+	err := s.vsp.CreateBridgePort(bpr)
+	return nil, err
 }
 
 func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBridgePortRequest) (*emptypb.Empty, error) {
-	s.log.Info("Delete Bridge Port", "req", bpr.Name)
-	return nil, nil
+	err := s.vsp.DeleteBridgePort(bpr)
+	return nil, err
 }
 
 func NewDpuDaemon(vsp plugin.VendorPlugin) *DpuDaemon {

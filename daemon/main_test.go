@@ -29,6 +29,14 @@ func (v *DummyPlugin) Stop() {
 
 }
 
+func (v *DummyPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
+	return nil
+}
+
+func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
+	return nil
+}
+
 var _ = g.BeforeSuite(func() {
 	opts := zap.Options{
 		Development: true,
