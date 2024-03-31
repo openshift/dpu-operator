@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/openshift/dpu-operator/daemon/plugin"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -13,13 +14,14 @@ import (
 )
 
 type HostDaemon struct {
-	dev    bool
-	log    logr.Logger
-	conn   *grpc.ClientConn
-	client pb.BridgePortServiceClient
-	vsp    plugin.VendorPlugin
-	addr   string
-	port   int32
+	dev           bool
+	log           logr.Logger
+	conn          *grpc.ClientConn
+	client        pb.BridgePortServiceClient
+	vsp           plugin.VendorPlugin
+	addr          string
+	port          int32
+	cniServerPath string
 }
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int) error {
@@ -51,8 +53,9 @@ func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int) error {
 
 func NewHostDaemon(vsp plugin.VendorPlugin) *HostDaemon {
 	return &HostDaemon{
-		vsp: vsp,
-		log: ctrl.Log.WithName("HostDaemon"),
+		vsp:           vsp,
+		log:           ctrl.Log.WithName("HostDaemon"),
+		cniServerPath: cnitypes.ServerSocketPath,
 	}
 }
 
