@@ -77,11 +77,21 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
+<<<<<<< HEAD
 func getImagePullPolicy() string {
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		return value
 	}
 	return "IfNotPresent"
+=======
+
+func getImagePullPolicy() string {
+	if os.Getenv("IMAGE_PULL_POLICIES") == "" {
+		return "IfNotPresent"
+	} else {
+		return "Always"
+	}
+>>>>>>> 75ea6b1 (add make local-deploy)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {

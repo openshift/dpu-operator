@@ -19,8 +19,15 @@ spec:
         name: manager
         env:
         - name: DPU_DAEMON_IMAGE
+<<<<<<< HEAD
           value: localhost:5000/dpu-daemon:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
         image: localhost:5000/dpu-operator:dev
+=======
+          value: localhost:5000/dpu-daemon
+        - name: IMAGE_PULL_POLICIES
+          value: Always
+        image: localhost:5000/dpu-operator
+>>>>>>> 75ea6b1 (add make local-deploy)
         imagePullPolicy: Always
