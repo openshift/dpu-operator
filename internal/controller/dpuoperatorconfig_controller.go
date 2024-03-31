@@ -20,15 +20,15 @@ import (
 	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
-	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/render"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
@@ -75,7 +75,6 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	return ctrl.Result{}, nil
 }
-
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
