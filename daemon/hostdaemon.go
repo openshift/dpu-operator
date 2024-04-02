@@ -5,12 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
 	"github.com/openshift/dpu-operator/daemon/plugin"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
@@ -169,5 +170,10 @@ func (d *HostDaemon) Start() {
 }
 
 func (d *HostDaemon) Stop() {
-
+	if d.cniserver != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 1* time.Minute)
+		defer cancel()
+		d.cniserver.Shutdown(ctx)
+		d.cniserver = nil
+	}
 }
