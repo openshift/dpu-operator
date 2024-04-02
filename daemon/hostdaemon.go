@@ -122,7 +122,7 @@ func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	sm := sriov.NewSriovManager()
 	res, err := sm.CmdAdd(req)
 	if err != nil {
-		return nil, errors.New("SRIOV manager falied in add handler")
+		return nil, errors.New("SRIOV manager failed in add handler")
 	}
 	d.log.Info("addHandler sm.CmdAdd succeeded")
 	return res, nil
@@ -139,7 +139,7 @@ func (d *HostDaemon) delHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	sm := sriov.NewSriovManager()
 	err := sm.CmdDel(req)
 	if err != nil {
-		return nil, errors.New("SRIOV manager falied in del handler")
+		return nil, errors.New("SRIOV manager failed in del handler")
 	}
 	return nil, nil
 }
