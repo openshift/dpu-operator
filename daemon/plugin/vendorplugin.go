@@ -20,7 +20,7 @@ const (
 type VendorPlugin interface {
 	Start() (string, int32, error)
 	Stop()
-	CreateBridgePort(bpr *opi.CreateBridgePortRequest) error
+	CreateBridgePort(bpr *opi.CreateBridgePortRequest) (*opi.BridgePort, error)
 	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
 }
 
@@ -79,10 +79,9 @@ func (g *GrpcPlugin) ensureConnected() error {
 	return nil
 }
 
-func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
+func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
 	g.ensureConnected()
-	_, err := g.opiClient.CreateBridgePort(context.TODO(), createRequest)
-	return err
+	return g.opiClient.CreateBridgePort(context.TODO(), createRequest)
 }
 func (g *GrpcPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
 	g.ensureConnected()

@@ -45,8 +45,8 @@ var _ = g.Describe("Cniserver", func() {
 		cniServer        *cniserver.Server
 		serverSocketPath string
 		listener         net.Listener
-		addHandlerCalled bool
-		delHandlerCalled bool
+		cniCmdAddHandlerCalled bool
+		cniCmdDelHandlerCalled bool
 	)
 
 	g.Context("CNI Server APIs", func() {
@@ -57,14 +57,14 @@ var _ = g.Describe("Cniserver", func() {
 			o.Expect(err).NotTo(o.HaveOccurred())
 
 			serverSocketPath = filepath.Join(tmpDir, filepath.Base(cnitypes.ServerSocketPath))
-			addHandlerCalled = false
-			delHandlerCalled = false
+			cniCmdAddHandlerCalled = false
+			cniCmdDelHandlerCalled = false
 			addHandler := func(request *cnitypes.PodRequest) (*current.Result, error) {
 				result := &current.Result{
 					CNIVersion: request.CNIConf.CNIVersion,
 				}
 
-				addHandlerCalled = true
+				cniCmdAddHandlerCalled = true
 
 				return result, nil
 			}
@@ -74,7 +74,7 @@ var _ = g.Describe("Cniserver", func() {
 					CNIVersion: request.CNIConf.CNIVersion,
 				}
 
-				delHandlerCalled = true
+				cniCmdDelHandlerCalled = true
 				return result, nil
 			}
 
@@ -98,18 +98,18 @@ var _ = g.Describe("Cniserver", func() {
 			g.When("Normal ADD request", func() {
 				cniVersion := "0.4.0"
 				g.It("should call add handler when passing in ADD", func() {
-					addHandlerCalled = false
-					delHandlerCalled = false
+					cniCmdAddHandlerCalled = false
+					cniCmdDelHandlerCalled = false
 					plugin.PostRequest(PrepArgs(cniVersion, cnitypes.CNIAdd))
-					o.Expect(addHandlerCalled).To(o.Equal(true))
-					o.Expect(delHandlerCalled).To(o.Equal(false))
+					o.Expect(cniCmdAddHandlerCalled).To(o.Equal(true))
+					o.Expect(cniCmdDelHandlerCalled).To(o.Equal(false))
 				})
 				g.It("should call add handler when passing in DEL", func() {
-					addHandlerCalled = false
-					delHandlerCalled = false
+					cniCmdAddHandlerCalled = false
+					cniCmdDelHandlerCalled = false
 					plugin.PostRequest(PrepArgs(cniVersion, cnitypes.CNIDel))
-					o.Expect(addHandlerCalled).To(o.Equal(false))
-					o.Expect(delHandlerCalled).To(o.Equal(true))
+					o.Expect(cniCmdAddHandlerCalled).To(o.Equal(false))
+					o.Expect(cniCmdDelHandlerCalled).To(o.Equal(true))
 				})
 
 			})

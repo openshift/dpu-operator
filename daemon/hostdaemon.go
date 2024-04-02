@@ -31,12 +31,12 @@ type HostDaemon struct {
 	cniserver     *cniserver.Server
 }
 
-func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) error {
+func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
 	d.connectWithRetry()
 
 	macBytes, err := hex.DecodeString(mac)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	createRequest := &pb.CreateBridgePortRequest{
@@ -52,8 +52,7 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) erro
 		},
 	}
 
-	_, err = d.client.CreateBridgePort(context.TODO(), createRequest)
-	return err
+	return d.client.CreateBridgePort(context.TODO(), createRequest)
 }
 
 func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) error {
@@ -114,7 +113,7 @@ func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	mac := req.CNIConf.MAC
 	vlan := 7
 	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
-	err := d.CreateBridgePort(pf, vf, vlan, mac)
+	_, err := d.CreateBridgePort(pf, vf, vlan, mac)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to call CreateBridgePort: %v", err)
 	}
