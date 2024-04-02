@@ -35,8 +35,8 @@ func (v *DummyPlugin) Stop() {
 
 }
 
-func (v *DummyPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) error {
-	return nil
+func (v *DummyPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
+	return nil, nil
 }
 
 func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
@@ -85,7 +85,7 @@ var _ = g.Describe("Main", func() {
 		g.It("Should connect successfully if the DPU Daemon is up first", func() {
 			DpuDaemon.Start()
 			HostDaemon.Start()
-			err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
+			_, err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
 			Expect(err).ShouldNot(HaveOccurred())
 
 			HostDaemon.Stop()
@@ -94,7 +94,7 @@ var _ = g.Describe("Main", func() {
 		g.It("Should connect successfully if the Host Daemon is up first", func() {
 			HostDaemon.Start()
 			DpuDaemon.Start()
-			err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
+			_, err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
 
 			Expect(err).ShouldNot(HaveOccurred())
 			HostDaemon.Stop()
