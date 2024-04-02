@@ -82,7 +82,7 @@ var _ = g.Describe("Main", func() {
 		dummyPluginHost := NewDummyPlugin()
 		HostDaemon := NewHostDaemon(dummyPluginHost)
 
-		g.It("Should connect succesfully if the server is up first", func() {
+		g.It("Should connect successfully if the DPU Daemon is up first", func() {
 			DpuDaemon.Start()
 			HostDaemon.Start()
 			err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
@@ -91,7 +91,7 @@ var _ = g.Describe("Main", func() {
 			HostDaemon.Stop()
 			DpuDaemon.Stop()
 		})
-		g.It("Should connect succesfully if the server is up first", func() {
+		g.It("Should connect successfully if the Host Daemon is up first", func() {
 			HostDaemon.Start()
 			DpuDaemon.Start()
 			err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
