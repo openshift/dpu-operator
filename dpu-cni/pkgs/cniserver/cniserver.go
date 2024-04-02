@@ -28,8 +28,8 @@ import (
 type processRequestFunc func(request *cnitypes.PodRequest) (*cni100.Result, error)
 type Server struct {
 	http.Server
-	addHandler processRequestFunc
-	delHandler processRequestFunc
+	cniCmdAddHandler processRequestFunc
+	cniCmdDelHandler processRequestFunc
 	runDir     string
 	socketPath string
 }
@@ -260,9 +260,9 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 
 	var result *cni100.Result = nil
 	if req.Command == cnitypes.CNIAdd {
-		result, err = s.addHandler(req)
+		result, err = s.cniCmdAddHandler(req)
 	} else if req.Command == cnitypes.CNIDel {
-		result, err = s.delHandler(req)
+		result, err = s.cniCmdDelHandler(req)
 	}
 	if err != nil {
 		klog.Errorf("Error occurend in handler: %v", err)
@@ -319,8 +319,8 @@ func NewCNIServer(addHandler processRequestFunc, delHandler processRequestFunc, 
 		Server: http.Server{
 			Handler: router,
 		},
-		addHandler: addHandler,
-		delHandler: delHandler,
+		cniCmdAddHandler: addHandler,
+		cniCmdDelHandler: delHandler,
 		socketPath: cnitypes.ServerSocketPath,
 	}
 
