@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
@@ -34,23 +34,36 @@ type HostDaemon struct {
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
 	d.connectWithRetry()
 
-	macBytes, err := hex.DecodeString(mac)
+	m, err := net.ParseMAC(mac)
 	if err != nil {
 		return nil, err
 	}
 
 	createRequest := &pb.CreateBridgePortRequest{
-		BridgePort: &pb.BridgePort{
-			Name: fmt.Sprintf("%d-%d", pf, vf),
-			Spec: &pb.BridgePortSpec{
-				Ptype:      1,
-				MacAddress: macBytes,
-				LogicalBridges: []string{
-					fmt.Sprintf("%d", vlan),
-				},
-			},
-		},
-	}
+    BridgePort: &pb.BridgePort{
+        Name: "m" + fmt.Sprint(1),
+        Spec: &pb.BridgePortSpec{
+            Ptype:          1,
+            MacAddress:     m,
+            LogicalBridges: []string{fmt.Sprint(1 + 2)},
+        },
+    },
+}
+
+
+//	createRequest := &pb.CreateBridgePortRequest{
+//		BridgePort: &pb.BridgePort{
+//			Name: fmt.Sprintf("%d-%d", pf, vf),
+//			Spec: &pb.BridgePortSpec{
+//				Ptype:      1,
+//				MacAddress: macBytes,
+//				LogicalBridges: []string{
+//					fmt.Sprintf("%d", vlan),
+//				},
+//			},
+//		},
+//	}
+	print("------")
 
 	return d.client.CreateBridgePort(context.TODO(), createRequest)
 }
@@ -161,7 +174,7 @@ func (d *HostDaemon) Start() {
 		return d.delHandler(r)
 	}
 
-	d.cniserver = cniserver.NewCNIServer(add, del)
+	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithSocketPath(d.cniServerPath))
 	err = d.cniserver.ListenAndServe()
 	if err != nil {
 		d.log.Error(err, "Error starting CNI server for shim")
