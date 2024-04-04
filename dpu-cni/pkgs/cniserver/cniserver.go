@@ -30,8 +30,8 @@ type Server struct {
 	http.Server
 	cniCmdAddHandler processRequestFunc
 	cniCmdDelHandler processRequestFunc
-	runDir     string
-	socketPath string
+	runDir           string
+	socketPath       string
 }
 
 // ensureRunDirExists makes sure that the socket being created is only accessible to root.
@@ -321,7 +321,7 @@ func NewCNIServer(addHandler processRequestFunc, delHandler processRequestFunc, 
 		},
 		cniCmdAddHandler: addHandler,
 		cniCmdDelHandler: delHandler,
-		socketPath: cnitypes.ServerSocketPath,
+		socketPath:       cnitypes.ServerSocketPath,
 	}
 
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)

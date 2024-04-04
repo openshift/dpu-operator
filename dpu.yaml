@@ -1,0 +1,7 @@
+apiVersion: config.openshift.io/v1
+kind: DpuOperatorConfig
+metadata:
+  name: dpu-operator-config
+  namespace: dpu-operator-system
+spec:
+  mode: dpu

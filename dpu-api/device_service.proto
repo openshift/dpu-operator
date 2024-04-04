@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package Vendor;
+
+option go_package = "github.com/openshift/dpu-operator/api/dpu-api";
+
+import "google/protobuf/empty.proto";
+
+// The device plugin API service definition.
+service DeviceService {
+  // GetDevices returns a list of devices.
+  rpc GetDevices(google.protobuf.Empty) returns (DeviceListResponse);
+}
+
+message TopologyInfo {
+  string node = 1;
+}
+
+// Device represents a single device.
+message Device {
+  string ID = 1;
+  string health = 2;
+  TopologyInfo topology = 3;
+}
+
+// DeviceListResponse is the response message containing the devices map.
+message DeviceListResponse {
+  map<string, Device> devices = 1;
+}

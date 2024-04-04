@@ -40,11 +40,11 @@ func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 
 var _ = g.Describe("Cniserver", func() {
 	var (
-		tmpDir           string
-		plugin           *cni.Plugin
-		cniServer        *cniserver.Server
-		serverSocketPath string
-		listener         net.Listener
+		tmpDir                 string
+		plugin                 *cni.Plugin
+		cniServer              *cniserver.Server
+		serverSocketPath       string
+		listener               net.Listener
 		cniCmdAddHandlerCalled bool
 		cniCmdDelHandlerCalled bool
 	)

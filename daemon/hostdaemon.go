@@ -40,29 +40,28 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb
 	}
 
 	createRequest := &pb.CreateBridgePortRequest{
-    BridgePort: &pb.BridgePort{
-        Name: "m" + fmt.Sprint(1),
-        Spec: &pb.BridgePortSpec{
-            Ptype:          1,
-            MacAddress:     m,
-            LogicalBridges: []string{fmt.Sprint(1 + 2)},
-        },
-    },
-}
+		BridgePort: &pb.BridgePort{
+			Name: "m" + fmt.Sprint(1),
+			Spec: &pb.BridgePortSpec{
+				Ptype:          1,
+				MacAddress:     m,
+				LogicalBridges: []string{fmt.Sprint(1 + 2)},
+			},
+		},
+	}
 
-
-//	createRequest := &pb.CreateBridgePortRequest{
-//		BridgePort: &pb.BridgePort{
-//			Name: fmt.Sprintf("%d-%d", pf, vf),
-//			Spec: &pb.BridgePortSpec{
-//				Ptype:      1,
-//				MacAddress: macBytes,
-//				LogicalBridges: []string{
-//					fmt.Sprintf("%d", vlan),
-//				},
-//			},
-//		},
-//	}
+	//	createRequest := &pb.CreateBridgePortRequest{
+	//		BridgePort: &pb.BridgePort{
+	//			Name: fmt.Sprintf("%d-%d", pf, vf),
+	//			Spec: &pb.BridgePortSpec{
+	//				Ptype:      1,
+	//				MacAddress: macBytes,
+	//				LogicalBridges: []string{
+	//					fmt.Sprintf("%d", vlan),
+	//				},
+	//			},
+	//		},
+	//	}
 	print("------")
 
 	return d.client.CreateBridgePort(context.TODO(), createRequest)
@@ -183,7 +182,7 @@ func (d *HostDaemon) Start() {
 
 func (d *HostDaemon) Stop() {
 	if d.cniserver != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 1* time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 		d.cniserver.Shutdown(ctx)
 		d.cniserver = nil
