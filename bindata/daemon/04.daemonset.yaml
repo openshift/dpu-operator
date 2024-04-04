@@ -23,7 +23,7 @@ spec:
         privileged: true
       containers:
       - name: dpu-operator-daemon
-        image: localhost:5001/dpu-daemon:dev
+        image: {{.DpuOperatorDaemonImage}}
         securityContext:
           privileged: true
         imagePullPolicy: {{.ImagePullPolicy}}
@@ -36,7 +36,7 @@ spec:
           value: {{.Namespace}}
         volumeMounts:
         - name: dpu-daemon-mount
-          mountPath: /var/run/dpu-daemon/
+          mountPath: /var/run/dpu-daemon
           mountPropagation: Bidirectional
         - name: cni-dir
           mountPath: /opt/cni/bin

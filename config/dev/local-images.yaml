@@ -22,5 +22,5 @@ spec:
           value: localhost:5000/dpu-daemon:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
-        image: localhost:5000/dpu-operator
+        image: localhost:5000/dpu-operator:dev
         imagePullPolicy: Always
