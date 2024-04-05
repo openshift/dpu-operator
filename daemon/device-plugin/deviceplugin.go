@@ -107,7 +107,7 @@ func (nf *nfResources) GetDeviceState(DeviceName string) string {
 }
 
 func (nf *nfResources) Start() error {
-
+	nf.cleanup()
 	nf.ensureConnected()
 
 	ctx := context.Background()
@@ -234,17 +234,17 @@ func (g *nfResources) ensureConnected() error {
 	return nil
 }
 
-func (nf *nfResources) Stop() error {
-	fmt.Printf("Stopping Device Plugin gRPC server..")
-	if nf.grpcServer == nil {
-		return nil
-	}
+// func (nf *nfResources) Stop() error {
+// 	fmt.Printf("Stopping Device Plugin gRPC server..")
+// 	if nf.grpcServer == nil {
+// 		return nil
+// 	}
 
-	nf.grpcServer.Stop()
-	nf.grpcServer = nil
+// 	nf.grpcServer.Stop()
+// 	nf.grpcServer = nil
 
-	return nf.cleanup()
-}
+// 	return nf.cleanup()
+// }
 
 func (nf *nfResources) cleanup() error {
 	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, nf.socketFile)
