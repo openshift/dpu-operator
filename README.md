@@ -42,6 +42,15 @@ UnDeploy the controller from the cluster:
 make undeploy
 ```
 
+## Local development
+First, set up a registry on the local host to which you can push and from which you can pull in the cluster. Then, build, push and use local-deploy to deploy in your cluster.
+
+```sh
+make images-build
+make images-push
+make local-deploy
+```
+
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
 
