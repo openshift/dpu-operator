@@ -1,4 +1,4 @@
-package deviceplugin
+package nfdeviceplugin
 
 import (
 	"context"
@@ -30,7 +30,7 @@ const (
 )
 
 // sriovManager manages sriov networking devices
-type apfManager struct {
+type nfResources struct {
 	socketFile string
 	devices    map[string]pluginapi.Device // for Kubelet DP API
 	grpcServer *grpc.Server
@@ -44,26 +44,26 @@ type DevicePlugin interface {
 	Start() error
 }
 
-func (sm *apfManager) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
 	changed := true
 	for {
-		for id, dev := range sm.devices {
-			state := sm.GetDeviceState(id)
+		for id, dev := range nf.devices {
+			state := nf.GetDeviceState(id)
 			if dev.Health != state {
 				changed = true
 				dev.Health = state
-				sm.devices[id] = dev
+				nf.devices[id] = dev
 			}
 		}
 		if changed {
 			resp := new(pluginapi.ListAndWatchResponse)
-			for _, dev := range sm.devices {
+			for _, dev := range nf.devices {
 				resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
 			}
 			fmt.Printf("ListAndWatch: send devices %v\n", resp)
 			if err := stream.Send(resp); err != nil {
 				fmt.Printf("Error. Cannot update device states: %v\n", err)
-				sm.grpcServer.Stop()
+				nf.grpcServer.Stop()
 				return err
 			}
 		}
@@ -73,14 +73,14 @@ func (sm *apfManager) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.Devi
 }
 
 // Allocate passes the dev name as an env variable to the requesting container
-func (sm *apfManager) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	resp := new(pluginapi.AllocateResponse)
 	devName := ""
 	for _, container := range rqt.ContainerRequests {
 		containerResp := new(pluginapi.ContainerAllocateResponse)
 		for _, id := range container.DevicesIDs {
 			fmt.Printf("DeviceID in Allocate: %v \n", id)
-			dev, ok := sm.devices[id]
+			dev, ok := nf.devices[id]
 			if !ok {
 				fmt.Printf("Error. Invalid allocation request with non-existing device %s", id)
 			}
@@ -93,7 +93,7 @@ func (sm *apfManager) Allocate(ctx context.Context, rqt *pluginapi.AllocateReque
 
 		fmt.Printf("device(s) allocated: %s\n", devName)
 		envmap := make(map[string]string)
-		envmap["APF-DEV"] = devName
+		envmap["NF-DEV"] = devName
 
 		containerResp.Envs = envmap
 		resp.ContainerResponses = append(resp.ContainerResponses, containerResp)
@@ -101,39 +101,38 @@ func (sm *apfManager) Allocate(ctx context.Context, rqt *pluginapi.AllocateReque
 	return resp, nil
 }
 
-func (sm *apfManager) GetDeviceState(DeviceName string) string {
+func (nf *nfResources) GetDeviceState(DeviceName string) string {
 	// TODO: Discover device health
 	return pluginapi.Healthy
 }
 
-func (sm *apfManager) Start() error {
+func (nf *nfResources) Start() error {
 
-	sm.ensureConnected()
+	nf.ensureConnected()
 
 	ctx := context.Background()
 
-	Devices, err := sm.client.GetDevices(ctx, &emptypb.Empty{})
-
-	for _, device := range Devices.Devices {
-		sm.devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
-	}
-
-	for dev := range sm.devices {
-		sm.log.Info(dev)
-	}
-
+	Devices, err := nf.client.GetDevices(ctx, &emptypb.Empty{})
 	if err != nil {
-		sm.log.Error(err, "Failed to handle GetDevices Request")
+		nf.log.Error(err, "Failed to handle GetDevices Request")
 		return err
 	}
 
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, sm.socketFile)
+	for _, device := range Devices.Devices {
+		nf.devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
+	}
+
+	for dev := range nf.devices {
+		nf.log.Info(dev)
+	}
+
+	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, nf.socketFile)
 	fmt.Printf("Starting APF Device Plugin server at: %s\n", pluginEndpoint)
 	lis, err := net.Listen("unix", pluginEndpoint)
 	if err != nil {
 		fmt.Printf("Error: Starting APF Device Plugin server failed: %v", err)
 	}
-	sm.grpcServer = grpc.NewServer()
+	nf.grpcServer = grpc.NewServer()
 
 	kubeletEndpoint := filepath.Join("unix:", DeprecatedSockDir, KubeEndPoint)
 
@@ -145,17 +144,14 @@ func (sm *apfManager) Start() error {
 	}
 	defer conn.Close()
 
-	pluginapi.RegisterDevicePluginServer(sm.grpcServer, sm)
+	pluginapi.RegisterDevicePluginServer(nf.grpcServer, nf)
 
 	client := pluginapi.NewRegistrationClient(conn)
 
-	go sm.grpcServer.Serve(lis)
+	go nf.grpcServer.Serve(lis)
 
-	// Wait for server to start by launching a blocking connection
-	ctx, _ = context.WithTimeout(context.TODO(), 5*time.Second)
-	conn, err = grpc.DialContext(
-		ctx, "unix:"+pluginEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
-
+	// Use connectWithRetry for the pluginEndpoint call
+	conn, err = nf.connectWithRetry("unix:" + pluginEndpoint)
 	if err != nil {
 		fmt.Printf("error. unable to establish test connection with %s gRPC server: %v", resourceName, err)
 		return err
@@ -167,7 +163,7 @@ func (sm *apfManager) Start() error {
 
 	request := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
-		Endpoint:     sm.socketFile,
+		Endpoint:     nf.socketFile,
 		ResourceName: resourceName,
 	}
 
@@ -180,7 +176,42 @@ func (sm *apfManager) Start() error {
 	return nil
 }
 
-func (g *apfManager) ensureConnected() error {
+// connectWithRetry tries to establish a connection with the given endpoint, with retries.
+func (nf *nfResources) connectWithRetry(endpoint string) (*grpc.ClientConn, error) {
+	var conn *grpc.ClientConn
+	var err error
+
+	retryPolicy := `{
+		"methodConfig": [{
+		  "waitForReady": true,
+		  "retryPolicy": {
+			  "MaxAttempts": 40,
+			  "InitialBackoff": "1s",
+			  "MaxBackoff": "16s",
+			  "BackoffMultiplier": 2.0,
+			  "RetryableStatusCodes": [ "UNAVAILABLE" ]
+		  }
+		}]}`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err = grpc.DialContext(
+		ctx,
+		endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithDefaultServiceConfig(retryPolicy),
+	)
+	if err != nil {
+		nf.log.Error(err, "Failed to establish connection with retry", "endpoint", endpoint)
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func (g *nfResources) ensureConnected() error {
 	if g.client != nil {
 		return nil
 	}
@@ -203,20 +234,20 @@ func (g *apfManager) ensureConnected() error {
 	return nil
 }
 
-func (sm *apfManager) Stop() error {
+func (nf *nfResources) Stop() error {
 	fmt.Printf("Stopping Device Plugin gRPC server..")
-	if sm.grpcServer == nil {
+	if nf.grpcServer == nil {
 		return nil
 	}
 
-	sm.grpcServer.Stop()
-	sm.grpcServer = nil
+	nf.grpcServer.Stop()
+	nf.grpcServer = nil
 
-	return sm.cleanup()
+	return nf.cleanup()
 }
 
-func (sm *apfManager) cleanup() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, sm.socketFile)
+func (nf *nfResources) cleanup() error {
+	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, nf.socketFile)
 	if err := os.Remove(pluginEndpoint); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -224,18 +255,18 @@ func (sm *apfManager) cleanup() error {
 	return nil
 }
 
-func (sm *apfManager) PreStartContainer(ctx context.Context, psRqt *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (nf *nfResources) PreStartContainer(ctx context.Context, psRqt *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-func (sm *apfManager) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (nf *nfResources) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	return &pluginapi.DevicePluginOptions{
 		PreStartRequired: false,
 	}, nil
 }
 
-func NewGrpcPlugin() *apfManager {
-	return &apfManager{
+func NewGrpcPlugin() *nfResources {
+	return &nfResources{
 		log:        ctrl.Log.WithName("GrpcPlugin"),
 		devices:    make(map[string]pluginapi.Device),
 		socketFile: pluginEndpoint,
