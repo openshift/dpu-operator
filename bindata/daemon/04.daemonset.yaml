@@ -26,6 +26,7 @@ spec:
         image: {{.DpuOperatorDaemonImage}}
         securityContext:
           privileged: true
+        imagePullPolicy: {{.ImagePullPolicy}}
         env:
         - name: K8S_NODE
           valueFrom:

@@ -66,7 +66,13 @@ endif
 # Be aware that the target commands are only tested with Docker which is
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
-CONTAINER_TOOL ?= docker
+CONTAINER_TOOL ?= podman
+
+
+# Use the image urls from the yaml that is used with Kustomize for local
+# development.
+DPU_OPERATOR_IMAGE := $(shell yq -r .spec.template.spec.containers[0].image config/dev/local-images.yaml)
+DPU_DAEMON_IMAGE := $(shell yq -r .spec.template.spec.containers[0].env[0].value config/dev/local-images.yaml)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -136,6 +142,18 @@ docker-build: test ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
+GO_CONTAINER_CACHE = /tmp/dpu-operator-cache
+
+.PHONY: images-build
+images-build: ## Build all container images necessary to run the whole operator
+	mkdir -p $(GO_CONTAINER_CACHE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+
+.PHONY: images-push
+images-push: test ## Push all container images necessary to run the whole operator
+	$(CONTAINER_TOOL) push $(DPU_OPERATOR_IMAGE)
+	$(CONTAINER_TOOL) push $(DPU_DAEMON_IMAGE)
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
@@ -171,6 +189,10 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+
+.PHONY: local-deploy
+local-deploy: manifests kustomize ## Deploy controller with images hosted on local registry
+	$(KUSTOMIZE) build config/dev | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

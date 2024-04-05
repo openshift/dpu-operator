@@ -70,6 +70,9 @@ spec:
         - /manager
         args:
         - --leader-elect
+        env:
+        - name: DPU_DAEMON_IMAGE
+          value: quay.io/bnemeth/dpu-daemon
         image: controller:latest
         name: manager
         securityContext:

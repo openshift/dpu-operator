@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: deployment
+    app.kubernetes.io/instance: controller-manager
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: dpu-operator
+    app.kubernetes.io/part-of: dpu-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  template:
+    spec:
+      containers:
+      - command:
+        name: manager
+        env:
+        - name: DPU_DAEMON_IMAGE
+          value: localhost:5000/dpu-daemon:dev
+        - name: IMAGE_PULL_POLICIES
+          value: Always
+        image: localhost:5000/dpu-operator:dev
+        imagePullPolicy: Always
