@@ -47,14 +47,6 @@ type DevicePlugin interface {
 func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
 	changed := true
 	for {
-		for id, dev := range nf.devices {
-			state := nf.GetDeviceState(id)
-			if dev.Health != state {
-				changed = true
-				dev.Health = state
-				nf.devices[id] = dev
-			}
-		}
 		if changed {
 			resp := new(pluginapi.ListAndWatchResponse)
 			for _, dev := range nf.devices {
@@ -67,9 +59,22 @@ func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.Dev
 				return err
 			}
 		}
-		changed = false
 		time.Sleep(5 * time.Second)
+		changed = nf.Changed()
 	}
+}
+
+func (nf *nfResources) Changed() bool {
+	changed := false
+	for id, dev := range nf.devices {
+		state := nf.GetDeviceState(id)
+		if dev.Health != state {
+			changed = true
+			dev.Health = state
+			nf.devices[id] = dev
+		}
+	}
+	return changed
 }
 
 // Allocate passes the dev name as an env variable to the requesting container
