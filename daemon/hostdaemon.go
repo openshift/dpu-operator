@@ -29,15 +29,20 @@ type HostDaemon struct {
 	port          int32
 	cniServerPath string
 	cniserver     *cniserver.Server
+	sm            sriov.Manager
 }
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
-	d.connectWithRetry()
+	err := d.connectWithRetry()
+	if err != nil {
+		return nil, err
+	}
 
 	m, err := net.ParseMAC(mac)
 	if err != nil {
 		return nil, err
 	}
+	print("---------------- no error yet")
 
 	createRequest := &pb.CreateBridgePortRequest{
 		BridgePort: &pb.BridgePort{
@@ -62,7 +67,6 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb
 	//			},
 	//		},
 	//	}
-	print("------")
 
 	return d.client.CreateBridgePort(context.TODO(), createRequest)
 }
@@ -82,6 +86,7 @@ func NewHostDaemon(vsp plugin.VendorPlugin) *HostDaemon {
 		vsp:           vsp,
 		log:           ctrl.Log.WithName("HostDaemon"),
 		cniServerPath: cnitypes.ServerSocketPath,
+		sm:            sriov.NewSriovManager(),
 	}
 }
 
@@ -90,9 +95,14 @@ func (d *HostDaemon) WithCniServerPath(serverPath string) *HostDaemon {
 	return d
 }
 
-func (d *HostDaemon) connectWithRetry() {
+func (d *HostDaemon) WithSriovManager(manager sriov.Manager) *HostDaemon {
+	d.sm = manager
+	return d
+}
+
+func (d *HostDaemon) connectWithRetry() error {
 	if d.conn != nil {
-		return
+		return nil
 	}
 	// Might want to change waitForReady to true to
 	// block on connection. Currently, we connect
@@ -114,15 +124,18 @@ func (d *HostDaemon) connectWithRetry() {
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", d.addr, d.port), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
 		d.log.Error(err, "did not connect")
+		return err
 	}
 	d.conn = conn
 	d.client = pb.NewBridgePortServiceClient(conn)
+	return nil
 }
 
 func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
 	pf := 0
 	vf := req.CNIConf.VFID
-	mac := req.CNIConf.MAC
+	mac := req.CNIConf.RuntimeConfig.Mac
+	d.log.Info("addHandler", "CNIConf", req.CNIConf)
 	vlan := 7
 	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
 	_, err := d.CreateBridgePort(pf, vf, vlan, mac)
@@ -131,12 +144,11 @@ func (d *HostDaemon) addHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	}
 	d.log.Info("addHandler CreateBridgePort succeeded")
 
-	sm := sriov.NewSriovManager()
-	res, err := sm.CmdAdd(req)
+	res, err := d.sm.CmdAdd(req)
 	if err != nil {
 		return nil, errors.New("SRIOV manager failed in add handler")
 	}
-	d.log.Info("addHandler sm.CmdAdd succeeded")
+	d.log.Info("addHandler d.sm.CmdAdd succeeded")
 	return res, nil
 }
 
@@ -148,16 +160,15 @@ func (d *HostDaemon) delHandler(req *cnitypes.PodRequest) (*cni100.Result, error
 	d.log.Info("delHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
 	d.DeleteBridgePort(pf, vf, vlan, mac)
 
-	sm := sriov.NewSriovManager()
-	err := sm.CmdDel(req)
+	err := d.sm.CmdDel(req)
 	if err != nil {
 		return nil, errors.New("SRIOV manager failed in del handler")
 	}
 	return nil, nil
 }
 
-func (d *HostDaemon) Start() {
-	d.log.Info("starting HostDaemon", "devflag", d.dev)
+func (d *HostDaemon) Listen() (net.Listener, error) {
+	d.log.Info("starting HostDaemon", "devflag", d.dev, "cniServerPath", d.cniServerPath)
 
 	addr, port, err := d.vsp.Start()
 	if err != nil {
@@ -174,10 +185,27 @@ func (d *HostDaemon) Start() {
 	}
 
 	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithSocketPath(d.cniServerPath))
-	err = d.cniserver.ListenAndServe()
+
+	return d.cniserver.Listen()
+}
+
+func (d *HostDaemon) ListenAndServe() error {
+	listener, err := d.Listen()
+
+	if err != nil {
+		d.log.Error(err, "Failed to listen")
+		return err
+	}
+	return d.Serve(listener)
+}
+
+func (d *HostDaemon) Serve(listner net.Listener) error {
+	err := d.cniserver.Serve(listner)
 	if err != nil {
 		d.log.Error(err, "Error starting CNI server for shim")
+		return err
 	}
+	return nil
 }
 
 func (d *HostDaemon) Stop() {

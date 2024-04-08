@@ -22,9 +22,15 @@ require (
 	golang.org/x/net v0.22.0
 	google.golang.org/grpc v1.58.3
 	google.golang.org/protobuf v1.33.0
+<<<<<<< HEAD
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
 	k8s.io/client-go v0.29.3
+=======
+	k8s.io/api v0.29.0
+	k8s.io/apimachinery v0.29.1
+	k8s.io/client-go v0.29.0
+>>>>>>> main
 	k8s.io/klog/v2 v2.110.1
 	sigs.k8s.io/controller-runtime v0.17.1
 )

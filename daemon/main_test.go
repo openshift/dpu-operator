@@ -3,19 +3,20 @@ package main_test
 import (
 	"flag"
 	"os"
-	// "path/filepath"
-	// "time"
+	"path/filepath"
 
 	g "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/klog/v2"
 
 	// . "github.com/onsi/gomega"
 
 	"github.com/containernetworking/cni/pkg/skel"
-	// current "github.com/containernetworking/cni/pkg/types/100"
-	// . "github.com/openshift/dpu-operator/daemon"
-	// "github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
-	// "github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
+	current "github.com/containernetworking/cni/pkg/types/100"
+	"github.com/containernetworking/plugins/pkg/ns"
+	. "github.com/openshift/dpu-operator/daemon"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,8 +46,40 @@ func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortReques
 	return nil
 }
 
+type SriovManagerMock struct{}
+
+func (m SriovManagerMock) SetupVF(conf *cnitypes.NetConf, podifName string, netns ns.NetNS) error {
+	return nil
+}
+
+func (m SriovManagerMock) ReleaseVF(conf *cnitypes.NetConf, podifName string, netns ns.NetNS) error {
+	return nil
+}
+
+func (m SriovManagerMock) ResetVFConfig(conf *cnitypes.NetConf) error {
+	return nil
+}
+
+func (m SriovManagerMock) ApplyVFConfig(conf *cnitypes.NetConf) error {
+	return nil
+}
+
+func (m SriovManagerMock) FillOriginalVfInfo(conf *cnitypes.NetConf) error {
+	return nil
+}
+
+func (m SriovManagerMock) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error) {
+	result := &current.Result{}
+	result.CNIVersion = req.CNIConf.CNIVersion
+	return result, nil
+}
+
+func (m SriovManagerMock) CmdDel(req *cnitypes.PodRequest) error {
+	return nil
+}
+
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
-	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
+	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\", \"RuntimeConfig\": {\"Mac\": \"00:11:22:33:44:55\"}}"
 	cmdArgs := &skel.CmdArgs{
 		ContainerID: "fakecontainerid",
 		Netns:       "fakenetns",
@@ -66,6 +99,11 @@ func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 	return cmdArgs
 }
 
+func cmdAdd(cniVersion string, serverSocketPath string) (*cnitypes.Response, string, error) {
+	p := &cni.Plugin{SocketPath: serverSocketPath}
+	return p.PostRequest(PrepArgs(cniVersion, cnitypes.CNIAdd))
+}
+
 var _ = g.BeforeSuite(func() {
 	opts := zap.Options{
 		Development: true,
@@ -77,71 +115,58 @@ var _ = g.BeforeSuite(func() {
 })
 
 var _ = g.Describe("Main", func() {
-	g.Context("Connection", func() {
-		// tmpDir, err := os.MkdirTemp("", "cniserver")
-		// defer os.RemoveAll(tmpDir)
-		// Expect(err).NotTo(HaveOccurred())
-		// serverSocketPath := filepath.Join(tmpDir, "server.socket")
-		// dummyPluginDPU := NewDummyPlugin()
-		// DpuDaemon := NewDpuDaemon(dummyPluginDPU)
+	var (
+		tmpDir           string
+		err              error
+		serverSocketPath string
+		dpuDaemon        *DpuDaemon
+		hostDaemon       *HostDaemon
+	)
+	g.BeforeEach(func() {
+		tmpDir, err = os.MkdirTemp("", "cniserver")
+		Expect(err).NotTo(HaveOccurred())
+		serverSocketPath = filepath.Join(tmpDir, "server.socket")
 
-		// dummyPluginHost := NewDummyPlugin()
-		// HostDaemon := NewHostDaemon(dummyPluginHost).WithCniServerPath(serverSocketPath)
-
-		// g.It("Should connect successfully if the DPU Daemon is up first", func() {
-		// 	DpuDaemon.Start()
-		// 	go func() {
-		// 		HostDaemon.Start()
-		// 	}()
-		// 	time.Sleep(time.Second)
-		// 	_, err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
-		// 	Expect(err).ShouldNot(HaveOccurred())
-
-		// 	HostDaemon.Stop()
-		// 	DpuDaemon.Stop()
-		// })
-		// g.It("Should connect successfully if the Host Daemon is up first", func() {
-		// 	go func() {
-		// 		HostDaemon.Start()
-		// 	}()
-		// 	time.Sleep(time.Second)
-		// 	DpuDaemon.Start()
-		// 	_, err := HostDaemon.CreateBridgePort(1, 1, 1, "00:00:00:00:00:00")
-
-		// 	Expect(err).ShouldNot(HaveOccurred())
-		// 	HostDaemon.Stop()
-		// 	DpuDaemon.Stop()
-		// })
+		dummyPluginDPU := NewDummyPlugin()
+		dpuDaemon = NewDpuDaemon(dummyPluginDPU)
+		dummyPluginHost := NewDummyPlugin()
+		m := SriovManagerMock{}
+		hostDaemon = NewHostDaemon(dummyPluginHost).
+			WithCniServerPath(serverSocketPath).
+			WithSriovManager(m)
 	})
 
-	g.Context("Daemon on host should receive request from CNI", func() {
-		// tmpDir, err := os.MkdirTemp("", "cniserver")
-		// defer os.RemoveAll(tmpDir)
-		// Expect(err).NotTo(HaveOccurred())
-		// serverSocketPath := filepath.Join(tmpDir, "server.socket")
+	g.AfterEach(func() {
+		klog.Info("Cleaning up")
+		os.RemoveAll(tmpDir)
+		dpuDaemon.Stop()
+		hostDaemon.Stop()
+	})
 
-		// dummyPluginHost := NewDummyPlugin()
-		// HostDaemon := NewHostDaemon(dummyPluginHost).WithCniServerPath(serverSocketPath)
-		// go func() {
-		// 	HostDaemon.Start()
-		// }()
-		// time.Sleep(time.Second)
+	g.Context("Connection", func() {
+		g.It("Should connect successfully if the DPU Daemon is up first", func() {
+			dpuListen, err := dpuDaemon.Listen()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				err = dpuDaemon.Serve(dpuListen)
+				Expect(err).NotTo(HaveOccurred())
+			}()
 
-		// p := &cni.Plugin{SocketPath: serverSocketPath}
+			hostListen, err := hostDaemon.Listen()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				_ = hostDaemon.Serve(hostListen)
+			}()
 
-		// g.Context("CNI propagetes to vendor plugin on DPU", func() {
-		// 	g.When("Normal ADD request", func() {
-		// 		cniVersion := "0.4.0"
-		// 		expectedResult := &current.Result{
-		// 			CNIVersion: cniVersion,
-		// 		}
-		// 		g.It("should get a correct response from the post request", func() {
-		// 			resp, ver, err := p.PostRequest(PrepArgs(cniVersion, cnitypes.CNIAdd))
-		// 			Expect(err).NotTo(HaveOccurred())
-		// 			Expect(ver).To(Equal(cniVersion))
-		// 			Expect(resp.Result).To(Equal(expectedResult))
-		// 		})
-		// 	})
-		// })
+			cniVersion := "0.4.0"
+			expectedResult := &current.Result{
+				CNIVersion: cniVersion,
+			}
+
+			resp, ver, err := cmdAdd(cniVersion, serverSocketPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ver).To(Equal(cniVersion))
+			Expect(resp.Result).To(Equal(expectedResult))
+		})
 	})
 })

@@ -12,6 +12,7 @@ import (
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -42,7 +43,7 @@ func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *DpuDae
 	}
 }
 
-func (d *DpuDaemon) Start() {
+func (d *DpuDaemon) Listen() (net.Listener, error) {
 	d.log.Info("starting DpuDaemon")
 	addr, port, err := d.vsp.Start()
 	if err != nil {
@@ -59,22 +60,36 @@ func (d *DpuDaemon) Start() {
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
-		d.log.Error(err, "Failed to start listening")
+		d.log.Error(err, "Failed to start listening on", "addr", addr, "port", port)
+		return lis, err
 	}
+	d.log.Info("server listening", "address", lis.Addr())
 
-	go func() {
-		d.log.Info("server listening", "address", lis.Addr())
+	return lis, err
+}
 
-		if err := d.server.Serve(lis); err != nil {
-			d.log.Error(err, "Failed to start serving")
-			panic("Failed to listen")
-		}
-	}()
-	select {}
+func (d *DpuDaemon) ListenAndServe() error {
+	lis, err := d.Listen()
+	if err != nil {
+		return err
+	}
+	return d.Serve(lis)
+}
+
+func (d *DpuDaemon) Serve(listen net.Listener) error {
+	d.server = grpc.NewServer()
+	pb.RegisterBridgePortServiceServer(d.server, d)
+	if err := d.server.Serve(listen); err != nil {
+		d.log.Error(err, "Failed to start serving")
+		return err
+	}
+	return nil
 }
 
 func (d *DpuDaemon) Stop() {
+	klog.Info("Stopping DPU daemon")
 	if d.server != nil {
+		klog.Info("Actually stopping")
 		d.server.GracefulStop()
 		d.server = nil
 	}

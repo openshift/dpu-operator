@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"net"
 	"os"
 
 	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
@@ -17,7 +18,10 @@ import (
 var ()
 
 type Daemon interface {
-	Start()
+	Listen() (net.Listener, error)
+	ListenAndServe() error
+	Serve(listen net.Listener) error
+	Stop()
 }
 
 func isDpuMode(mode string) (bool, error) {
@@ -97,5 +101,5 @@ func main() {
 		log.Error(err, "Failed to start daemon")
 		return
 	}
-	daemon.Start()
+	daemon.ListenAndServe()
 }

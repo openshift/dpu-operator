@@ -59,7 +59,7 @@ type sriovManager struct {
 }
 
 // NewSriovManager returns an instance of SriovManager
-func NewSriovManager() Manager {
+func NewSriovManager() *sriovManager {
 	return &sriovManager{
 		nLink: &sriovutils.MyNetlink{},
 		utils: &pciUtilsImpl{},

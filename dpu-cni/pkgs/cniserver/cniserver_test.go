@@ -18,7 +18,7 @@ import (
 )
 
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
-	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
+	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\", \"Mac\": \"00:11:22:33:44:55\"}"
 	cmdArgs := &skel.CmdArgs{
 		ContainerID: "fakecontainerid",
 		Netns:       "fakenetns",
