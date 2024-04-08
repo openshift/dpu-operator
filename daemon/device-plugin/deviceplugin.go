@@ -25,8 +25,7 @@ const (
 	pluginMountPath = "/var/lib/kubelet/device-plugins"
 	kubeletEndpoint = "kubelet.sock"
 	pluginEndpoint  = "sriovNet.sock"
-	resourceName    = "intel.com/ipu"
-	prefix          = "intel.com"
+	resourceName    = "dpu"
 )
 
 // sriovManager manages sriov networking devices

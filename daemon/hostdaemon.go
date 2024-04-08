@@ -171,6 +171,9 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 	d.log.Info("starting HostDaemon", "devflag", d.dev, "cniServerPath", d.cniServerPath)
 
 	addr, port, err := d.vsp.Start()
+
+	d.log.Info("Listen", "Address", addr, "Port", port)
+
 	if err != nil {
 		d.log.Error(err, "VSP init returned error")
 	}
