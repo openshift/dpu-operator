@@ -6,14 +6,14 @@ import (
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
-	DaemonBaseDir          string = "/var/run/daemon/"
-	VendorPluginSocketPath string = DaemonBaseDir + "vendor-plugin/vendor-plugin.sock"
+	VendorPluginSocketPath string = cnitypes.DaemonBaseDir + "vendor-plugin/vendor-plugin.sock"
 )
 
 type VendorPlugin interface {
