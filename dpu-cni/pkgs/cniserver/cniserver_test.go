@@ -18,7 +18,7 @@ import (
 )
 
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
-	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\", \"Mac\": \"00:11:22:33:44:55\"}"
+	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\"}"
 	cmdArgs := &skel.CmdArgs{
 		ContainerID: "fakecontainerid",
 		Netns:       "fakenetns",
@@ -40,13 +40,13 @@ func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 
 var _ = g.Describe("Cniserver", func() {
 	var (
-		tmpDir                 string
-		plugin                 *cni.Plugin
-		cniServer              *cniserver.Server
-		serverSocketPath       string
-		listener               net.Listener
-		cniCmdAddHandlerCalled bool
-		cniCmdDelHandlerCalled bool
+		tmpDir           string
+		plugin           *cni.Plugin
+		cniServer        *cniserver.Server
+		serverSocketPath string
+		listener         net.Listener
+		addHandlerCalled bool
+		delHandlerCalled bool
 	)
 
 	g.Context("CNI Server APIs", func() {
@@ -57,14 +57,14 @@ var _ = g.Describe("Cniserver", func() {
 			o.Expect(err).NotTo(o.HaveOccurred())
 
 			serverSocketPath = filepath.Join(tmpDir, filepath.Base(cnitypes.ServerSocketPath))
-			cniCmdAddHandlerCalled = false
-			cniCmdDelHandlerCalled = false
+			addHandlerCalled = false
+			delHandlerCalled = false
 			addHandler := func(request *cnitypes.PodRequest) (*current.Result, error) {
 				result := &current.Result{
 					CNIVersion: request.CNIConf.CNIVersion,
 				}
 
-				cniCmdAddHandlerCalled = true
+				addHandlerCalled = true
 
 				return result, nil
 			}
@@ -74,7 +74,7 @@ var _ = g.Describe("Cniserver", func() {
 					CNIVersion: request.CNIConf.CNIVersion,
 				}
 
-				cniCmdDelHandlerCalled = true
+				delHandlerCalled = true
 				return result, nil
 			}
 
@@ -98,18 +98,18 @@ var _ = g.Describe("Cniserver", func() {
 			g.When("Normal ADD request", func() {
 				cniVersion := "0.4.0"
 				g.It("should call add handler when passing in ADD", func() {
-					cniCmdAddHandlerCalled = false
-					cniCmdDelHandlerCalled = false
+					addHandlerCalled = false
+					delHandlerCalled = false
 					plugin.PostRequest(PrepArgs(cniVersion, cnitypes.CNIAdd))
-					o.Expect(cniCmdAddHandlerCalled).To(o.Equal(true))
-					o.Expect(cniCmdDelHandlerCalled).To(o.Equal(false))
+					o.Expect(addHandlerCalled).To(o.Equal(true))
+					o.Expect(delHandlerCalled).To(o.Equal(false))
 				})
 				g.It("should call add handler when passing in DEL", func() {
-					cniCmdAddHandlerCalled = false
-					cniCmdDelHandlerCalled = false
+					addHandlerCalled = false
+					delHandlerCalled = false
 					plugin.PostRequest(PrepArgs(cniVersion, cnitypes.CNIDel))
-					o.Expect(cniCmdAddHandlerCalled).To(o.Equal(false))
-					o.Expect(cniCmdDelHandlerCalled).To(o.Equal(true))
+					o.Expect(addHandlerCalled).To(o.Equal(false))
+					o.Expect(delHandlerCalled).To(o.Equal(true))
 				})
 
 			})
