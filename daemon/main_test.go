@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/openshift/dpu-operator/daemon"
+	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -27,6 +28,14 @@ func (v *DummyPlugin) Start() (string, int32, error) {
 
 func (v *DummyPlugin) Stop() {
 
+}
+
+func (v *DummyPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
+	return &opi.BridgePort{}, nil
+}
+
+func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
+	return nil
 }
 
 var _ = g.BeforeSuite(func() {
@@ -50,7 +59,7 @@ var _ = g.Describe("Main", func() {
 		g.It("Should connect succesfully if the server is up first", func() {
 			HostDaemon.Start()
 			DpuDaemon.Start()
-			err := HostDaemon.CreateBridgePort(1, 1, 1)
+			_, err := HostDaemon.CreateBridgePort(1, 1, 1)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})
