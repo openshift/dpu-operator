@@ -83,6 +83,7 @@ func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest
 	g.ensureConnected()
 	return g.opiClient.CreateBridgePort(context.TODO(), createRequest)
 }
+
 func (g *GrpcPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
 	g.ensureConnected()
 	_, err := g.opiClient.DeleteBridgePort(context.TODO(), deleteRequest)

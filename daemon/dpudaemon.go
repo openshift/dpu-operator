@@ -36,28 +36,38 @@ func NewDpuDaemon(vsp plugin.VendorPlugin) *DpuDaemon {
 	}
 }
 
-func (d *DpuDaemon) Start() {
+func (d *DpuDaemon) Listen() (net.Listener, error) {
 	d.log.Info("starting DpuDaemon")
 	addr, port, err := d.vsp.Start()
 	if err != nil {
 		d.log.Error(err, "Failed to get addr:port from VendorPlugin")
 	}
-	d.server = grpc.NewServer()
-	pb.RegisterBridgePortServiceServer(d.server, d)
-
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
-		d.log.Error(err, "Failed to start listening")
+		d.log.Error(err, "Failed to start listening on", "addr", addr, "port", port)
+		return lis, err
 	}
+	d.log.Info("server listening", "address", lis.Addr())
 
-	go func() {
-		d.log.Info("server listening", "address", lis.Addr())
+	return lis, err
+}
 
-		if err := d.server.Serve(lis); err != nil {
-			d.log.Error(err, "Failed to start serving")
-			panic("Failed to listen")
-		}
-	}()
+func (d *DpuDaemon) ListenAndServe() error {
+	lis, err := d.Listen()
+	if err != nil {
+		return err
+	}
+	return d.Serve(lis)
+}
+
+func (d *DpuDaemon) Serve(listen net.Listener) error {
+	d.server = grpc.NewServer()
+	pb.RegisterBridgePortServiceServer(d.server, d)
+	if err := d.server.Serve(listen); err != nil {
+		d.log.Error(err, "Failed to start serving")
+		return err
+	}
+	return nil
 }
 
 func (d *DpuDaemon) Stop() {
