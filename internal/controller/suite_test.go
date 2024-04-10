@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -49,24 +50,32 @@ func TestControllers(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	var err error
+	// IMPORTANT: We want to be at the project root directory (please keep this mind when
+	// developing tests).
+	// Explanation: The controller manger will need to look into "bindata" to render
+	// the manifest files, thus the test container need to be at the correct level.
+	err = os.Chdir("../..")
+	Expect(err).NotTo(HaveOccurred())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
-	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	By("registering schemes")
 	err = configv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
+	By("creating k8s client")
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
