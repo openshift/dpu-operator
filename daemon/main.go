@@ -64,7 +64,7 @@ func copyFile(src, dst string) error {
 }
 
 func copyCNI() error {
-	return copyFile("/dpu-cni", "/opt/cni/bin/dpu-cni")
+	return copyFile("/dpu-cni", "/var/lib/cni/dpu-cni")
 }
 
 func main() {
