@@ -49,7 +49,7 @@ var (
 	testSriovDevicePlugin     = "sriov-device-plugin"
 	testNetworkFunctionNAD    = "dpunfcni-conf"
 	testClusterName           = "dpu-operator-test-cluster"
-	testAPITimeout            = time.Second * 5
+	testAPITimeout            = time.Second * 2
 	testRetryInterval         = time.Millisecond * 10
 	testInitialSetupTimeout   = time.Minute
 	setupLog                  = ctrl.Log.WithName("setup")
@@ -146,7 +146,6 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	utilruntime.Must(configv1.AddToScheme(scheme))
 	utilruntime.Must(netattdefv1.AddToScheme(scheme))
 
-	os.Setenv("DPU_DAEMON_IMAGE", "mock-image")
 	mgr, err := ctrl.NewManager(client, ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
@@ -156,10 +155,9 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 		LeaderElectionID: "1e46962d.openshift.io",
 	})
 	Expect(err).NotTo(HaveOccurred())
-	reconciler := DpuOperatorConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme()}
-	err = reconciler.SetupWithManager(mgr)
+
+	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), "mock-image")
+	err = b.SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	wg.Add(1)
