@@ -8,6 +8,11 @@ service LifeCycleService {
   rpc Init(InitRequest) returns (IpPort);
 }
 
+service NetworkFunctionService {
+  rpc CreateNetworkFunction(NFRequest) returns (Empty);
+  rpc DeleteNetworkFunction(NFRequest) returns (Empty);
+}
+
 message InitRequest {
   bool dpu_mode = 1;
 }
@@ -16,3 +21,10 @@ message IpPort {
   string ip = 1;
   int32 port = 2;
 }
+
+message NFRequest {
+  string input = 1;
+  string output = 2;
+}
+
+message Empty {}
