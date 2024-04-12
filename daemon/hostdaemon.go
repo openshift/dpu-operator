@@ -141,17 +141,16 @@ func (d *HostDaemon) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result,
 }
 
 func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+	err := d.sm.CmdDel(req)
+	if err != nil {
+		return nil, errors.New("SRIOV manager failed in del handler")
+	}
 	pf := 0
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.MAC
 	vlan := *req.CNIConf.Vlan
 	d.log.Info("delHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
 	d.DeleteBridgePort(pf, vf, vlan, mac)
-
-	err := d.sm.CmdDel(req)
-	if err != nil {
-		return nil, errors.New("SRIOV manager failed in del handler")
-	}
 	return nil, nil
 }
 
