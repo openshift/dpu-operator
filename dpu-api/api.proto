@@ -28,3 +28,21 @@ message NFRequest {
 }
 
 message Empty {}
+
+service DeviceService {
+  rpc GetDevices(Empty) returns (DeviceListResponse);
+}
+
+message TopologyInfo {
+  string node = 1;
+}
+
+message Device {
+  string ID = 1;
+  string health = 2;
+  TopologyInfo topology = 3;
+}
+
+message DeviceListResponse {
+  map<string, Device> devices = 1;
+}
