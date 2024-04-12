@@ -150,6 +150,20 @@ images-build: ## Build all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
 
+.PHONY: images-buildx
+images-buildx: ## Build all container images necessary to run the whole operator
+	mkdir -p $(GO_CONTAINER_CACHE)
+	buildah manifest rm tmp-manifest || true
+	buildah manifest create tmp-manifest
+	buildah build --authfile /root/config.json --manifest tmp-manifest --arch amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	buildah build --authfile /root/config.json --manifest tmp-manifest --arch arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	buildah manifest rm tmp-manifest2
+	buildah manifest create tmp-manifest2 || true
+	buildah build --authfile /root/config.json --manifest tmp-manifest2 --arch amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	buildah build --authfile /root/config.json --manifest tmp-manifest2 --arch arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	buildah manifest push --all tmp-manifest docker://$(DPU_OPERATOR_IMAGE)
+	buildah manifest push --all tmp-manifest2 docker://$(DPU_DAEMON_IMAGE)
+
 .PHONY: images-push
 images-push: test ## Push all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) push $(DPU_OPERATOR_IMAGE)
