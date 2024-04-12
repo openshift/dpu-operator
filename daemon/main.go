@@ -63,8 +63,27 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-func copyCNI() error {
-	return copyFile("/dpu-cni", "/var/lib/cni/dpu-cni")
+func makeExecutable(file string) error {
+	info, err := os.Stat(file)
+	if err != nil {
+		return err
+	}
+
+	newMode := info.Mode() | 0111
+
+	if err := os.Chmod(file, newMode); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func prepareCni() error {
+	err := copyFile("/dpu-cni", "/var/lib/cni/bin/dpu-cni")
+	if err != nil {
+		return err
+	}
+	return makeExecutable("/var/lib/cni/bin/dpu-cni")
 }
 
 func main() {
@@ -83,9 +102,9 @@ func main() {
 	log := ctrl.Log.WithName("Daemon Init")
 	log.Info("Daemon init")
 
-	err = copyCNI()
+	err = prepareCni()
 	if err != nil {
-		log.Error(err, "Failed to copy CNI")
+		log.Error(err, "Failed to prepare CNI binary")
 		return
 	}
 
