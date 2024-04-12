@@ -73,6 +73,10 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
 	}
+	err = r.ensureSriovDevicePluginRunning(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to ensure SRIOV Device Plugin DaemonSet is running")
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -84,15 +88,19 @@ func getImagePullPolicy() string {
 	return "IfNotPresent"
 }
 
+func setCommonData(data *render.RenderData, cfg *configv1.DpuOperatorConfig) {
+	data.Data["Namespace"] = cfg.Namespace
+	data.Data["ImagePullPolicy"] = getImagePullPolicy()
+}
+
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	var err error
 
 	logger := log.FromContext(ctx)
 	data := render.MakeRenderData()
 	// All the CRs will be in the same namespace as the operator config
-	data.Data["Namespace"] = cfg.Namespace
+	setCommonData(&data, cfg)
 	data.Data["Mode"] = cfg.Spec.Mode
-	data.Data["ImagePullPolicy"] = getImagePullPolicy()
 	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
 	if dpuDaemonImage == "" {
 		return fmt.Errorf("DPU_DAEMON_IMAGE not set")
@@ -131,6 +139,33 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Cont
 		}
 		if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
 			return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
+		}
+	}
+	return nil
+}
+
+func (r *DpuOperatorConfigReconciler) ensureSriovDevicePluginRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	// There will be a device plugin running in the daemon
+	if cfg.Spec.Mode == "host" {
+		data := render.MakeRenderData()
+		// All the CRs will be in the same namespace as the operator config
+		setCommonData(&data, cfg)
+
+		logger.Info("Ensuring that SRIOV Device Plugin DaemonSet is running")
+		objs, err := render.RenderDir("./bindata/sriov-device-plugin", &data)
+		if err != nil {
+			logger.Error(err, "Failed to render SRIOV Device Plugin DaemonSet manifests")
+			return err
+		}
+
+		for _, obj := range objs {
+			if err := ctrl.SetControllerReference(cfg, obj, r.Scheme); err != nil {
+				return err
+			}
+			if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
+				return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
+			}
 		}
 	}
 	return nil
