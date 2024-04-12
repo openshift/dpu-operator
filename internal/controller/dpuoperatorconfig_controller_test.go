@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -12,11 +13,13 @@ import (
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 var (
@@ -24,6 +27,7 @@ var (
 	testDpuOperatorConfigName = "default"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-operator-daemon"
+	testSriovDevicePlugin     = "sriov-device-plugin"
 	testAPITimeout            = time.Second * 20
 	testRetryInterval         = time.Second * 1
 )
@@ -94,6 +98,15 @@ func startDPUControllerManager(ctx context.Context, wg *sync.WaitGroup) {
 	}()
 }
 
+func stopDPUControllerManager(mode string, cancel context.CancelFunc, wg *sync.WaitGroup) {
+	By("shut down controller manager")
+	cancel()
+	wg.Wait()
+	config := createDpuOperatorCR(mode)
+	err := k8sClient.Delete(context.Background(), config)
+	Expect(err).ToNot(HaveOccurred())
+}
+
 func createDpuOperatorCR(mode string) *configv1.DpuOperatorConfig {
 	config := &configv1.DpuOperatorConfig{}
 	config.SetNamespace(testNamespace)
@@ -123,19 +136,45 @@ var _ = Describe("Main Controller", Ordered, func() {
 	var ctx context.Context
 	var wg sync.WaitGroup
 
-	BeforeAll(func() {
-		// NOTE: We know that it is more complete to delete and re-create the test
-		// namespace however there seems to be a problem deleting the namespace
-		// after creation.
+	BeforeEach(func() {
+		// IMPORTANT Note: The Envtest has many limitations described here:
+		// https://book.kubebuilder.io/reference/envtest.html#testing-considerations
+		// Thus we need to create and destroy the Envtest environment. Please note
+		// that Envtest does not garbage collect thus owner references do not get
+		// cleaned up!!
+		By("bootstrapping test environment")
+		testEnv = &envtest.Environment{
+			CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases")},
+			ErrorIfCRDPathMissing: true,
+		}
+		var err error
+		By("starting the test env")
+		cfg, err = testEnv.Start()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg).NotTo(BeNil())
+
+		By("registering schemes")
+		err = configv1.AddToScheme(scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating k8s client")
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(k8sClient).NotTo(BeNil())
+
+		// NOTE: Please refer to this limitation of namespace deletion:
+		// https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation
+		// Namespaces cannot be cleaned up!
 		ensureDpuOperatorNamespace()
 	})
 
-	Context("When controller manager has started without DpuOperatorConfig CRD", func() {
+	Context("When Host controller manager has started without DpuOperatorConfig CR", func() {
+		mode := "host"
 		BeforeEach(func() {
 			ctx, cancel = context.WithCancel(context.Background())
 			wg = sync.WaitGroup{}
 			startDPUControllerManager(ctx, &wg)
-			ensureDpuOperatorCR("host")
+			ensureDpuOperatorCR(mode)
 		})
 		It("should have DPU daemon daemonsets created by controller manager", func() {
 			daemonSet := &appsv1.DaemonSet{}
@@ -143,15 +182,49 @@ var _ = Describe("Main Controller", Ordered, func() {
 			Expect(daemonSet.OwnerReferences).To(HaveLen(1))
 			Expect(daemonSet.OwnerReferences[0].Kind).To(Equal(testDpuOperatorConfigKind))
 			Expect(daemonSet.OwnerReferences[0].Name).To(Equal(testDpuOperatorConfigName))
+			Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(mode))
+		})
+		It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
+			daemonSet := &appsv1.DaemonSet{}
+			WaitForDaemonSetReady(daemonSet, k8sClient, testNamespace, testSriovDevicePlugin)
+			Expect(daemonSet.OwnerReferences).To(HaveLen(1))
+			Expect(daemonSet.OwnerReferences[0].Kind).To(Equal(testDpuOperatorConfigKind))
+			Expect(daemonSet.OwnerReferences[0].Name).To(Equal(testDpuOperatorConfigName))
 		})
 		AfterEach(func() {
-			By("shut down controller manager")
-			cancel()
-			wg.Wait()
-			config := createDpuOperatorCR("host")
-			err := k8sClient.Delete(context.Background(), config)
-			Expect(err).ToNot(HaveOccurred())
+			stopDPUControllerManager(mode, cancel, &wg)
 		})
 	})
 
+	Context("When DPU controller manager has started without DpuOperatorConfig CR", func() {
+		mode := "dpu"
+		BeforeEach(func() {
+			ctx, cancel = context.WithCancel(context.Background())
+			wg = sync.WaitGroup{}
+			startDPUControllerManager(ctx, &wg)
+			ensureDpuOperatorCR(mode)
+		})
+		It("should have DPU daemon daemonsets created by controller manager", func() {
+			daemonSet := &appsv1.DaemonSet{}
+			WaitForDaemonSetReady(daemonSet, k8sClient, testNamespace, testDpuDaemonName)
+			Expect(daemonSet.OwnerReferences).To(HaveLen(1))
+			Expect(daemonSet.OwnerReferences[0].Kind).To(Equal(testDpuOperatorConfigKind))
+			Expect(daemonSet.OwnerReferences[0].Name).To(Equal(testDpuOperatorConfigName))
+			Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(mode))
+		})
+		It("should not have SR-IOV device plugin daemonsets created by controller manager", func() {
+			daemonSet := &appsv1.DaemonSet{}
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: testNamespace, Namespace: testSriovDevicePlugin}, daemonSet)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+		AfterEach(func() {
+			stopDPUControllerManager(mode, cancel, &wg)
+		})
+	})
+
+	AfterEach(func() {
+		By("tearing down the test environment")
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
