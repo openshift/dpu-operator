@@ -120,22 +120,22 @@ func (d *HostDaemon) connectWithRetry() error {
 }
 
 func (d *HostDaemon) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+	res, err := d.sm.CmdAdd(req)
+	if err != nil {
+		return nil, fmt.Errorf("SRIOV manager failed in add handler: %v", err)
+	}
 	pf := 0
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.RuntimeConfig.Mac
 	d.log.Info("addHandler", "CNIConf", req.CNIConf)
 	vlan := *req.CNIConf.Vlan
 	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
-	_, err := d.CreateBridgePort(pf, vf, vlan, mac)
+	_, err = d.CreateBridgePort(pf, vf, vlan, mac)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to call CreateBridgePort: %v", err)
 	}
 	d.log.Info("addHandler CreateBridgePort succeeded")
 
-	res, err := d.sm.CmdAdd(req)
-	if err != nil {
-		return nil, errors.New("SRIOV manager failed in add handler")
-	}
 	d.log.Info("addHandler d.sm.CmdAdd succeeded")
 	return res, nil
 }
