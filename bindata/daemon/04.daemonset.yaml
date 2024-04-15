@@ -35,6 +35,9 @@ spec:
         - name: NAMESPACE
           value: {{.Namespace}}
         volumeMounts:
+        - name: devicesock
+          mountPath: /var/lib/kubelet/
+          readOnly: false
         - name: dpu-daemon-mount
           mountPath: /var/run/dpu-daemon
           mountPropagation: Bidirectional
@@ -49,6 +52,9 @@ spec:
         - --mode
         - {{.Mode}}
       volumes:
+        - name: devicesock
+          hostPath:
+            path: /var/lib/kubelet/
         - name: dpu-daemon-mount
           hostPath:
             path: /var/run/dpu-daemon
