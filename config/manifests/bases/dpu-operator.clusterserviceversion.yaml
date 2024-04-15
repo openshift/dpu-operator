@@ -40,7 +40,7 @@ spec:
   - ipu
   links:
   - name: Dpu Operator
-    url: https://dpu-operator.domain
+    url: https://github.com/openshift/dpu-operator
   maintainers:
   - email: wizhao@redhat.com
     name: William Zhao
