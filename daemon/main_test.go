@@ -23,6 +23,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+type DummyDevicePlugin struct{}
+
+func (d *DummyDevicePlugin) Start() error {
+	return nil
+}
+
 type DummyPlugin struct {
 }
 
@@ -128,7 +134,7 @@ var _ = g.Describe("Main", func() {
 		serverSocketPath = filepath.Join(tmpDir, "server.socket")
 
 		dummyPluginDPU := NewDummyPlugin()
-		dpuDaemon = NewDpuDaemon(dummyPluginDPU)
+		dpuDaemon = NewDpuDaemon(dummyPluginDPU, &DummyDevicePlugin{})
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
 		hostDaemon = NewHostDaemon(dummyPluginHost).

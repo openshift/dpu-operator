@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 
+	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"go.uber.org/zap/zapcore"
 
@@ -35,8 +36,9 @@ func isDpuMode(mode string) (bool, error) {
 
 func createDaemon(dpuMode bool) (Daemon, error) {
 	plugin := plugin.NewGrpcPlugin(dpuMode)
+	dp := deviceplugin.NewGrpcPlugin()
 	if dpuMode {
-		return NewDpuDaemon(plugin), nil
+		return NewDpuDaemon(plugin, dp), nil
 	} else {
 		return NewHostDaemon(plugin), nil
 	}

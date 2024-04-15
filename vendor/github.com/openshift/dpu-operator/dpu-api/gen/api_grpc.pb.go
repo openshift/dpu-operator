@@ -107,3 +107,221 @@ var LifeCycleService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "api.proto",
 }
+
+const (
+	NetworkFunctionService_CreateNetworkFunction_FullMethodName = "/Vendor.NetworkFunctionService/CreateNetworkFunction"
+	NetworkFunctionService_DeleteNetworkFunction_FullMethodName = "/Vendor.NetworkFunctionService/DeleteNetworkFunction"
+)
+
+// NetworkFunctionServiceClient is the client API for NetworkFunctionService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type NetworkFunctionServiceClient interface {
+	CreateNetworkFunction(ctx context.Context, in *NFRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeleteNetworkFunction(ctx context.Context, in *NFRequest, opts ...grpc.CallOption) (*Empty, error)
+}
+
+type networkFunctionServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewNetworkFunctionServiceClient(cc grpc.ClientConnInterface) NetworkFunctionServiceClient {
+	return &networkFunctionServiceClient{cc}
+}
+
+func (c *networkFunctionServiceClient) CreateNetworkFunction(ctx context.Context, in *NFRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, NetworkFunctionService_CreateNetworkFunction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *networkFunctionServiceClient) DeleteNetworkFunction(ctx context.Context, in *NFRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, NetworkFunctionService_DeleteNetworkFunction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// NetworkFunctionServiceServer is the server API for NetworkFunctionService service.
+// All implementations must embed UnimplementedNetworkFunctionServiceServer
+// for forward compatibility
+type NetworkFunctionServiceServer interface {
+	CreateNetworkFunction(context.Context, *NFRequest) (*Empty, error)
+	DeleteNetworkFunction(context.Context, *NFRequest) (*Empty, error)
+	mustEmbedUnimplementedNetworkFunctionServiceServer()
+}
+
+// UnimplementedNetworkFunctionServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedNetworkFunctionServiceServer struct {
+}
+
+func (UnimplementedNetworkFunctionServiceServer) CreateNetworkFunction(context.Context, *NFRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateNetworkFunction not implemented")
+}
+func (UnimplementedNetworkFunctionServiceServer) DeleteNetworkFunction(context.Context, *NFRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteNetworkFunction not implemented")
+}
+func (UnimplementedNetworkFunctionServiceServer) mustEmbedUnimplementedNetworkFunctionServiceServer() {
+}
+
+// UnsafeNetworkFunctionServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to NetworkFunctionServiceServer will
+// result in compilation errors.
+type UnsafeNetworkFunctionServiceServer interface {
+	mustEmbedUnimplementedNetworkFunctionServiceServer()
+}
+
+func RegisterNetworkFunctionServiceServer(s grpc.ServiceRegistrar, srv NetworkFunctionServiceServer) {
+	s.RegisterService(&NetworkFunctionService_ServiceDesc, srv)
+}
+
+func _NetworkFunctionService_CreateNetworkFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NFRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NetworkFunctionServiceServer).CreateNetworkFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NetworkFunctionService_CreateNetworkFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NetworkFunctionServiceServer).CreateNetworkFunction(ctx, req.(*NFRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NetworkFunctionService_DeleteNetworkFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NFRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NetworkFunctionServiceServer).DeleteNetworkFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NetworkFunctionService_DeleteNetworkFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NetworkFunctionServiceServer).DeleteNetworkFunction(ctx, req.(*NFRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// NetworkFunctionService_ServiceDesc is the grpc.ServiceDesc for NetworkFunctionService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var NetworkFunctionService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "Vendor.NetworkFunctionService",
+	HandlerType: (*NetworkFunctionServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateNetworkFunction",
+			Handler:    _NetworkFunctionService_CreateNetworkFunction_Handler,
+		},
+		{
+			MethodName: "DeleteNetworkFunction",
+			Handler:    _NetworkFunctionService_DeleteNetworkFunction_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "api.proto",
+}
+
+const (
+	DeviceService_GetDevices_FullMethodName = "/Vendor.DeviceService/GetDevices"
+)
+
+// DeviceServiceClient is the client API for DeviceService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type DeviceServiceClient interface {
+	GetDevices(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DeviceListResponse, error)
+}
+
+type deviceServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewDeviceServiceClient(cc grpc.ClientConnInterface) DeviceServiceClient {
+	return &deviceServiceClient{cc}
+}
+
+func (c *deviceServiceClient) GetDevices(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DeviceListResponse, error) {
+	out := new(DeviceListResponse)
+	err := c.cc.Invoke(ctx, DeviceService_GetDevices_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeviceServiceServer is the server API for DeviceService service.
+// All implementations must embed UnimplementedDeviceServiceServer
+// for forward compatibility
+type DeviceServiceServer interface {
+	GetDevices(context.Context, *Empty) (*DeviceListResponse, error)
+	mustEmbedUnimplementedDeviceServiceServer()
+}
+
+// UnimplementedDeviceServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedDeviceServiceServer struct {
+}
+
+func (UnimplementedDeviceServiceServer) GetDevices(context.Context, *Empty) (*DeviceListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDevices not implemented")
+}
+func (UnimplementedDeviceServiceServer) mustEmbedUnimplementedDeviceServiceServer() {}
+
+// UnsafeDeviceServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to DeviceServiceServer will
+// result in compilation errors.
+type UnsafeDeviceServiceServer interface {
+	mustEmbedUnimplementedDeviceServiceServer()
+}
+
+func RegisterDeviceServiceServer(s grpc.ServiceRegistrar, srv DeviceServiceServer) {
+	s.RegisterService(&DeviceService_ServiceDesc, srv)
+}
+
+func _DeviceService_GetDevices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeviceServiceServer).GetDevices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeviceService_GetDevices_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeviceServiceServer).GetDevices(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// DeviceService_ServiceDesc is the grpc.ServiceDesc for DeviceService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var DeviceService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "Vendor.DeviceService",
+	HandlerType: (*DeviceServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetDevices",
+			Handler:    _DeviceService_GetDevices_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "api.proto",
+}

@@ -26,6 +26,7 @@ require (
 	k8s.io/apimachinery v0.29.1
 	k8s.io/client-go v0.29.0
 	k8s.io/klog/v2 v2.110.1
+	k8s.io/kubelet v0.24.0
 	sigs.k8s.io/controller-runtime v0.17.1
 )
 
@@ -105,4 +106,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/openshift/dpu-operator/api => ./api
+replace (
+	github.com/openshift/dpu-operator/api => ./api
+	github.com/openshift/dpu-operator/dpu-api => ./dpu-api
+)
