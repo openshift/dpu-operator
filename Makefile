@@ -153,16 +153,14 @@ images-build: ## Build all container images necessary to run the whole operator
 .PHONY: images-buildx
 images-buildx: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
-	buildah manifest rm tmp-manifest || true
-	buildah manifest create tmp-manifest
-	buildah build --authfile /root/config.json --manifest tmp-manifest --arch amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	buildah build --authfile /root/config.json --manifest tmp-manifest --arch arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	buildah manifest rm tmp-manifest2
-	buildah manifest create tmp-manifest2 || true
-	buildah build --authfile /root/config.json --manifest tmp-manifest2 --arch amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	buildah build --authfile /root/config.json --manifest tmp-manifest2 --arch arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	buildah manifest push --all tmp-manifest docker://$(DPU_OPERATOR_IMAGE)
-	buildah manifest push --all tmp-manifest2 docker://$(DPU_DAEMON_IMAGE)
+	buildah manifest rm $(DPU_OPERATOR_IMAGE)-manifest || true
+	buildah manifest create $(DPU_OPERATOR_IMAGE)-manifest
+	buildah build --authfile /root/config.json --manifest $(DPU_OPERATOR_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)
+	buildah manifest rm $(DPU_DAEMON_IMAGE)-manifest || true
+	buildah manifest create $(DPU_DAEMON_IMAGE)-manifest
+	buildah build --authfile /root/config.json --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 
 .PHONY: images-push
 images-push: test ## Push all container images necessary to run the whole operator
@@ -209,7 +207,7 @@ local-deploy: manifests kustomize ## Deploy controller with images hosted on loc
 	$(KUSTOMIZE) build config/dev | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Build Dependencies

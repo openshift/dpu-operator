@@ -114,21 +114,25 @@ func (d *HostDaemon) connectWithRetry() error {
 		d.log.Error(err, "did not connect")
 		return err
 	}
+	d.log.Info("Dial succeeded", "addr", d.addr, "port", d.port)
 	d.conn = conn
 	d.client = pb.NewBridgePortServiceClient(conn)
 	return nil
 }
 
 func (d *HostDaemon) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+	d.log.Info("addHandler")
 	res, err := d.sm.CmdAdd(req)
 	if err != nil {
 		return nil, fmt.Errorf("SRIOV manager failed in add handler: %v", err)
 	}
+	d.log.Info("addHandler d.sm.CmdAdd succeeded")
 	pf := 0
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.OrigVfState.EffectiveMAC
 	d.log.Info("addHandler", "CNIConf", req.CNIConf)
-	vlan := *req.CNIConf.Vlan
+	// TODO: fix setting Vlan based on network definition in CR
+	vlan := 2 // *req.CNIConf.Vlan
 	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
 	_, err = d.CreateBridgePort(pf, vf, vlan, mac)
 	if err != nil {
@@ -136,7 +140,6 @@ func (d *HostDaemon) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result,
 	}
 	d.log.Info("addHandler CreateBridgePort succeeded")
 
-	d.log.Info("addHandler d.sm.CmdAdd succeeded")
 	return res, nil
 }
 
@@ -148,7 +151,8 @@ func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result,
 	pf := 0
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.OrigVfState.EffectiveMAC
-	vlan := *req.CNIConf.Vlan
+	// TODO: fix setting Vlan based on network definition in CR
+	vlan := 2 // *req.CNIConf.Vlan
 	d.log.Info("delHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
 	d.DeleteBridgePort(pf, vf, vlan, mac)
 	return nil, nil
