@@ -25,6 +25,5 @@ COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/bindata /bindata
 USER 65532:65532
 
-RUN ls /
 ENTRYPOINT ["/manager"]
 
