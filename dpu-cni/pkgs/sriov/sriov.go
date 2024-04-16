@@ -567,6 +567,7 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 			return err
 		}
 	}
+	req.CNIConf.VFID = netConf.VFID
 
 	// Mark the pci address as released
 	klog.Infof("Mark the PCI address as released %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)

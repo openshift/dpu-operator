@@ -24,7 +24,7 @@ const (
 	pluginMountPath = "/var/lib/kubelet/device-plugins"
 	kubeletEndpoint = "kubelet.sock"
 	pluginEndpoint  = "sriovNet.sock"
-	resourceName    = "dpu"
+	resourceName    = "openshift.io/dpu"
 )
 
 // sriovManager manages sriov networking devices
