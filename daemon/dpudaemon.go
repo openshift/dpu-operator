@@ -25,12 +25,12 @@ type DpuDaemon struct {
 }
 
 func (s *DpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
-	s.log.Info("Passing CreateBridgePort")
+	s.log.Info("Passing CreateBridgePort", "name", bpr.BridgePort.Name)
 	return s.vsp.CreateBridgePort(bpr)
 }
 
 func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBridgePortRequest) (*emptypb.Empty, error) {
-	s.log.Info("Passing DeleteBridgePort")
+	s.log.Info("Passing DeleteBridgePort", "name", bpr.Name)
 	err := s.vsp.DeleteBridgePort(bpr)
 	return &emptypb.Empty{}, err
 }
