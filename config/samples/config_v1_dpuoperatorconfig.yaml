@@ -9,4 +9,4 @@ metadata:
     app.kubernetes.io/created-by: dpu-operator
   name: dpuoperatorconfig-sample
 spec:
-  # TODO(user): Add fields here
+  mode: host

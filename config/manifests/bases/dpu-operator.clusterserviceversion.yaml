@@ -1,0 +1,53 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: dpu-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
+      displayName: Dpu Operator Config
+      kind: DpuOperatorConfig
+      name: dpuoperatorconfigs.config.openshift.io
+      version: v1
+  description: This operator will manage and configure data processing unit (DPUs)
+    to be used in accelerating/offloading k8s networking functions
+  displayName: DPU Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - dpu
+  - dpu-operator
+  - ipu
+  links:
+  - name: Dpu Operator
+    url: https://github.com/openshift/dpu-operator
+  maintainers:
+  - email: wizhao@redhat.com
+    name: William Zhao
+  - email: bnemeth@redhat.com
+    name: Balazs Nemeth
+  maturity: alpha
+  provider:
+    name: Red Hat
+    url: www.redhat.com
+  version: 0.0.0
