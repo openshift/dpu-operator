@@ -45,12 +45,13 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb
 
 	createRequest := &pb.CreateBridgePortRequest{
 		BridgePort: &pb.BridgePort{
-			Name: fmt.Sprintf("%d-%d", pf, vf),
+			Name: "host" + fmt.Sprintf("%d-%d", pf, vf),
 			Spec: &pb.BridgePortSpec{
 				Ptype:      1,
 				MacAddress: m,
 				LogicalBridges: []string{
-					fmt.Sprintf("%d", vlan),
+					// TODO: Remove +2
+					fmt.Sprintf("%d", vf + 2),
 				},
 			},
 		},
@@ -61,9 +62,7 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb
 
 func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) error {
 	d.connectWithRetry()
-	req := &pb.DeleteBridgePortRequest{
-		Name: fmt.Sprintf("%d-%d-%d-%s", pf, vf, vlan, mac),
-	}
+	req := &pb.DeleteBridgePortRequest{Name: "host" + fmt.Sprintf("%d-%d", pf, vf)}
 
 	_, err := d.client.DeleteBridgePort(context.TODO(), req)
 	return err
