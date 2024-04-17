@@ -1,0 +1,17 @@
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+spec:
+  tags:
+  - name: dpu-operator
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-dpu-operator:4.16
+  - name: dpu-operator-daemon
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-dpu-operator-daemon:4.16
+  - name: kube-rbac-proxy
+    from:
+      kind: DockerImage
+      name: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
