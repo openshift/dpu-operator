@@ -1,13 +1,13 @@
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: dpu-operator-daemon-role-binding
-  namespace: {{.Namespace}} 
+  name: dpu-daemon-role-binding
+  namespace: {{.Namespace}}
 subjects:
 - kind: ServiceAccount
-  name: dpu-operator-daemon-sa
+  name: dpu-daemon-sa
 roleRef:
   kind: Role
-  name: dpu-operator-daemon-role
+  name: dpu-daemon-role
   apiGroup: rbac.authorization.k8s.io
 

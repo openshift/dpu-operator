@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: dpu-operator-daemon
+  name: dpu-daemon
   namespace: {{.Namespace}}
 spec:
   selector:
     matchLabels:
-      app: dpu-operator-daemon
+      app: dpu-daemon
   template:
     metadata:
       labels:
-        app: dpu-operator-daemon
+        app: dpu-daemon
         component: network
         type: infra
     spec:
-      serviceAccountName: dpu-operator-daemon-sa
+      serviceAccountName: dpu-daemon-sa
       hostNetwork: true
       hostPID: true
       nodeSelector:
@@ -22,7 +22,7 @@ spec:
       securityContext:
         privileged: true
       containers:
-      - name: dpu-operator-daemon
+      - name: dpu-daemon
         image: {{.DpuOperatorDaemonImage}}
         securityContext:
           privileged: true
