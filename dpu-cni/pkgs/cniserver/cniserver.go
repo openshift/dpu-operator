@@ -18,7 +18,6 @@ import (
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnihelper"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
-	sriovtypes "github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovtypes"
 	"k8s.io/klog/v2"
 )
 
@@ -217,17 +216,22 @@ func cniRequestToPodRequest(cr *cnitypes.Request) (*cnitypes.PodRequest, error) 
 	req.NetName = conf.Name
 
 	if conf.DeviceID != "" {
-		if sriovtypes.IsPCIDeviceName(conf.DeviceID) {
-			// DeviceID is a PCI address
-		} else if sriovtypes.IsAuxDeviceName(conf.DeviceID) {
-			// DeviceID is an Auxiliary device name - <driver_name>.<kind_of_a_type>.<id>
-			chunks := strings.Split(conf.DeviceID, ".")
-			if chunks[1] != "sf" {
-				return nil, fmt.Errorf("only SF auxiliary devices are supported")
+		// FIXME: Some DeviceIDs are formated differently between CNIs
+		// for instance the sriov CNI uses PCI address from the sriov device plugin
+		// and the nf CNI uses interface names from our internal device plugin
+		/*
+			if sriovtypes.IsPCIDeviceName(conf.DeviceID) {
+				// DeviceID is a PCI address
+			} else if sriovtypes.IsAuxDeviceName(conf.DeviceID) {
+				// DeviceID is an Auxiliary device name - <driver_name>.<kind_of_a_type>.<id>
+				chunks := strings.Split(conf.DeviceID, ".")
+				if chunks[1] != "sf" {
+					return nil, fmt.Errorf("only SF auxiliary devices are supported")
+				}
+			} else {
+				return nil, fmt.Errorf("expected PCI or Auxiliary device name, got - %s", conf.DeviceID)
 			}
-		} else {
-			return nil, fmt.Errorf("expected PCI or Auxiliary device name, got - %s", conf.DeviceID)
-		}
+		*/
 	}
 
 	req.CNIConf = conf
