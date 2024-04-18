@@ -26,7 +26,7 @@ var (
 	testNamespace             = "openshift-dpu-operator"
 	testDpuOperatorConfigName = "default"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
-	testDpuDaemonName         = "dpu-operator-daemon"
+	testDpuDaemonName         = "dpu-daemon"
 	testSriovDevicePlugin     = "sriov-device-plugin"
 	testAPITimeout            = time.Second * 20
 	testRetryInterval         = time.Second * 1
