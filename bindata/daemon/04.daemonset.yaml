@@ -41,8 +41,10 @@ spec:
         - name: dpu-daemon-mount
           mountPath: /var/run/dpu-daemon
           mountPropagation: Bidirectional
-        - name: cni-dir
+        - name: var-cni-dir
           mountPath: /var/lib/cni
+        - name: opt-cni-dir
+          mountPath: /opt/cni
         - name: host-run
           mountPath: /var/run/netns
           mountPropagation: Bidirectional
@@ -58,9 +60,12 @@ spec:
         - name: dpu-daemon-mount
           hostPath:
             path: /var/run/dpu-daemon
-        - name: cni-dir
+        - name: var-cni-dir
           hostPath:
             path: /var/lib/cni
+        - name: opt-cni-dir
+          hostPath:
+            path: /opt/cni
         - name: host-run
           hostPath:
             path: /var/run/netns

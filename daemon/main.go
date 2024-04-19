@@ -80,12 +80,12 @@ func makeExecutable(file string) error {
 	return nil
 }
 
-func prepareCni() error {
-	err := copyFile("/dpu-cni", "/var/lib/cni/bin/dpu-cni")
+func prepareCni(path string) error {
+	err := copyFile("/dpu-cni", path)
 	if err != nil {
 		return err
 	}
-	return makeExecutable("/var/lib/cni/bin/dpu-cni")
+	return makeExecutable(path)
 }
 
 func main() {
@@ -104,9 +104,18 @@ func main() {
 	log := ctrl.Log.WithName("Daemon Init")
 	log.Info("Daemon init")
 
-	err = prepareCni()
+	// Some k8s clusters use /var/lib (in the case of RHCOS based)
+	// and some use /opt (in the case of RHEL based)
+	// FIXME: In the future we should detect the cluster and move the
+	// binaries to the expected locations only.
+	err = prepareCni("/var/lib/cni/bin/dpu-cni")
 	if err != nil {
-		log.Error(err, "Failed to prepare CNI binary")
+		log.Error(err, "Failed to prepare CNI binary in /var/lib")
+		return
+	}
+	err = prepareCni("/opt/cni/bin/dpu-cni")
+	if err != nil {
+		log.Error(err, "Failed to prepare CNI binary in /opt")
 		return
 	}
 
