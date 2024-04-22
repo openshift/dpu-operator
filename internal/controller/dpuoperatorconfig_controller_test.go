@@ -223,7 +223,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 		})
 		It("should not have SR-IOV device plugin daemonsets created by controller manager", func() {
 			daemonSet := &appsv1.DaemonSet{}
-			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: testNamespace, Namespace: testSriovDevicePlugin}, daemonSet)
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testSriovDevicePlugin}, daemonSet)
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 		It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
