@@ -77,6 +77,10 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil {
 		logger.Error(err, "Failed to ensure SRIOV Device Plugin DaemonSet is running")
 	}
+	err = r.createNetworkFunctionNad(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to create Network Function NAD")
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -154,6 +158,33 @@ func (r *DpuOperatorConfigReconciler) ensureSriovDevicePluginRunning(ctx context
 
 		logger.Info("Ensuring that SRIOV Device Plugin DaemonSet is running")
 		objs, err := render.RenderDir("./bindata/sriov-device-plugin", &data)
+		if err != nil {
+			logger.Error(err, "Failed to render SRIOV Device Plugin DaemonSet manifests")
+			return err
+		}
+
+		for _, obj := range objs {
+			if err := ctrl.SetControllerReference(cfg, obj, r.Scheme); err != nil {
+				return err
+			}
+			if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
+				return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *DpuOperatorConfigReconciler) createNetworkFunctionNad(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	if cfg.Spec.Mode == "dpu" {
+		data := render.MakeRenderData()
+		// All the CRs will be in the same namespace as the operator config
+		setCommonData(&data, cfg)
+		data.Data["ResourceName"] = "openshift.io/dpu" // FIXME: Hardcode for now
+
+		logger.Info("Create the Network Function NAD")
+		objs, err := render.RenderDir("./bindata/networkfn-nad", &data)
 		if err != nil {
 			logger.Error(err, "Failed to render SRIOV Device Plugin DaemonSet manifests")
 			return err
