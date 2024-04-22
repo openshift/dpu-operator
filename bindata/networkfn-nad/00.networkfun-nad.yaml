@@ -1,0 +1,13 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: dpunfcni-conf
+  namespace: {{.Namespace}}
+  annotations:
+        k8s.v1.cni.cncf.io/resourceName: {{.ResourceName}}
+spec:
+  config: '{
+      "cniVersion": "0.4.0",
+      "name": "dpu-cni",
+      "type": "dpu-cni"
+    }'

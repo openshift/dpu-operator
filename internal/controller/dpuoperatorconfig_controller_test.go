@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	netattdefv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -28,6 +29,7 @@ var (
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
 	testSriovDevicePlugin     = "sriov-device-plugin"
+	testNetworkFunctionNAD    = "dpunfcni-conf"
 	testAPITimeout            = time.Second * 20
 	testRetryInterval         = time.Second * 1
 )
@@ -144,7 +146,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 		// cleaned up!!
 		By("bootstrapping test environment")
 		testEnv = &envtest.Environment{
-			CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases")},
+			CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases"), filepath.Join("test", "crd")},
 			ErrorIfCRDPathMissing: true,
 		}
 		var err error
@@ -155,6 +157,8 @@ var _ = Describe("Main Controller", Ordered, func() {
 
 		By("registering schemes")
 		err = configv1.AddToScheme(scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
+		err = netattdefv1.AddToScheme(scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating k8s client")
@@ -191,6 +195,11 @@ var _ = Describe("Main Controller", Ordered, func() {
 			Expect(daemonSet.OwnerReferences[0].Kind).To(Equal(testDpuOperatorConfigKind))
 			Expect(daemonSet.OwnerReferences[0].Name).To(Equal(testDpuOperatorConfigName))
 		})
+		It("should not have the network function NAD created by controller manager", func() {
+			nad := &netattdefv1.NetworkAttachmentDefinition{}
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, nad)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
 		AfterEach(func() {
 			stopDPUControllerManager(mode, cancel, &wg)
 		})
@@ -214,8 +223,21 @@ var _ = Describe("Main Controller", Ordered, func() {
 		})
 		It("should not have SR-IOV device plugin daemonsets created by controller manager", func() {
 			daemonSet := &appsv1.DaemonSet{}
-			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: testNamespace, Namespace: testSriovDevicePlugin}, daemonSet)
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testSriovDevicePlugin}, daemonSet)
 			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+		It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
+			nad := &netattdefv1.NetworkAttachmentDefinition{}
+			Eventually(func() error {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, nad)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, testAPITimeout, testRetryInterval).ShouldNot(HaveOccurred())
+			Expect(nad.OwnerReferences).To(HaveLen(1))
+			Expect(nad.OwnerReferences[0].Kind).To(Equal(testDpuOperatorConfigKind))
+			Expect(nad.OwnerReferences[0].Name).To(Equal(testDpuOperatorConfigName))
 		})
 		AfterEach(func() {
 			stopDPUControllerManager(mode, cancel, &wg)
