@@ -10,7 +10,6 @@ import (
 	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/sys/unix"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -81,21 +80,12 @@ func makeExecutable(file string) error {
 	return nil
 }
 
-func writable(path string) bool {
-	return unix.Access(path, unix.W_OK) == nil
-}
-
 func prepareCni(path string) error {
-	// Some cluster node environments do not allow certain
-	// directories to be writeable. (e.g. RHCOS systems)
-	if writable(path) {
-		err := copyFile("/dpu-cni", path)
-		if err != nil {
-			return err
-		}
-		return makeExecutable(path)
+	err := copyFile("/dpu-cni", path)
+	if err != nil {
+		return err
 	}
-	return nil
+	return makeExecutable(path)
 }
 
 func main() {
@@ -121,12 +111,12 @@ func main() {
 	err = prepareCni("/var/lib/cni/bin/dpu-cni")
 	if err != nil {
 		log.Error(err, "Failed to prepare CNI binary in /var/lib")
-		return
+		/* Don't return on error for now */
 	}
 	err = prepareCni("/opt/cni/bin/dpu-cni")
 	if err != nil {
 		log.Error(err, "Failed to prepare CNI binary in /opt")
-		return
+		/* Don't return on error for now */
 	}
 
 	dpuMode, err = isDpuMode(mode)
