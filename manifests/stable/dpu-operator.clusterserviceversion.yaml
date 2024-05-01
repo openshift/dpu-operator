@@ -23,7 +23,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-04-24T14:07:47Z"
+    createdAt: "2024-05-01T20:33:53Z"
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: dpu-operator.v4.16.0
