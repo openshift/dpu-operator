@@ -23,7 +23,8 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-01T18:51:54Z"
+    createdAt: "2024-05-02T01:10:03Z"
+    operatorframework.io/suggested-namespace: dpu-operator-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: dpu-operator.v4.16.0
@@ -290,9 +291,9 @@ spec:
         serviceAccountName: dpu-operator-controller-manager
     strategy: deployment
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
