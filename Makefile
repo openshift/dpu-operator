@@ -71,8 +71,8 @@ CONTAINER_TOOL ?= podman
 
 # Use the image urls from the yaml that is used with Kustomize for local
 # development.
-DPU_OPERATOR_IMAGE := $(shell yq -r .spec.template.spec.containers[0].image config/dev/local-images.yaml)
-DPU_DAEMON_IMAGE := $(shell yq -r .spec.template.spec.containers[0].env[0].value config/dev/local-images.yaml)
+DPU_OPERATOR_IMAGE ?= $(shell yq -r .spec.template.spec.containers[0].image config/dev/local-images.yaml)
+DPU_DAEMON_IMAGE ?= $(shell yq -r .spec.template.spec.containers[0].env[0].value config/dev/local-images.yaml)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
