@@ -113,6 +113,13 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
+.PHONY: fmt-check
+fmt-check:
+	@files=$$(find . -name "*.go" -not -path "./vendor/*" -not -path "./dpu-api/vendor/*"); \
+	output=$$(gofmt -d $$files); \
+	[ -n "$$output" ] && echo "$$output"; \
+	[ -z "$$output" ]
+
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
