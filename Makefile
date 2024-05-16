@@ -124,10 +124,22 @@ fmt-check:
 vet: ## Run go vet against code.
 	go vet ./...
 
-.PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+.PHONY: podman-check
+check-podman:
+	@if which podman > /dev/null; then \
+		echo "Podman is available"; \
+		else \
+		echo "Error: Podman is not available"; \
+		exit 1; \
+	fi
 
+.PHONY: test
+test: podman-check manifests generate fmt vet envtest
+	FAST_TEST=false KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+
+.PHONY: test
+fast-test: 
+	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 ##@ Build
 
 .PHONY: build
