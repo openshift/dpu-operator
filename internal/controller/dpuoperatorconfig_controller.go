@@ -18,24 +18,48 @@ package controller
 
 import (
 	"context"
+	"embed"
 	"fmt"
-	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
-	"github.com/openshift/cluster-network-operator/pkg/render"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
-	appsv1 "k8s.io/api/apps/v1"
+	"github.com/openshift/dpu-operator/pkgs/render"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+//go:embed bindata/*
+var binData embed.FS
+
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
 type DpuOperatorConfigReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	dpuDaemonImage  string
+	imagePullPolicy string
+}
+
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string) *DpuOperatorConfigReconciler {
+	return &DpuOperatorConfigReconciler{
+		Client:          client,
+		Scheme:          scheme,
+		dpuDaemonImage:  dpuDaemonImage,
+		imagePullPolicy: "IfNotPresent",
+	}
+}
+
+func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOperatorConfigReconciler {
+	r.imagePullPolicy = policy
+	return r
 }
 
 //+kubebuilder:rbac:groups=config.openshift.io,resources=dpuoperatorconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -70,137 +94,113 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		logger.Error(err, "Failed to get DpuOperatorConfig resource")
 		return ctrl.Result{}, err
 	}
-	err := r.ensureDpuDeamonSetRunning(ctx, dpuOperatorConfig)
+
+	err := r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
 	if err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
 	}
-	err = r.ensureSriovDevicePluginRunning(ctx, dpuOperatorConfig)
-	if err != nil {
-		logger.Error(err, "Failed to ensure SRIOV Device Plugin DaemonSet is running")
+	if dpuOperatorConfig.Spec.Mode == "host" {
+		err = r.ensureSriovDevicePlugin(ctx, dpuOperatorConfig)
+		if err != nil {
+			logger.Error(err, "Failed to ensure SRIOV Device Plugin DaemonSet is running")
+		}
 	}
-	err = r.createNetworkFunctionNad(ctx, dpuOperatorConfig)
-	if err != nil {
-		logger.Error(err, "Failed to create Network Function NAD")
+
+	if dpuOperatorConfig.Spec.Mode == "dpu" {
+		err = r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig)
+		if err != nil {
+			logger.Error(err, "Failed to create Network Function NAD")
+		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func getImagePullPolicy() string {
-	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
-		return value
-	}
-	return "IfNotPresent"
-}
-
-func setCommonData(data *render.RenderData, cfg *configv1.DpuOperatorConfig) {
-	data.Data["Namespace"] = cfg.Namespace
-	data.Data["ImagePullPolicy"] = getImagePullPolicy()
-}
-
-func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSetRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
-	var err error
-
-	logger := log.FromContext(ctx)
-	data := render.MakeRenderData()
+func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]string {
 	// All the CRs will be in the same namespace as the operator config
-	setCommonData(&data, cfg)
-	data.Data["Mode"] = cfg.Spec.Mode
-	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
-	if dpuDaemonImage == "" {
-		return fmt.Errorf("DPU_DAEMON_IMAGE not set")
+	data := map[string]string{
+		"Namespace":              cfg.Namespace,
+		"ImagePullPolicy":        r.imagePullPolicy,
+		"Mode":                   cfg.Spec.Mode,
+		"DpuOperatorDaemonImage": r.dpuDaemonImage,
+		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
 	}
-	data.Data["DpuOperatorDaemonImage"] = dpuDaemonImage
+	return data
+}
 
-	logger.Info("Ensuring that DPU DaemonSet is running", "image", dpuDaemonImage)
-	objs, err := render.RenderDir("./bindata/daemon", &data)
+func binDataYamlFiles(dirPath string) ([]string, error) {
+	var yamlFileDescriptors []string
+
+	dir, err := binData.ReadDir(filepath.Join("bindata", dirPath))
 	if err != nil {
-		logger.Error(err, "Failed to render dpu daemon manifests")
+		return nil, err
+	}
+
+	for _, f := range dir {
+		if !f.IsDir() && strings.HasSuffix(f.Name(), ".yaml") {
+			yamlFileDescriptors = append(yamlFileDescriptors, filepath.Join(dirPath, f.Name()))
+		}
+	}
+
+	sort.Strings(yamlFileDescriptors)
+	return yamlFileDescriptors, nil
+}
+
+func (r *DpuOperatorConfigReconciler) applyFromBinData(logger logr.Logger, cfg *configv1.DpuOperatorConfig, filePath string, data map[string]string) error {
+	file, err := binData.Open(filepath.Join("bindata", filePath))
+	if err != nil {
+		return fmt.Errorf("Failed to read file '%s': %v", filePath, err)
+	}
+	applied, err := render.ApplyTemplate(file, data)
+	if err != nil {
+		return fmt.Errorf("Failed to apply template on '%s': %v", filePath, err)
+	}
+	var obj *unstructured.Unstructured
+	err = yaml.NewYAMLOrJSONDecoder(applied, 1024).Decode(&obj)
+	if err != nil {
 		return err
 	}
-
-	for _, obj := range objs {
-		if err := ctrl.SetControllerReference(cfg, obj, r.Scheme); err != nil {
-			return err
-		}
+	if err := ctrl.SetControllerReference(cfg, obj, r.Scheme); err != nil {
+		return err
 	}
+	logger.Info("Preparing CR", "kind", obj.GetKind())
+	if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
+		return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
+	}
+	return nil
+}
 
-	for _, obj := range objs {
-		logger.Info("Preparing CR", "kind", obj.GetKind())
-		if obj.GetKind() == "DaemonSet" {
-			scheme := r.Scheme
-			ds := &appsv1.DaemonSet{}
-			err = scheme.Convert(obj, ds, nil)
-			if err != nil {
-				logger.Error(err, "Fail to convert to DaemonSet")
-				return err
-			}
-			ds.Spec.Template.Spec.NodeSelector["dpu"] = "true"
-			err = scheme.Convert(ds, obj, nil)
-			if err != nil {
-				logger.Error(err, "Fail to convert to Unstructured")
-				return err
-			}
-		}
-		if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
-			return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
+func (r *DpuOperatorConfigReconciler) applyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
+	data := r.createCommonData(cfg)
+	filePaths, err := binDataYamlFiles(binDataPath)
+	if err != nil {
+		return err
+	}
+	for _, f := range filePaths {
+		err = r.applyFromBinData(logger, cfg, f, data)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (r *DpuOperatorConfigReconciler) ensureSriovDevicePluginRunning(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-	// There will be a device plugin running in the daemon
-	if cfg.Spec.Mode == "host" {
-		data := render.MakeRenderData()
-		// All the CRs will be in the same namespace as the operator config
-		setCommonData(&data, cfg)
-
-		logger.Info("Ensuring that SRIOV Device Plugin DaemonSet is running")
-		objs, err := render.RenderDir("./bindata/sriov-device-plugin", &data)
-		if err != nil {
-			logger.Error(err, "Failed to render SRIOV Device Plugin DaemonSet manifests")
-			return err
-		}
-
-		for _, obj := range objs {
-			if err := ctrl.SetControllerReference(cfg, obj, r.Scheme); err != nil {
-				return err
-			}
-			if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
-				return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
-			}
-		}
-	}
-	return nil
+	logger.Info("Ensuring DPU DaemonSet", "image", r.dpuDaemonImage)
+	return r.applyAllFromBinData(logger, "daemon", cfg)
 }
 
-func (r *DpuOperatorConfigReconciler) createNetworkFunctionNad(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+func (r *DpuOperatorConfigReconciler) ensureSriovDevicePlugin(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-	if cfg.Spec.Mode == "dpu" {
-		data := render.MakeRenderData()
-		// All the CRs will be in the same namespace as the operator config
-		setCommonData(&data, cfg)
-		data.Data["ResourceName"] = "openshift.io/dpu" // FIXME: Hardcode for now
+	logger.Info("Ensurting Sriov Device Plugin")
+	return r.applyAllFromBinData(logger, "sriov-device-plugin", cfg)
+}
 
-		logger.Info("Create the Network Function NAD")
-		objs, err := render.RenderDir("./bindata/networkfn-nad", &data)
-		if err != nil {
-			logger.Error(err, "Failed to render SRIOV Device Plugin DaemonSet manifests")
-			return err
-		}
-
-		for _, obj := range objs {
-			if err := ctrl.SetControllerReference(cfg, obj, r.Scheme); err != nil {
-				return err
-			}
-			if err := apply.ApplyObject(context.TODO(), r.Client, obj); err != nil {
-				return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
-			}
-		}
-	}
-	return nil
+func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Create the Network Function NAD")
+	return r.applyAllFromBinData(logger, "networkfn-nad", cfg)
 }
 
 // SetupWithManager sets up the controller with the Manager.

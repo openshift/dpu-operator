@@ -54,8 +54,10 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var binDataPath string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":18090", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":18091", "The address the probe endpoint binds to.")
+	flag.StringVar(&binDataPath, "bindata", "./bindata", "bin data path")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -93,10 +95,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.DpuOperatorConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
+	if dpuDaemonImage == "" {
+		setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
+	}
+
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage)
+
+	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
+		b = b.WithImagePullPolicy(value)
+	}
+
+	if err = b.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DpuOperatorConfig")
 		os.Exit(1)
 	}
