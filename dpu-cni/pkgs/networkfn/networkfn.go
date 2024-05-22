@@ -267,6 +267,7 @@ func CmdAdd(req *cnitypes.PodRequest) (*current.Result, error) {
 		Mac:     contDev.Attrs().HardwareAddr.String(),
 		Sandbox: containerNs.Path(),
 	}}
+	req.CNIConf.MAC = contDev.Attrs().HardwareAddr.String()
 
 	if conf.IPAM.Type == "" {
 		return result, nil

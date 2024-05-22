@@ -52,6 +52,14 @@ func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortReques
 	return nil
 }
 
+func (g *DummyPlugin) CreateNetworkFunction(input string, output string) error {
+	return nil
+}
+
+func (g *DummyPlugin) DeleteNetworkFunction(input string, output string) error {
+	return nil
+}
+
 type SriovManagerStub struct{}
 
 func (m SriovManagerStub) SetupVF(conf *cnitypes.NetConf, podifName string, netns ns.NetNS) error {

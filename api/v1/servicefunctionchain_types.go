@@ -25,17 +25,12 @@ import (
 
 // ServiceFunctionChainSpec defines the desired state of ServiceFunctionChain
 type ServiceFunctionChainSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ServiceFunctionChain. Edit servicefunctionchain_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	NetworkFunctions []NetworkFunction `json:"networkFunctions"`
 }
 
-// ServiceFunctionChainStatus defines the observed state of ServiceFunctionChain
-type ServiceFunctionChainStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+type NetworkFunction struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
 }
 
 //+kubebuilder:object:root=true
@@ -50,7 +45,8 @@ type ServiceFunctionChain struct {
 	Status ServiceFunctionChainStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+type ServiceFunctionChainStatus struct {
+}
 
 // ServiceFunctionChainList contains a list of ServiceFunctionChain
 type ServiceFunctionChainList struct {

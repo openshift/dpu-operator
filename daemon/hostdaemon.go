@@ -9,14 +9,21 @@ import (
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/daemon/plugin"
+	sfcreconciler "github.com/openshift/dpu-operator/daemon/sfc-reconciler"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
 
 type HostDaemon struct {
@@ -30,6 +37,7 @@ type HostDaemon struct {
 	cniServerPath string
 	cniserver     *cniserver.Server
 	sm            sriov.Manager
+	manager       ctrl.Manager
 }
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -84,6 +92,11 @@ func (d *HostDaemon) WithCniServerPath(serverPath string) *HostDaemon {
 
 func (d *HostDaemon) WithSriovManager(manager sriov.Manager) *HostDaemon {
 	d.sm = manager
+	return d
+}
+
+func (d *HostDaemon) WithManager(manager ctrl.Manager) *HostDaemon {
+	d.manager = manager
 	return d
 }
 
@@ -180,13 +193,33 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 }
 
 func (d *HostDaemon) ListenAndServe() error {
+	done := make(chan error, 1)
 	listener, err := d.Listen()
 
 	if err != nil {
 		d.log.Error(err, "Failed to listen")
 		return err
 	}
-	return d.Serve(listener)
+	go func() {
+		d.log.Info("Starging CNI server")
+		if err := d.Serve(listener); err != nil {
+			done <- err
+		} else {
+			done <- nil
+		}
+	}()
+
+	d.setupReconcilers()
+	go func() {
+		d.log.Info("Starting manager")
+		if err := d.manager.Start(ctrl.SetupSignalHandler()); err != nil {
+			done <- err
+		} else {
+			done <- nil
+		}
+	}()
+
+	return <-done
 }
 
 func (d *HostDaemon) Serve(listener net.Listener) error {
@@ -204,5 +237,42 @@ func (d *HostDaemon) Stop() {
 		defer cancel()
 		d.cniserver.Shutdown(ctx)
 		d.cniserver = nil
+	}
+}
+
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
+}
+
+func (d *HostDaemon) setupReconcilers() {
+	if d.manager == nil {
+		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+			Scheme: scheme,
+			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+				opts.DefaultNamespaces = map[string]cache.Config{
+					"dpu-operator-system": {},
+				}
+				return cache.New(config, opts)
+			},
+		})
+		if err != nil {
+			d.log.Error(err, "unable to start manager")
+		}
+
+		sfcReconciler := &sfcreconciler.SfcReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}
+
+		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
+			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
+		}
+		d.manager = mgr
 	}
 }
