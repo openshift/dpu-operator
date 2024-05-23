@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
@@ -193,6 +194,7 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 }
 
 func (d *HostDaemon) ListenAndServe() error {
+	var wg sync.WaitGroup
 	done := make(chan error, 1)
 	listener, err := d.Listen()
 
@@ -200,6 +202,8 @@ func (d *HostDaemon) ListenAndServe() error {
 		d.log.Error(err, "Failed to listen")
 		return err
 	}
+
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starging CNI server")
 		if err := d.Serve(listener); err != nil {
@@ -207,19 +211,29 @@ func (d *HostDaemon) ListenAndServe() error {
 		} else {
 			done <- nil
 		}
+		wg.Done()
 	}()
 
 	d.setupReconcilers()
+	wg.Add(1)
+
+	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
 	go func() {
 		d.log.Info("Starting manager")
-		if err := d.manager.Start(ctrl.SetupSignalHandler()); err != nil {
+
+		if err := d.manager.Start(ctx); err != nil {
 			done <- err
 		} else {
 			done <- nil
 		}
+		wg.Done()
 	}()
 
-	return <-done
+	cancelManager()
+	d.cniserver.Shutdown(context.TODO())
+	wg.Wait()
+
+	return err
 }
 
 func (d *HostDaemon) Serve(listener net.Listener) error {
