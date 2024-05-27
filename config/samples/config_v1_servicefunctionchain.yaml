@@ -1,0 +1,12 @@
+apiVersion: config.openshift.io/v1
+kind: ServiceFunctionChain
+metadata:
+  labels:
+    app.kubernetes.io/name: servicefunctionchain
+    app.kubernetes.io/instance: servicefunctionchain-sample
+    app.kubernetes.io/part-of: dpu-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: dpu-operator
+  name: servicefunctionchain-sample
+spec:
+  # TODO(user): Add fields here

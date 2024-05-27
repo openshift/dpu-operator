@@ -19,6 +19,7 @@ require (
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20230905152006-63484bbf69f8
 	go.uber.org/zap v1.26.0
 	golang.org/x/net v0.20.0
+	golang.org/x/sys v0.16.0
 	google.golang.org/grpc v1.58.3
 	google.golang.org/protobuf v1.33.0
 	k8s.io/api v0.29.0
@@ -82,7 +83,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect

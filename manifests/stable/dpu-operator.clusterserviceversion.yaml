@@ -20,10 +20,25 @@ metadata:
           "spec": {
             "mode": "host"
           }
+        },
+        {
+          "apiVersion": "config.openshift.io/v1",
+          "kind": "ServiceFunctionChain",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "dpu-operator",
+              "app.kubernetes.io/instance": "servicefunctionchain-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "servicefunctionchain",
+              "app.kubernetes.io/part-of": "dpu-operator"
+            },
+            "name": "servicefunctionchain-sample"
+          },
+          "spec": null
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-22T07:10:45Z"
+    createdAt: "2024-05-22T07:12:10Z"
     operatorframework.io/suggested-namespace: dpu-operator-system
     operators.operatorframework.io/builder: operator-sdk-v1.34.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -37,6 +52,12 @@ spec:
       displayName: Dpu Operator Config
       kind: DpuOperatorConfig
       name: dpuoperatorconfigs.config.openshift.io
+      version: v1
+    - description: ServiceFunctionChain is the Schema for the servicefunctionchains
+        API
+      displayName: Service Function Chain
+      kind: ServiceFunctionChain
+      name: servicefunctionchains.config.openshift.io
       version: v1
   description: This operator will manage and configure data processing unit (DPUs)
     to be used in accelerating/offloading k8s networking functions
@@ -106,6 +127,32 @@ spec:
           - config.openshift.io
           resources:
           - dpuoperatorconfigs/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - servicefunctionchains
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - servicefunctionchains/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - servicefunctionchains/status
           verbs:
           - get
           - patch

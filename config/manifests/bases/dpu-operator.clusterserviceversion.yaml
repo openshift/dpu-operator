@@ -16,6 +16,12 @@ spec:
       kind: DpuOperatorConfig
       name: dpuoperatorconfigs.config.openshift.io
       version: v1
+    - description: ServiceFunctionChain is the Schema for the servicefunctionchains
+        API
+      displayName: Service Function Chain
+      kind: ServiceFunctionChain
+      name: servicefunctionchains.config.openshift.io
+      version: v1
   description: This operator will manage and configure data processing unit (DPUs)
     to be used in accelerating/offloading k8s networking functions
   displayName: DPU Operator

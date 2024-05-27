@@ -1,0 +1,27 @@
+# permissions for end users to view servicefunctionchains.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: servicefunctionchain-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: dpu-operator
+    app.kubernetes.io/part-of: dpu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: servicefunctionchain-viewer-role
+rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - servicefunctionchains
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - servicefunctionchains/status
+  verbs:
+  - get

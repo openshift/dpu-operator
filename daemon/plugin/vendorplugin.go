@@ -22,12 +22,15 @@ type VendorPlugin interface {
 	Stop()
 	CreateBridgePort(bpr *opi.CreateBridgePortRequest) (*opi.BridgePort, error)
 	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
+	CreateNetworkFunction(input string, output string) error
+	DeleteNetworkFunction(input string, output string) error
 }
 
 type GrpcPlugin struct {
 	log       logr.Logger
 	client    pb.LifeCycleServiceClient
 	opiClient opi.BridgePortServiceClient
+	nfclient  pb.NetworkFunctionServiceClient
 	dpuMode   bool
 	conn      *grpc.ClientConn
 }
@@ -75,6 +78,7 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.conn = conn
 
 	g.client = pb.NewLifeCycleServiceClient(conn)
+	g.nfclient = pb.NewNetworkFunctionServiceClient(conn)
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	return nil
 }
@@ -87,5 +91,21 @@ func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest
 func (g *GrpcPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
 	g.ensureConnected()
 	_, err := g.opiClient.DeleteBridgePort(context.TODO(), deleteRequest)
+	return err
+}
+
+func (g *GrpcPlugin) CreateNetworkFunction(input string, output string) error {
+	g.log.Info("CreateNetworkFunction", "input", input, "output", output)
+	g.ensureConnected()
+	req := pb.NFRequest{Input: input, Output: output}
+	_, err := g.nfclient.CreateNetworkFunction(context.TODO(), &req)
+	return err
+}
+
+func (g *GrpcPlugin) DeleteNetworkFunction(input string, output string) error {
+	g.log.Info("DeleteNetworkFunction", "input", input, "output", output)
+	g.ensureConnected()
+	req := pb.NFRequest{Input: input, Output: output}
+	_, err := g.nfclient.DeleteNetworkFunction(context.TODO(), &req)
 	return err
 }

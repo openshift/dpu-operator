@@ -67,6 +67,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - servicefunctionchains
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - servicefunctionchains/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - servicefunctionchains/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - k8s.cni.cncf.io
   resources:
   - network-attachment-definitions
