@@ -104,12 +104,57 @@ func deleteKindTestCluster() {
 	provider.Delete(testClusterName, "")
 }
 
-func prepareKindCluster() *rest.Config {
-	provider := cluster.NewProvider()
-	// ignore error on create which will be non-nil when the cluster already exists
-	provider.Create(testClusterName)
-	cfg, err := provider.KubeConfig(testClusterName, false)
+func envToKubeConfig() ([]byte, error) {
+	varName := "TEST_KUBECONFIG"
+	kubeconfigPath, ok := os.LookupEnv(varName)
+	if !ok {
+		return nil, fmt.Errorf("No %v env var defined", varName)
+	}
+	f, err := os.Open(kubeconfigPath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	stats, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := make([]byte, stats.Size())
+	_, err = f.Read(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func clusterExists(p *cluster.Provider, name string) bool {
+	clusters, err := p.List()
 	Expect(err).NotTo(HaveOccurred())
+	for _, n := range clusters {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+func prepareTestCluster() *rest.Config {
+	var cfg []byte
+	var err error
+
+	cfg, err = envToKubeConfig()
+	if err != nil {
+		provider := cluster.NewProvider()
+		if !clusterExists(provider, testClusterName) {
+			err := provider.Create(testClusterName)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		cfgString, err := provider.KubeConfig(testClusterName, false)
+		Expect(err).NotTo(HaveOccurred())
+		cfg = []byte(cfgString)
+	}
 	config, err := clientcmd.NewClientConfigFromBytes([]byte(cfg))
 	Expect(err).NotTo(HaveOccurred())
 	restCfg, err := config.ClientConfig()
@@ -236,7 +281,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 		}
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 		fmt.Println(os.Args[0])
-		client := prepareKindCluster()
+		client := prepareTestCluster()
 		bootstrapTestEnv(client)
 		ctx, cancel = context.WithCancel(context.Background())
 		wg = sync.WaitGroup{}
