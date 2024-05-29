@@ -42,30 +42,30 @@ type DevicePlugin interface {
 	Start() error
 }
 
-func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
-	changed := true
-	for {
-		if changed {
-			resp := new(pluginapi.ListAndWatchResponse)
-			for _, dev := range nf.devices {
-				resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
-			}
-			fmt.Printf("ListAndWatch: send devices %v\n", resp)
-			if err := stream.Send(resp); err != nil {
-				fmt.Printf("Error. Cannot update device states: %v\n", err)
-				nf.grpcServer.Stop()
-				return err
-			}
-		}
-		time.Sleep(5 * time.Second)
-		changed = nf.Changed()
+func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+	resp := new(pluginapi.ListAndWatchResponse)
+	for _, dev := range nf.devices {
+		resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
 	}
+
+	nf.log.Info("SendDevices:", "resp", resp)
+	if err := stream.Send(resp); err != nil {
+		nf.log.Error(err, "Cannot send devices to ListAndWatch server")
+		nf.grpcServer.Stop()
+		return err
+	}
+	return nil
 }
 
-func (nf *nfResources) Changed() bool {
+func (nf *nfResources) getDeviceState(DeviceName string) string {
+	// TODO: Discover device health
+	return pluginapi.Healthy
+}
+
+func (nf *nfResources) changed() bool {
 	changed := false
 	for id, dev := range nf.devices {
-		state := nf.GetDeviceState(id)
+		state := nf.getDeviceState(id)
 		if dev.Health != state {
 			changed = true
 			dev.Health = state
@@ -75,6 +75,20 @@ func (nf *nfResources) Changed() bool {
 	return changed
 }
 
+func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+	changed := true
+	for {
+		if changed {
+			err := nf.sendDevices(stream)
+			if err != nil {
+				return err
+			}
+		}
+		time.Sleep(5 * time.Second)
+		changed = nf.changed()
+	}
+}
+
 // Allocate passes the dev name as an env variable to the requesting container
 func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	resp := new(pluginapi.AllocateResponse)
@@ -82,19 +96,19 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 	for _, container := range rqt.ContainerRequests {
 		containerResp := new(pluginapi.ContainerAllocateResponse)
 		for _, id := range container.DevicesIDs {
-			fmt.Printf("DeviceID in Allocate: %v \n", id)
+			nf.log.Info("DeviceID in Allocate:", "id", id)
 			dev, ok := nf.devices[id]
 			if !ok {
-				fmt.Printf("Error. Invalid allocation request with non-existing device %s", id)
+				return nil, fmt.Errorf("invalid allocation request with non-existing device: %s", id)
 			}
 			if dev.Health != pluginapi.Healthy {
-				fmt.Printf("Error. Invalid allocation request with unhealthy device %s", id)
+				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", id)
 			}
 
 			devName = devName + id + ","
 		}
 
-		fmt.Printf("device(s) allocated: %s\n", devName)
+		nf.log.Info("Device(s) allocated:", "devName", devName)
 		envmap := make(map[string]string)
 		envmap["NF-DEV"] = devName
 
@@ -104,46 +118,38 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 	return resp, nil
 }
 
-func (nf *nfResources) GetDeviceState(DeviceName string) string {
-	// TODO: Discover device health
-	return pluginapi.Healthy
-}
-
-func (nf *nfResources) Start() error {
-	nf.cleanup()
-	nf.ensureConnected()
-
-	ctx := context.Background()
-
-	Devices, err := nf.client.GetDevices(ctx, &pb.Empty{})
+func (nf *nfResources) GetDevices() error {
+	err := nf.ensureConnected()
 	if err != nil {
-		nf.log.Error(err, "Failed to handle GetDevices Request")
-		return err
+		return fmt.Errorf("failed to ensure connection to plugin: %v", err)
+	}
+
+	Devices, err := nf.client.GetDevices(context.Background(), &pb.Empty{})
+	if err != nil {
+		return fmt.Errorf("failed to handle GetDevices request: %v", err)
 	}
 
 	for _, device := range Devices.Devices {
 		nf.devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
+		nf.log.Info("Found device", "device.ID", device.ID)
 	}
 
-	for dev := range nf.devices {
-		nf.log.Info(dev)
-	}
+	return nil
+}
 
+func (nf *nfResources) RegisterDevicePlugin() error {
 	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, nf.socketFile)
-	fmt.Printf("Starting NF Device Plugin server at: %s\n", pluginEndpoint)
+	nf.log.Info("Starting Device Plugin server at:", "pluginEndpoint", pluginEndpoint)
 	lis, err := net.Listen("unix", pluginEndpoint)
 	if err != nil {
-		fmt.Printf("Error: Starting NF Device Plugin server failed: %v", err)
+		return fmt.Errorf("resource %s failed to listen to Device Plugin server: %v", resourceName, err)
 	}
 	nf.grpcServer = grpc.NewServer()
 
 	kubeletEndpoint := filepath.Join("unix:", DeprecatedSockDir, KubeEndPoint)
-
 	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
 	if err != nil {
-		fmt.Printf("%s device plugin unable connect to Kubelet : %v", resourceName, err)
-		return err
+		return fmt.Errorf("resource %s unable connect to Kubelet: %v", resourceName, err)
 	}
 	defer conn.Close()
 
@@ -151,18 +157,20 @@ func (nf *nfResources) Start() error {
 
 	client := pluginapi.NewRegistrationClient(conn)
 
-	go nf.grpcServer.Serve(lis)
+	go func() {
+		err := nf.grpcServer.Serve(lis)
+		if err != nil {
+			nf.log.Error(err, "Serving Device Plugin incoming requests failed.")
+		}
+	}()
 
 	// Use connectWithRetry for the pluginEndpoint call
 	conn, err = nf.connectWithRetry("unix:" + pluginEndpoint)
 	if err != nil {
-		fmt.Printf("error. unable to establish test connection with %s gRPC server: %v", resourceName, err)
-		return err
+		return fmt.Errorf("resource %s unable to establish test connection with gRPC server: %v", resourceName, err)
 	}
-	fmt.Printf("%s device plugin endpoint started serving \n", resourceName)
+	nf.log.Info("Device plugin endpoint started serving:", "resourceName", resourceName)
 	conn.Close()
-
-	ctx = context.Background()
 
 	request := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
@@ -170,11 +178,29 @@ func (nf *nfResources) Start() error {
 		ResourceName: resourceName,
 	}
 
-	if _, err = client.Register(ctx, request); err != nil {
-		fmt.Printf("%s device plugin unable to register with Kubelet : %v \n", resourceName, err)
-		return err
+	if _, err = client.Register(context.Background(), request); err != nil {
+		return fmt.Errorf("unable to register resource %s with Kubelet: %v", resourceName, err)
 	}
-	fmt.Printf("%s device plugin registered with Kubelet\n", resourceName)
+	nf.log.Info("Device plugin registered with Kubelet", "resourceName", resourceName)
+
+	return nil
+}
+
+func (nf *nfResources) Start() error {
+	err := nf.cleanup()
+	if err != nil {
+		return fmt.Errorf("failed to cleanup: %v", err)
+	}
+
+	err = nf.GetDevices()
+	if err != nil {
+		return fmt.Errorf("failed to get devices: %v", err)
+	}
+
+	err = nf.RegisterDevicePlugin()
+	if err != nil {
+		return fmt.Errorf("failed to register the device plugin: %v", err)
+	}
 
 	return nil
 }
@@ -214,8 +240,8 @@ func (nf *nfResources) connectWithRetry(endpoint string) (*grpc.ClientConn, erro
 	return conn, nil
 }
 
-func (g *nfResources) ensureConnected() error {
-	if g.client != nil {
+func (nf *nfResources) ensureConnected() error {
+	if nf.client != nil {
 		return nil
 	}
 	dialOptions := []grpc.DialOption{
@@ -228,12 +254,11 @@ func (g *nfResources) ensureConnected() error {
 	conn, err := grpc.DialContext(context.Background(), VendorPluginSocketPath, dialOptions...)
 
 	if err != nil {
-		g.log.Error(err, "Failed to connect to vendor plugin")
-		return err
+		return fmt.Errorf("failed to connect to vendor plugin: %v", err)
 	}
-	g.conn = conn
+	nf.conn = conn
 
-	g.client = pb.NewDeviceServiceClient(conn)
+	nf.client = pb.NewDeviceServiceClient(conn)
 	return nil
 }
 
@@ -270,7 +295,7 @@ func (nf *nfResources) GetDevicePluginOptions(ctx context.Context, empty *plugin
 
 func NewGrpcPlugin() *nfResources {
 	return &nfResources{
-		log:        ctrl.Log.WithName("GrpcPlugin"),
+		log:        ctrl.Log.WithName("DevicePlugin"),
 		devices:    make(map[string]pluginapi.Device),
 		socketFile: pluginEndpoint,
 	}
