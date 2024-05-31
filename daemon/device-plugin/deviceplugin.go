@@ -27,7 +27,9 @@ const (
 	resourceName    = "openshift.io/dpu"
 )
 
-// sriovManager manages sriov networking devices
+type deviceList map[string]pluginapi.Device
+
+// nfResources manages NF networking devices
 type nfResources struct {
 	socketFile string
 	devices    map[string]pluginapi.Device // for Kubelet DP API
@@ -42,9 +44,29 @@ type DevicePlugin interface {
 	Start() error
 }
 
-func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (nf *nfResources) getDevices() (*deviceList, error) {
+	err := nf.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure connection to plugin: %v", err)
+	}
+
+	Devices, err := nf.client.GetDevices(context.Background(), &pb.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to handle GetDevices request: %v", err)
+	}
+
+	devices := make(deviceList)
+
+	for _, device := range Devices.Devices {
+		devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
+	}
+
+	return &devices, nil
+}
+
+func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *deviceList) error {
 	resp := new(pluginapi.ListAndWatchResponse)
-	for _, dev := range nf.devices {
+	for _, dev := range *devices {
 		resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
 	}
 
@@ -57,35 +79,53 @@ func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchSer
 	return nil
 }
 
-func (nf *nfResources) getDeviceState(DeviceName string) string {
-	// TODO: Discover device health
-	return pluginapi.Healthy
-}
+func (nf *nfResources) devicesEqual(d1, d2 *deviceList) bool {
+	if len(*d1) != len(*d2) {
+		return false
+	}
 
-func (nf *nfResources) changed() bool {
-	changed := false
-	for id, dev := range nf.devices {
-		state := nf.getDeviceState(id)
-		if dev.Health != state {
-			changed = true
-			dev.Health = state
-			nf.devices[id] = dev
+	for d1key, d1value := range *d1 {
+		if d2value, ok := (*d2)[d1key]; !ok || d2value != d1value {
+			return false
 		}
 	}
-	return changed
+
+	return true
+}
+
+func (nf *nfResources) setDeviceCache(devices *deviceList) {
+	nf.devices = *devices
+	for id, dev := range nf.devices {
+		nf.log.Info("Cached device", "id", id, "dev.ID", dev.ID)
+	}
+}
+
+func (nf *nfResources) checkCachedDeviceHealth(id string) (bool, error) {
+	dev, ok := nf.devices[id]
+	if !ok {
+		return false, fmt.Errorf("invalid allocation request with non-existing device: %s", id)
+	}
+	return dev.Health != pluginapi.Healthy, nil
 }
 
 func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
-	changed := true
+	oldDevices := make(deviceList)
 	for {
-		if changed {
-			err := nf.sendDevices(stream)
+		newDevices, err := nf.getDevices()
+		if err != nil {
+			nf.log.Error(err, "Failed to get Devices")
+			return err
+		}
+		if !nf.devicesEqual(&oldDevices, newDevices) {
+			err := nf.sendDevices(stream, newDevices)
 			if err != nil {
+				nf.log.Error(err, "Failed to send Devices")
 				return err
 			}
+			oldDevices = *newDevices
+			nf.setDeviceCache(newDevices)
 		}
 		time.Sleep(5 * time.Second)
-		changed = nf.changed()
 	}
 }
 
@@ -97,11 +137,12 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 		containerResp := new(pluginapi.ContainerAllocateResponse)
 		for _, id := range container.DevicesIDs {
 			nf.log.Info("DeviceID in Allocate:", "id", id)
-			dev, ok := nf.devices[id]
-			if !ok {
-				return nil, fmt.Errorf("invalid allocation request with non-existing device: %s", id)
+			isHealthy, err := nf.checkCachedDeviceHealth(id)
+			if err != nil {
+				return nil, err
 			}
-			if dev.Health != pluginapi.Healthy {
+
+			if !isHealthy {
 				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", id)
 			}
 
@@ -116,25 +157,6 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 		resp.ContainerResponses = append(resp.ContainerResponses, containerResp)
 	}
 	return resp, nil
-}
-
-func (nf *nfResources) GetDevices() error {
-	err := nf.ensureConnected()
-	if err != nil {
-		return fmt.Errorf("failed to ensure connection to plugin: %v", err)
-	}
-
-	Devices, err := nf.client.GetDevices(context.Background(), &pb.Empty{})
-	if err != nil {
-		return fmt.Errorf("failed to handle GetDevices request: %v", err)
-	}
-
-	for _, device := range Devices.Devices {
-		nf.devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
-		nf.log.Info("Found device", "device.ID", device.ID)
-	}
-
-	return nil
 }
 
 func (nf *nfResources) RegisterDevicePlugin() error {
@@ -190,11 +212,6 @@ func (nf *nfResources) Start() error {
 	err := nf.cleanup()
 	if err != nil {
 		return fmt.Errorf("failed to cleanup: %v", err)
-	}
-
-	err = nf.GetDevices()
-	if err != nil {
-		return fmt.Errorf("failed to get devices: %v", err)
 	}
 
 	err = nf.RegisterDevicePlugin()
