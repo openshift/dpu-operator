@@ -1,4 +1,4 @@
-package nfdeviceplugin
+package deviceplugin
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,44 +26,21 @@ const (
 	resourceName    = "openshift.io/dpu"
 )
 
-type deviceList map[string]pluginapi.Device
-
 // nfResources manages NF networking devices
 type nfResources struct {
 	socketFile string
 	devices    map[string]pluginapi.Device // for Kubelet DP API
 	grpcServer *grpc.Server
 	pluginapi.DevicePluginServer
-	log    logr.Logger
-	client pb.DeviceServiceClient
-	conn   *grpc.ClientConn
+	log           logr.Logger
+	deviceHandler DeviceHandler
 }
 
 type DevicePlugin interface {
 	Start() error
 }
 
-func (nf *nfResources) getDevices() (*deviceList, error) {
-	err := nf.ensureConnected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to ensure connection to plugin: %v", err)
-	}
-
-	Devices, err := nf.client.GetDevices(context.Background(), &pb.Empty{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to handle GetDevices request: %v", err)
-	}
-
-	devices := make(deviceList)
-
-	for _, device := range Devices.Devices {
-		devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
-	}
-
-	return &devices, nil
-}
-
-func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *deviceList) error {
+func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *DeviceList) error {
 	resp := new(pluginapi.ListAndWatchResponse)
 	for _, dev := range *devices {
 		resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
@@ -79,7 +55,7 @@ func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchSer
 	return nil
 }
 
-func (nf *nfResources) devicesEqual(d1, d2 *deviceList) bool {
+func (nf *nfResources) devicesEqual(d1, d2 *DeviceList) bool {
 	if len(*d1) != len(*d2) {
 		return false
 	}
@@ -93,7 +69,7 @@ func (nf *nfResources) devicesEqual(d1, d2 *deviceList) bool {
 	return true
 }
 
-func (nf *nfResources) setDeviceCache(devices *deviceList) {
+func (nf *nfResources) setDeviceCache(devices *DeviceList) {
 	nf.devices = *devices
 	for id, dev := range nf.devices {
 		nf.log.Info("Cached device", "id", id, "dev.ID", dev.ID)
@@ -109,9 +85,9 @@ func (nf *nfResources) checkCachedDeviceHealth(id string) (bool, error) {
 }
 
 func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
-	oldDevices := make(deviceList)
+	oldDevices := make(DeviceList)
 	for {
-		newDevices, err := nf.getDevices()
+		newDevices, err := nf.deviceHandler.GetDevices()
 		if err != nil {
 			nf.log.Error(err, "Failed to get Devices")
 			return err
@@ -258,28 +234,6 @@ func (nf *nfResources) connectWithRetry(endpoint string) (*grpc.ClientConn, erro
 	return conn, nil
 }
 
-func (nf *nfResources) ensureConnected() error {
-	if nf.client != nil {
-		return nil
-	}
-	dialOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return net.Dial("unix", addr)
-		}),
-	}
-
-	conn, err := grpc.DialContext(context.Background(), VendorPluginSocketPath, dialOptions...)
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to vendor plugin: %v", err)
-	}
-	nf.conn = conn
-
-	nf.client = pb.NewDeviceServiceClient(conn)
-	return nil
-}
-
 // func (nf *nfResources) Stop() error {
 // 	fmt.Printf("Stopping Device Plugin gRPC server..")
 // 	if nf.grpcServer == nil {
@@ -311,10 +265,11 @@ func (nf *nfResources) GetDevicePluginOptions(ctx context.Context, empty *plugin
 	}, nil
 }
 
-func NewGrpcPlugin() *nfResources {
+func NewDevicePlugin(dh DeviceHandler) *nfResources {
 	return &nfResources{
-		log:        ctrl.Log.WithName("DevicePlugin"),
-		devices:    make(map[string]pluginapi.Device),
-		socketFile: pluginEndpoint,
+		log:           ctrl.Log.WithName("DevicePlugin"),
+		devices:       make(map[string]pluginapi.Device),
+		socketFile:    pluginEndpoint,
+		deviceHandler: dh,
 	}
 }

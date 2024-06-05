@@ -1,4 +1,4 @@
-package nfdeviceplugin
+package deviceplugin
 
 import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -19,6 +19,12 @@ const (
 // ExcludeConfig contains excluded list of devices
 type ExcludeConfig struct {
 	ExcludeDevices []string `json:"exclude"`
+}
+
+type DeviceList map[string]pluginapi.Device
+
+type DeviceHandler interface {
+	GetDevices() (*DeviceList, error)
 }
 
 // ResourceFactory is an interface to get instances of ResourcePool and ResourceServer
