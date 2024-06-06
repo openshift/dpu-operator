@@ -105,7 +105,7 @@ func (nf *nfResources) checkCachedDeviceHealth(id string) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("invalid allocation request with non-existing device: %s", id)
 	}
-	return dev.Health != pluginapi.Healthy, nil
+	return dev.Health == pluginapi.Healthy, nil
 }
 
 func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
@@ -141,6 +141,7 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 			if err != nil {
 				return nil, err
 			}
+			nf.log.Info("DeviceID Health", "id", id, "isHealthy", isHealthy, "err", err)
 
 			if !isHealthy {
 				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", id)
