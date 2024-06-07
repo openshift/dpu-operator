@@ -12,3 +12,15 @@ rules:
     - securitycontextconstraints
   verbs:
     - use
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - servicefunctionchains
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
