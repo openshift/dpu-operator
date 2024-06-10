@@ -111,12 +111,12 @@ func main() {
 	err = prepareCni("/var/lib/cni/bin/dpu-cni")
 	if err != nil {
 		log.Error(err, "Failed to prepare CNI binary in /var/lib")
-		return
+		/* Don't return on error for now */
 	}
 	err = prepareCni("/opt/cni/bin/dpu-cni")
 	if err != nil {
 		log.Error(err, "Failed to prepare CNI binary in /opt")
-		return
+		/* Don't return on error for now */
 	}
 
 	dpuMode, err = isDpuMode(mode)
