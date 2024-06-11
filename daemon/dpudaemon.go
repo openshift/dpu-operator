@@ -154,7 +154,7 @@ func (d *DpuDaemon) ListenAndServe() error {
 
 	wg.Add(1)
 	go func() {
-		d.log.Info("Starging CNI server")
+		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
 			done <- err
 		} else {
