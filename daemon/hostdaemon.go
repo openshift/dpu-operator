@@ -229,6 +229,8 @@ func (d *HostDaemon) ListenAndServe() error {
 		wg.Done()
 	}()
 
+	err = <-done
+
 	cancelManager()
 	d.cniserver.Shutdown(context.TODO())
 	wg.Wait()
