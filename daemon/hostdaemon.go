@@ -172,7 +172,7 @@ func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result,
 }
 
 func (d *HostDaemon) Listen() (net.Listener, error) {
-	d.log.Info("starting HostDaemon", "devflag", d.dev, "cniServerPath", d.cniServerPath)
+	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.cniServerPath)
 
 	addr, port, err := d.vsp.Start()
 	if err != nil {
@@ -205,7 +205,7 @@ func (d *HostDaemon) ListenAndServe() error {
 
 	wg.Add(1)
 	go func() {
-		d.log.Info("Starging CNI server")
+		d.log.Info("Starting CNI server")
 		if err := d.Serve(listener); err != nil {
 			done <- err
 		} else {
@@ -228,6 +228,8 @@ func (d *HostDaemon) ListenAndServe() error {
 		}
 		wg.Done()
 	}()
+
+	err = <-done
 
 	cancelManager()
 	d.cniserver.Shutdown(context.TODO())
