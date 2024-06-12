@@ -1,0 +1,58 @@
+# # Build the manager binary
+# #FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16 AS builder
+# # FROM golang:1.22 AS builder
+# FROM debian:bullseye AS builder
+# #FROM ubuntu:latest AS builder
+# USER root
+# ARG TARGETOS
+# ARG TARGETARCH
+
+# WORKDIR /workspace
+# COPY main.go .
+
+# RUN apt-get update --fix-missing -y \
+#    && apt-get install golang -y \
+#    && apt-get install -y net-tools kmod pciutils make iputils-ping \
+#    && apt-get install -y software-properties-common \
+#    && rm -rf /var/lib/apt/lists/* \
+#    && apt clean
+
+# #RUN apt-get install software-properties-common -y
+# #RUN add-apt-repository ppa:longsleep/golang-backports -y
+# #RUN apt-get update -y
+# #RUN apt install golang -y
+# ENV GOROOT /usr/local/go/
+# ENV GOPATH /go
+# # Build
+# # the GOARCH has not a default value to allow the binary be built according to the host where the command
+# # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+# RUN go mod init main.go && \
+#     go mod tidy 
+# #   go mod vendor 
+
+# RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o /mrvlCommChannel main.go 
+
+# # Use distroless as minimal base image to package the manager binary
+# # Refer to https://github.com/GoogleContainerTools/distroless for more details
+# #FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
+# #FROM ubuntu:latest
+# # FROM golang:1.22
+# FROM debian:bullseye 
+# WORKDIR /
+# COPY --from=builder /mrvlCommChannel .
+
+# ENTRYPOINT ["/mrvlCommChannel"]
+FROM ubuntu:22.04
+
+RUN DEBIAN_FRONTEND=noninteractive \
+  apt-get update \
+  && apt-get install net-tools kmod pciutils make iputils-ping iproute2 -y
+
+
+COPY ./mrvl-commchannel /mrvl-commchannel 
+COPY ./config.yaml /config.yaml
+
+ENTRYPOINT [ "/mrvl-commchannel" ]
+

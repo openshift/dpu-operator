@@ -1,0 +1,68 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mrvl-comm-channel
+  # namespace: {{.Namespace}}
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: mrvl-comm-channel
+  template:
+    metadata:
+      labels:
+        app: mrvl-comm-channel
+        component: network
+        type: infra
+    spec:
+      serviceAccountName: dpu-daemon-sa
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        dpu: "true"
+      # securityContext:
+      #   privileged: true
+      containers:
+      - name: mrvl-comm-channel
+        image: <repo>/mrvlcommchannel-106:latest-amd64
+        securityContext:
+          privileged: true
+        # imagePullPolicy: {{.ImagePullPolicy}}
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          # value: {{.Namespace}}
+          value: default
+        volumeMounts:
+        - name: devicesock
+          mountPath: /var/lib/kubelet/
+          readOnly: false
+        - name: mrvlcommchannel-mount
+          mountPath: /var/run/dpu-daemon/
+          mountPropagation: Bidirectional
+        - name: host-run
+          mountPath: /var/run/netns
+          mountPropagation: Bidirectional
+        - name: proc
+          mountPath: /proc
+        # args:
+        # - --mode
+        # - {{.Mode}}
+      volumes:
+        - name: devicesock
+          hostPath:
+            path: /var/lib/kubelet/
+        - name: mrvlcommchannel-mount
+          hostPath:
+            path: /var/run/dpu-daemon/
+        - name: host-run
+          hostPath:
+            path: /var/run/netns
+        - name: proc
+          hostPath:
+            path: /proc/
