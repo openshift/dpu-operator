@@ -1,4 +1,4 @@
-package nfdeviceplugin
+package deviceplugin
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -18,8 +16,6 @@ import (
 )
 
 const (
-	VendorPluginSocketPath string = cnitypes.DaemonBaseDir + "vendor-plugin/vendor-plugin.sock"
-
 	// Device plugin settings.
 	pluginMountPath = "/var/lib/kubelet/device-plugins"
 	kubeletEndpoint = "kubelet.sock"
@@ -27,59 +23,36 @@ const (
 	resourceName    = "openshift.io/dpu"
 )
 
-type deviceList map[string]pluginapi.Device
-
-// nfResources manages NF networking devices
-type nfResources struct {
+// dpServer manages the k8s Device Plugin Server
+type dpServer struct {
 	socketFile string
 	devices    map[string]pluginapi.Device // for Kubelet DP API
 	grpcServer *grpc.Server
 	pluginapi.DevicePluginServer
-	log    logr.Logger
-	client pb.DeviceServiceClient
-	conn   *grpc.ClientConn
+	log           logr.Logger
+	deviceHandler DeviceHandler
 }
 
 type DevicePlugin interface {
 	Start() error
 }
 
-func (nf *nfResources) getDevices() (*deviceList, error) {
-	err := nf.ensureConnected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to ensure connection to plugin: %v", err)
-	}
-
-	Devices, err := nf.client.GetDevices(context.Background(), &pb.Empty{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to handle GetDevices request: %v", err)
-	}
-
-	devices := make(deviceList)
-
-	for _, device := range Devices.Devices {
-		devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
-	}
-
-	return &devices, nil
-}
-
-func (nf *nfResources) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *deviceList) error {
+func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *DeviceList) error {
 	resp := new(pluginapi.ListAndWatchResponse)
 	for _, dev := range *devices {
 		resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
 	}
 
-	nf.log.Info("SendDevices:", "resp", resp)
+	dp.log.Info("SendDevices:", "resp", resp)
 	if err := stream.Send(resp); err != nil {
-		nf.log.Error(err, "Cannot send devices to ListAndWatch server")
-		nf.grpcServer.Stop()
+		dp.log.Error(err, "Cannot send devices to ListAndWatch server")
+		dp.grpcServer.Stop()
 		return err
 	}
 	return nil
 }
 
-func (nf *nfResources) devicesEqual(d1, d2 *deviceList) bool {
+func (dp *dpServer) devicesEqual(d1, d2 *DeviceList) bool {
 	if len(*d1) != len(*d2) {
 		return false
 	}
@@ -93,55 +66,55 @@ func (nf *nfResources) devicesEqual(d1, d2 *deviceList) bool {
 	return true
 }
 
-func (nf *nfResources) setDeviceCache(devices *deviceList) {
-	nf.devices = *devices
-	for id, dev := range nf.devices {
-		nf.log.Info("Cached device", "id", id, "dev.ID", dev.ID)
+func (dp *dpServer) setDeviceCache(devices *DeviceList) {
+	dp.devices = *devices
+	for id, dev := range dp.devices {
+		dp.log.Info("Cached device", "id", id, "dev.ID", dev.ID)
 	}
 }
 
-func (nf *nfResources) checkCachedDeviceHealth(id string) (bool, error) {
-	dev, ok := nf.devices[id]
+func (dp *dpServer) checkCachedDeviceHealth(id string) (bool, error) {
+	dev, ok := dp.devices[id]
 	if !ok {
 		return false, fmt.Errorf("invalid allocation request with non-existing device: %s", id)
 	}
 	return dev.Health == pluginapi.Healthy, nil
 }
 
-func (nf *nfResources) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
-	oldDevices := make(deviceList)
+func (dp *dpServer) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+	oldDevices := make(DeviceList)
 	for {
-		newDevices, err := nf.getDevices()
+		newDevices, err := dp.deviceHandler.GetDevices()
 		if err != nil {
-			nf.log.Error(err, "Failed to get Devices")
+			dp.log.Error(err, "Failed to get Devices")
 			return err
 		}
-		if !nf.devicesEqual(&oldDevices, newDevices) {
-			err := nf.sendDevices(stream, newDevices)
+		if !dp.devicesEqual(&oldDevices, newDevices) {
+			err := dp.sendDevices(stream, newDevices)
 			if err != nil {
-				nf.log.Error(err, "Failed to send Devices")
+				dp.log.Error(err, "Failed to send Devices")
 				return err
 			}
 			oldDevices = *newDevices
-			nf.setDeviceCache(newDevices)
+			dp.setDeviceCache(newDevices)
 		}
 		time.Sleep(5 * time.Second)
 	}
 }
 
 // Allocate passes the dev name as an env variable to the requesting container
-func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+func (dp *dpServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	resp := new(pluginapi.AllocateResponse)
 	devName := ""
 	for _, container := range rqt.ContainerRequests {
 		containerResp := new(pluginapi.ContainerAllocateResponse)
 		for _, id := range container.DevicesIDs {
-			nf.log.Info("DeviceID in Allocate:", "id", id)
-			isHealthy, err := nf.checkCachedDeviceHealth(id)
+			dp.log.Info("DeviceID in Allocate:", "id", id)
+			isHealthy, err := dp.checkCachedDeviceHealth(id)
 			if err != nil {
 				return nil, err
 			}
-			nf.log.Info("DeviceID Health", "id", id, "isHealthy", isHealthy, "err", err)
+			dp.log.Info("DeviceID Health", "id", id, "isHealthy", isHealthy, "err", err)
 
 			if !isHealthy {
 				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", id)
@@ -150,7 +123,7 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 			devName = devName + id + ","
 		}
 
-		nf.log.Info("Device(s) allocated:", "devName", devName)
+		dp.log.Info("Device(s) allocated:", "devName", devName)
 		envmap := make(map[string]string)
 		envmap["NF-DEV"] = devName
 
@@ -160,14 +133,14 @@ func (nf *nfResources) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequ
 	return resp, nil
 }
 
-func (nf *nfResources) RegisterDevicePlugin() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, nf.socketFile)
-	nf.log.Info("Starting Device Plugin server at:", "pluginEndpoint", pluginEndpoint)
+func (dp *dpServer) RegisterDevicePlugin() error {
+	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, dp.socketFile)
+	dp.log.Info("Starting Device Plugin server at:", "pluginEndpoint", pluginEndpoint)
 	lis, err := net.Listen("unix", pluginEndpoint)
 	if err != nil {
 		return fmt.Errorf("resource %s failed to listen to Device Plugin server: %v", resourceName, err)
 	}
-	nf.grpcServer = grpc.NewServer()
+	dp.grpcServer = grpc.NewServer()
 
 	kubeletEndpoint := filepath.Join("unix:", DeprecatedSockDir, KubeEndPoint)
 	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -176,46 +149,46 @@ func (nf *nfResources) RegisterDevicePlugin() error {
 	}
 	defer conn.Close()
 
-	pluginapi.RegisterDevicePluginServer(nf.grpcServer, nf)
+	pluginapi.RegisterDevicePluginServer(dp.grpcServer, dp)
 
 	client := pluginapi.NewRegistrationClient(conn)
 
 	go func() {
-		err := nf.grpcServer.Serve(lis)
+		err := dp.grpcServer.Serve(lis)
 		if err != nil {
-			nf.log.Error(err, "Serving Device Plugin incoming requests failed.")
+			dp.log.Error(err, "Serving Device Plugin incoming requests failed.")
 		}
 	}()
 
 	// Use connectWithRetry for the pluginEndpoint call
-	conn, err = nf.connectWithRetry("unix:" + pluginEndpoint)
+	conn, err = dp.connectWithRetry("unix:" + pluginEndpoint)
 	if err != nil {
 		return fmt.Errorf("resource %s unable to establish test connection with gRPC server: %v", resourceName, err)
 	}
-	nf.log.Info("Device plugin endpoint started serving:", "resourceName", resourceName)
+	dp.log.Info("Device plugin endpoint started serving:", "resourceName", resourceName)
 	conn.Close()
 
 	request := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
-		Endpoint:     nf.socketFile,
+		Endpoint:     dp.socketFile,
 		ResourceName: resourceName,
 	}
 
 	if _, err = client.Register(context.Background(), request); err != nil {
 		return fmt.Errorf("unable to register resource %s with Kubelet: %v", resourceName, err)
 	}
-	nf.log.Info("Device plugin registered with Kubelet", "resourceName", resourceName)
+	dp.log.Info("Device plugin registered with Kubelet", "resourceName", resourceName)
 
 	return nil
 }
 
-func (nf *nfResources) Start() error {
-	err := nf.cleanup()
+func (dp *dpServer) Start() error {
+	err := dp.cleanup()
 	if err != nil {
 		return fmt.Errorf("failed to cleanup: %v", err)
 	}
 
-	err = nf.RegisterDevicePlugin()
+	err = dp.RegisterDevicePlugin()
 	if err != nil {
 		return fmt.Errorf("failed to register the device plugin: %v", err)
 	}
@@ -224,7 +197,7 @@ func (nf *nfResources) Start() error {
 }
 
 // connectWithRetry tries to establish a connection with the given endpoint, with retries.
-func (nf *nfResources) connectWithRetry(endpoint string) (*grpc.ClientConn, error) {
+func (dp *dpServer) connectWithRetry(endpoint string) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
 	var err error
 
@@ -251,49 +224,27 @@ func (nf *nfResources) connectWithRetry(endpoint string) (*grpc.ClientConn, erro
 		grpc.WithDefaultServiceConfig(retryPolicy),
 	)
 	if err != nil {
-		nf.log.Error(err, "Failed to establish connection with retry", "endpoint", endpoint)
+		dp.log.Error(err, "Failed to establish connection with retry", "endpoint", endpoint)
 		return nil, err
 	}
 
 	return conn, nil
 }
 
-func (nf *nfResources) ensureConnected() error {
-	if nf.client != nil {
-		return nil
-	}
-	dialOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return net.Dial("unix", addr)
-		}),
-	}
-
-	conn, err := grpc.DialContext(context.Background(), VendorPluginSocketPath, dialOptions...)
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to vendor plugin: %v", err)
-	}
-	nf.conn = conn
-
-	nf.client = pb.NewDeviceServiceClient(conn)
-	return nil
-}
-
-// func (nf *nfResources) Stop() error {
+// func (dp *dpServer) Stop() error {
 // 	fmt.Printf("Stopping Device Plugin gRPC server..")
-// 	if nf.grpcServer == nil {
+// 	if dp.grpcServer == nil {
 // 		return nil
 // 	}
 
-// 	nf.grpcServer.Stop()
-// 	nf.grpcServer = nil
+// 	dp.grpcServer.Stop()
+// 	dp.grpcServer = nil
 
-// 	return nf.cleanup()
+// 	return dp.cleanup()
 // }
 
-func (nf *nfResources) cleanup() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, nf.socketFile)
+func (dp *dpServer) cleanup() error {
+	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, dp.socketFile)
 	if err := os.Remove(pluginEndpoint); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -301,20 +252,21 @@ func (nf *nfResources) cleanup() error {
 	return nil
 }
 
-func (nf *nfResources) PreStartContainer(ctx context.Context, psRqt *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (dp *dpServer) PreStartContainer(ctx context.Context, psRqt *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-func (nf *nfResources) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (dp *dpServer) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	return &pluginapi.DevicePluginOptions{
 		PreStartRequired: false,
 	}, nil
 }
 
-func NewGrpcPlugin() *nfResources {
-	return &nfResources{
-		log:        ctrl.Log.WithName("DevicePlugin"),
-		devices:    make(map[string]pluginapi.Device),
-		socketFile: pluginEndpoint,
+func NewDevicePlugin(dh DeviceHandler) *dpServer {
+	return &dpServer{
+		log:           ctrl.Log.WithName("DevicePlugin"),
+		devices:       make(map[string]pluginapi.Device),
+		socketFile:    pluginEndpoint,
+		deviceHandler: dh,
 	}
 }

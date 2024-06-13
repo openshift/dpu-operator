@@ -8,6 +8,7 @@ import (
 	"os"
 
 	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
+	nfdevicehandler "github.com/openshift/dpu-operator/daemon/nf-device-handler"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"go.uber.org/zap/zapcore"
 
@@ -36,8 +37,10 @@ func isDpuMode(mode string) (bool, error) {
 
 func createDaemon(dpuMode bool) (Daemon, error) {
 	plugin := plugin.NewGrpcPlugin(dpuMode)
-	dp := deviceplugin.NewGrpcPlugin()
+
 	if dpuMode {
+		deviceHandler := nfdevicehandler.NewNfDeviceHandler()
+		dp := deviceplugin.NewDevicePlugin(deviceHandler)
 		return NewDpuDaemon(plugin, dp), nil
 	} else {
 		return NewHostDaemon(plugin), nil
