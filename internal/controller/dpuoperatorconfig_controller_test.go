@@ -339,8 +339,10 @@ var _ = Describe("Main Controller", Ordered, func() {
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := &appsv1.DaemonSet{}
-				WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
-				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(cr.Spec.Mode))
+				Eventually(func() string {
+					WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
+					return daemonSet.Spec.Template.Spec.Containers[0].Args[1]
+				}, testAPITimeout*2, testRetryInterval).Should(Equal(cr.Spec.Mode))
 			})
 			It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}
