@@ -25,12 +25,12 @@ import (
 
 // ServiceFunctionChainSpec defines the desired state of ServiceFunctionChain
 type ServiceFunctionChainSpec struct {
-	NetworkFunctions []NetworkFunction `json:"networkFunctions"`
+    NetworkFunctions []NetworkFunction `json:"networkFunctions"`
 }
 
 type NetworkFunction struct {
-	Name  string `json:"name"`
-	Image string `json:"image"`
+    Name string `json:"name"`
+    Image  string `json:"image"`
 }
 
 //+kubebuilder:object:root=true
@@ -46,6 +46,7 @@ type ServiceFunctionChain struct {
 }
 
 type ServiceFunctionChainStatus struct {
+
 }
 
 // ServiceFunctionChainList contains a list of ServiceFunctionChain
