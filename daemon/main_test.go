@@ -145,7 +145,7 @@ var _ = g.Describe("Main", func() {
 		dpuDaemon = NewDpuDaemon(dummyPluginDPU, &DummyDevicePlugin{})
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon = NewHostDaemon(dummyPluginHost).
+		hostDaemon = NewHostDaemon(dummyPluginHost, &DummyDevicePlugin{}).
 			WithCniServerPath(serverSocketPath).
 			WithSriovManager(m)
 	})

@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -40,7 +41,7 @@ type DevicePlugin interface {
 func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *DeviceList) error {
 	resp := new(pluginapi.ListAndWatchResponse)
 	for _, dev := range *devices {
-		resp.Devices = append(resp.Devices, &pluginapi.Device{ID: dev.ID, Health: dev.Health})
+		resp.Devices = append(resp.Devices, &dev)
 	}
 
 	dp.log.Info("SendDevices:", "resp", resp)
@@ -58,7 +59,7 @@ func (dp *dpServer) devicesEqual(d1, d2 *DeviceList) bool {
 	}
 
 	for d1key, d1value := range *d1 {
-		if d2value, ok := (*d2)[d1key]; !ok || d2value != d1value {
+		if d2value, ok := (*d2)[d1key]; !ok || !reflect.DeepEqual(d1value, d2value) {
 			return false
 		}
 	}

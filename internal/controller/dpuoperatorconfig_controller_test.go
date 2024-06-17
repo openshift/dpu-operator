@@ -46,7 +46,6 @@ var (
 	testDpuOperatorConfigName = "default"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
-	testSriovDevicePlugin     = "sriov-device-plugin"
 	testNetworkFunctionNAD    = "dpunfcni-conf"
 	testClusterName           = "dpu-operator-test-cluster"
 	testAPITimeout            = time.Second * 2
@@ -319,11 +318,6 @@ var _ = Describe("Main Controller", Ordered, func() {
 				WaitForDaemonSetReady(&daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
 				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(cr.Spec.Mode))
 			})
-			It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
-				daemonSet1 := appsv1.DaemonSet{}
-				WaitForDaemonSetReady(&daemonSet1, mgr.GetClient(), testNamespace, testSriovDevicePlugin)
-				deleteDpuOperatorCR(mgr.GetClient(), cr)
-			})
 			It("should not have the network function NAD created by controller manager", func() {
 				nad := netattdefv1.NetworkAttachmentDefinition{}
 				err := mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, &nad)
@@ -345,13 +339,10 @@ var _ = Describe("Main Controller", Ordered, func() {
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := &appsv1.DaemonSet{}
-				WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
-				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(cr.Spec.Mode))
-			})
-			It("should not have SR-IOV device plugin daemonsets created by controller manager", func() {
-				daemonSet := &appsv1.DaemonSet{}
-				err := mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testSriovDevicePlugin}, daemonSet)
-				Expect(errors.IsNotFound(err)).To(BeTrue())
+				Eventually(func() string {
+					WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
+					return daemonSet.Spec.Template.Spec.Containers[0].Args[1]
+				}, testAPITimeout*2, testRetryInterval).Should(Equal(cr.Spec.Mode))
 			})
 			It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}

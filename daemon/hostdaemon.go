@@ -11,6 +11,7 @@ import (
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	sfcreconciler "github.com/openshift/dpu-operator/daemon/sfc-reconciler"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
@@ -33,6 +34,7 @@ type HostDaemon struct {
 	conn          *grpc.ClientConn
 	client        pb.BridgePortServiceClient
 	vsp           plugin.VendorPlugin
+	dp            deviceplugin.DevicePlugin
 	addr          string
 	port          int32
 	cniServerPath string
@@ -77,9 +79,10 @@ func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) erro
 	return err
 }
 
-func NewHostDaemon(vsp plugin.VendorPlugin) *HostDaemon {
+func NewHostDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *HostDaemon {
 	return &HostDaemon{
 		vsp:           vsp,
+		dp:            dp,
 		log:           ctrl.Log.WithName("HostDaemon"),
 		cniServerPath: cnitypes.ServerSocketPath,
 		sm:            sriov.NewSriovManager(),
@@ -180,6 +183,11 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 	}
 	d.addr = addr
 	d.port = port
+
+	err = d.dp.Start()
+	if err != nil {
+		d.log.Error(err, "device plugin call failed")
+	}
 
 	add := func(r *cnitypes.PodRequest) (*cni100.Result, error) {
 		return d.cniCmdAddHandler(r)

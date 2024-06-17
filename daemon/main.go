@@ -7,8 +7,9 @@ import (
 	"net"
 	"os"
 
+	nfdevicehandler "github.com/openshift/dpu-operator/daemon/device-handler/nf-device-handler"
+	sriovdevicehandler "github.com/openshift/dpu-operator/daemon/device-handler/sriov-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
-	nfdevicehandler "github.com/openshift/dpu-operator/daemon/nf-device-handler"
 	"github.com/openshift/dpu-operator/daemon/plugin"
 	"go.uber.org/zap/zapcore"
 
@@ -43,7 +44,9 @@ func createDaemon(dpuMode bool) (Daemon, error) {
 		dp := deviceplugin.NewDevicePlugin(deviceHandler)
 		return NewDpuDaemon(plugin, dp), nil
 	} else {
-		return NewHostDaemon(plugin), nil
+		deviceHandler := sriovdevicehandler.NewSriovDeviceHandler()
+		dp := deviceplugin.NewDevicePlugin(deviceHandler)
+		return NewHostDaemon(plugin, dp), nil
 	}
 }
 

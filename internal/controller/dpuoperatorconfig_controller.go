@@ -99,12 +99,6 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
 	}
-	if dpuOperatorConfig.Spec.Mode == "host" {
-		err = r.ensureSriovDevicePlugin(ctx, dpuOperatorConfig)
-		if err != nil {
-			logger.Error(err, "Failed to ensure SRIOV Device Plugin DaemonSet is running")
-		}
-	}
 
 	if dpuOperatorConfig.Spec.Mode == "dpu" {
 		err = r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig)
@@ -189,12 +183,6 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cf
 	logger := log.FromContext(ctx)
 	logger.Info("Ensuring DPU DaemonSet", "image", r.dpuDaemonImage)
 	return r.applyAllFromBinData(logger, "daemon", cfg)
-}
-
-func (r *DpuOperatorConfigReconciler) ensureSriovDevicePlugin(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
-	logger := log.FromContext(ctx)
-	logger.Info("Ensurting Sriov Device Plugin")
-	return r.applyAllFromBinData(logger, "sriov-device-plugin", cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
