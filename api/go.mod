@@ -1,6 +1,6 @@
 module github.com/openshift/dpu-operator/api
 
-go 1.22
+go 1.22.1
 
 require (
 	k8s.io/apimachinery v0.29.1
