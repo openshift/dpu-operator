@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -125,7 +126,9 @@ func (d *HostDaemon) connectWithRetry() error {
 		  }
 		}]}`
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", d.addr, d.port), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicy))
+	connectionString := "["+d.addr+"]:"+strconv.Itoa(int(d.port))
+	conn, err := grpc.Dial(connectionString, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicy))
+
 	if err != nil {
 		d.log.Error(err, "did not connect")
 		return err
