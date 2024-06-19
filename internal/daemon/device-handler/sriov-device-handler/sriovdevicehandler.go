@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw"
-	devicehandler "github.com/openshift/dpu-operator/daemon/device-handler"
-	dp "github.com/openshift/dpu-operator/daemon/device-plugin"
+	devicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler"
+	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )

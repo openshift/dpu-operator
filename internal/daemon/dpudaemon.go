@@ -1,4 +1,4 @@
-package main
+package daemon
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
-	deviceplugin "github.com/openshift/dpu-operator/daemon/device-plugin"
-	"github.com/openshift/dpu-operator/daemon/plugin"
-	sfcreconciler "github.com/openshift/dpu-operator/daemon/sfc-reconciler"
 	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/networkfn"
+	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
+	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	sfcreconciler "github.com/openshift/dpu-operator/internal/daemon/sfc-reconciler"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
