@@ -6,9 +6,9 @@ import (
 	"net"
 
 	"github.com/go-logr/logr"
-	dp "github.com/openshift/dpu-operator/daemon/device-plugin"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
+	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"

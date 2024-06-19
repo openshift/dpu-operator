@@ -1,4 +1,4 @@
-package main_test
+package daemon
 
 import (
 	"flag"
@@ -14,7 +14,6 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
-	. "github.com/openshift/dpu-operator/daemon"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
