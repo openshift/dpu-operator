@@ -19,5 +19,6 @@ const (
 type DeviceList map[string]pluginapi.Device
 
 type DeviceHandler interface {
+	SetupDevices() error
 	GetDevices() (*DeviceList, error)
 }

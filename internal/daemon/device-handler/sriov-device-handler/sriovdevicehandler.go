@@ -2,6 +2,9 @@ package sriovdevicehandler
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw"
@@ -13,8 +16,9 @@ import (
 
 // sriovDeviceHandler handles NF networking devices
 type sriovDeviceHandler struct {
-	log        logr.Logger
-	filterFunc FilterFunc
+	log              logr.Logger
+	vfFilterFunc     FilterFunc
+	setupDevicesDone chan struct{}
 }
 
 type FilterFunc func(*ghw.PCIDevice) (bool, error)
@@ -29,7 +33,31 @@ func CreatePcieDevFilter(vendorID, deviceID, driverName string) FilterFunc {
 	}
 }
 
-func (nf *sriovDeviceHandler) GetPcieDevices() ([]*ghw.PCIDevice, error) {
+func (s *sriovDeviceHandler) SetSriovNumVfs(pciAddr string, numVfs int) error {
+	s.log.Info("SetSriovNumVfs(): set sriov_numvfs", "device", pciAddr, "numVfs", numVfs)
+
+	numVfsFilePath := filepath.Join("/sys/bus/pci/devices", pciAddr, "sriov_numvfs")
+
+	bs := []byte(strconv.Itoa(numVfs))
+
+	// We must always write 0 to sriov_numvfs first before changing the number of VFs.
+	err := os.WriteFile(numVfsFilePath, []byte("0"), os.ModeAppend)
+	if err != nil {
+		return fmt.Errorf("SetSriovNumVfs(): fail to reset %s: %v", numVfsFilePath, err)
+	}
+
+	if numVfs != 0 {
+		err = os.WriteFile(numVfsFilePath, bs, os.ModeAppend)
+		if err != nil {
+			return fmt.Errorf("SetSriovNumVfs(): fail to set %s: %v", numVfsFilePath, err)
+		}
+		// NOTE: VF netdevs are not guaranteed to appear immediately after writing the file
+	}
+
+	return nil
+}
+
+func (s *sriovDeviceHandler) GetPcieDevices() ([]*ghw.PCIDevice, error) {
 	pci, err := ghw.PCI()
 	if err != nil {
 		return nil, fmt.Errorf("error getting PCI info: %v", err)
@@ -43,14 +71,18 @@ func (nf *sriovDeviceHandler) GetPcieDevices() ([]*ghw.PCIDevice, error) {
 	return pciDevices, nil
 }
 
-func (nf *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
+func (s *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	devices := make(dp.DeviceList)
-	pciDevices, err := nf.GetPcieDevices()
+
+	// Wait for devices to be done initializing
+	<-s.setupDevicesDone
+
+	pciDevices, err := s.GetPcieDevices()
 	if err != nil {
 		return nil, err
 	}
 	for _, pciDevice := range pciDevices {
-		matchedDevice, err := nf.filterFunc(pciDevice)
+		matchedDevice, err := s.vfFilterFunc(pciDevice)
 		if err != nil {
 			return nil, err
 		}
@@ -75,11 +107,50 @@ func (nf *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	return &devices, nil
 }
 
-func NewSriovDeviceHandler() *sriovDeviceHandler {
-	// TODO: The VSP should pass the following parameters to create a filter
-	filterFunc := CreatePcieDevFilter("8086", "145c", "idpf")
-	return &sriovDeviceHandler{
-		log:        ctrl.Log.WithName("SriovDeviceHandler"),
-		filterFunc: filterFunc,
+// ensureConnected makes sure we are connected to the VSP's gRPC
+func (s *sriovDeviceHandler) ensureConnected() error {
+	// TODO: FIXME, design proto API for VSP
+	return nil
+}
+
+// SetupDevices
+func (s *sriovDeviceHandler) SetupDevices() error {
+	s.setupDevicesDone = make(chan struct{})
+
+	err := s.ensureConnected()
+	if err != nil {
+		return fmt.Errorf("failed to ensure connection to vsp: %v", err)
 	}
+
+	// TODO: The VSP should pass the hardcoded parameters to create a filter
+	s.vfFilterFunc = CreatePcieDevFilter("8086", "145c", "idpf")
+
+	// TODO: The VSP should pass in the PF
+	err = s.SetSriovNumVfs("0000:06:00.0", 8)
+	if err != nil {
+		return fmt.Errorf("failed to set sriov numVfs: %v", err)
+	}
+
+	close(s.setupDevicesDone)
+
+	return nil
+}
+
+func NewSriovDeviceHandler() *sriovDeviceHandler {
+	devHandler := &sriovDeviceHandler{
+		log: ctrl.Log.WithName("SriovDeviceHandler"),
+	}
+
+	// TODO: When changing the SRIOV numVfs, we should do the following:
+	// 1) Drain all pods running on the node with a drain controller running
+	// on the control plane. The nodes will be marked for draining and read by
+	// the drain controller.
+	// 2) Clearly define which PF and how many VFs from an API. User facing or
+	// otherwise
+	err := devHandler.SetupDevices()
+	if err != nil {
+		devHandler.log.Error(err, "Failed to setup devices")
+	}
+
+	return devHandler
 }
