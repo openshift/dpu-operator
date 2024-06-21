@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -44,12 +43,6 @@ func TestControllers(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-	// IMPORTANT: We want to be at the project root directory (please keep this mind when
-	// developing tests).
-	// Explanation: The controller manger will need to look into "bindata" to render
-	// the manifest files, thus the test container need to be at the correct level.
-	err := os.Chdir("../..")
-	Expect(err).NotTo(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {

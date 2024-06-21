@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -221,7 +220,7 @@ func bootstrapTestEnv(restConfig *rest.Config) {
 	trueVal := true
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases"), filepath.Join("test", "crd")},
+		CRDDirectoryPaths:     []string{"../../config/crd/bases", "../../test/crd"},
 		ErrorIfCRDPathMissing: true,
 		UseExistingCluster:    &trueVal,
 		Config:                restConfig,
