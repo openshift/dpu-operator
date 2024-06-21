@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
 
@@ -87,7 +86,7 @@ func deleteNameSpace(client client.Client, ns *v1.Namespace) {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("Still found")
+		return err
 	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 }
 
@@ -108,7 +107,7 @@ func deleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("Still found")
+		return err
 	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 }
 
@@ -188,8 +187,6 @@ var _ = Describe("Main Controller", Ordered, func() {
 			Development: true,
 		}
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-		fmt.Println(os.Args[0])
-
 		testCluster = testutils.TestCluster{Name: testClusterName}
 		client := testCluster.EnsureExists()
 		ctx, cancel = context.WithCancel(context.Background())
