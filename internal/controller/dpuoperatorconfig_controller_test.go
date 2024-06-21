@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	netattdefv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 
@@ -18,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/kind/pkg/cluster"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,12 +28,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"k8s.io/client-go/tools/clientcmd"
+	"github.com/openshift/dpu-operator/internal/testutils"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 )
@@ -47,9 +44,6 @@ var (
 	testDpuDaemonName         = "dpu-daemon"
 	testNetworkFunctionNAD    = "dpunfcni-conf"
 	testClusterName           = "dpu-operator-test-cluster"
-	testAPITimeout            = time.Second * 2
-	testRetryInterval         = time.Millisecond * 10
-	testInitialSetupTimeout   = time.Minute
 	setupLog                  = ctrl.Log.WithName("setup")
 )
 
@@ -82,7 +76,7 @@ func createNameSpace(client client.Client, ns *v1.Namespace) {
 	found := v1.Namespace{}
 	Eventually(func() error {
 		return client.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: ns.GetName()}, &found)
-	}, testAPITimeout, testRetryInterval).Should(Succeed())
+	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 }
 
 func deleteNameSpace(client client.Client, ns *v1.Namespace) {
@@ -94,70 +88,7 @@ func deleteNameSpace(client client.Client, ns *v1.Namespace) {
 			return nil
 		}
 		return fmt.Errorf("Still found")
-	}, testAPITimeout, testRetryInterval).Should(Succeed())
-}
-
-func deleteKindTestCluster() {
-	provider := cluster.NewProvider()
-	provider.Delete(testClusterName, "")
-}
-
-func envToKubeConfig() ([]byte, error) {
-	varName := "TEST_KUBECONFIG"
-	kubeconfigPath, ok := os.LookupEnv(varName)
-	if !ok {
-		return nil, fmt.Errorf("No %v env var defined", varName)
-	}
-	f, err := os.Open(kubeconfigPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	stats, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := make([]byte, stats.Size())
-	_, err = f.Read(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
-}
-
-func clusterExists(p *cluster.Provider, name string) bool {
-	clusters, err := p.List()
-	Expect(err).NotTo(HaveOccurred())
-	for _, n := range clusters {
-		if n == name {
-			return true
-		}
-	}
-	return false
-}
-
-func prepareTestCluster() *rest.Config {
-	var cfg []byte
-	var err error
-
-	cfg, err = envToKubeConfig()
-	if err != nil {
-		provider := cluster.NewProvider()
-		if !clusterExists(provider, testClusterName) {
-			err := provider.Create(testClusterName)
-			Expect(err).NotTo(HaveOccurred())
-		}
-		cfgString, err := provider.KubeConfig(testClusterName, false)
-		Expect(err).NotTo(HaveOccurred())
-		cfg = []byte(cfgString)
-	}
-	config, err := clientcmd.NewClientConfigFromBytes([]byte(cfg))
-	Expect(err).NotTo(HaveOccurred())
-	restCfg, err := config.ClientConfig()
-	Expect(err).NotTo(HaveOccurred())
-	return restCfg
+	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 }
 
 func createDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
@@ -166,7 +97,7 @@ func createDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 	found := configv1.DpuOperatorConfig{}
 	Eventually(func() error {
 		return client.Get(context.Background(), types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.GetName()}, &found)
-	}, testAPITimeout, testRetryInterval).Should(Succeed())
+	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 }
 
 func deleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
@@ -178,7 +109,7 @@ func deleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 			return nil
 		}
 		return fmt.Errorf("Still found")
-	}, testAPITimeout, testRetryInterval).Should(Succeed())
+	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 }
 
 func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *sync.WaitGroup) ctrl.Manager {
@@ -215,39 +146,17 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	return mgr
 }
 
-func bootstrapTestEnv(restConfig *rest.Config) {
-	var err error
-	trueVal := true
-	By("bootstrapping test environment")
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{"../../config/crd/bases", "../../test/crd"},
-		ErrorIfCRDPathMissing: true,
-		UseExistingCluster:    &trueVal,
-		Config:                restConfig,
-	}
-	By("starting the test env")
-	cfg, err = testEnv.Start()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
-}
-
 func stopDPUControllerManager(cancel context.CancelFunc, wg *sync.WaitGroup) {
 	By("shut down controller manager")
 	cancel()
 	wg.Wait()
 }
 
-func WaitForDaemonSetReady(daemonSet *appsv1.DaemonSet, k8sClient client.Client, namespace, name string) {
-	Eventually(func() error {
-		return k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, daemonSet)
-	}, testAPITimeout, testRetryInterval).ShouldNot(HaveOccurred())
-}
-
 func waitAllNodesReady(client client.Client) {
 	var nodes corev1.NodeList
 	Eventually(func() error {
 		return client.List(context.Background(), &nodes)
-	}, testAPITimeout, testRetryInterval).Should(Succeed())
+	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 
 	Eventually(func() bool {
 		var latestNodes corev1.NodeList
@@ -264,7 +173,7 @@ func waitAllNodesReady(client client.Client) {
 			}
 		}
 		return readyNodes == len(latestNodes.Items)
-	}, testInitialSetupTimeout, testRetryInterval).Should(BeTrue())
+	}, testutils.TestInitialSetupTimeout, testutils.TestRetryInterval).Should(BeTrue())
 }
 
 var _ = Describe("Main Controller", Ordered, func() {
@@ -272,6 +181,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 	var ctx context.Context
 	var wg sync.WaitGroup
 	var mgr ctrl.Manager
+	var testCluster testutils.TestCluster
 
 	BeforeAll(func() {
 		opts := zap.Options{
@@ -279,8 +189,9 @@ var _ = Describe("Main Controller", Ordered, func() {
 		}
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 		fmt.Println(os.Args[0])
-		client := prepareTestCluster()
-		bootstrapTestEnv(client)
+
+		testCluster = testutils.TestCluster{Name: testClusterName}
+		client := testCluster.EnsureExists()
 		ctx, cancel = context.WithCancel(context.Background())
 		wg = sync.WaitGroup{}
 		mgr = startDPUControllerManager(ctx, client, &wg)
@@ -294,12 +205,12 @@ var _ = Describe("Main Controller", Ordered, func() {
 			} else {
 				return err
 			}
-		}, testAPITimeout, testRetryInterval).Should(Succeed())
+		}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 	})
 	AfterAll(func() {
 		stopDPUControllerManager(cancel, &wg)
 		if os.Getenv("FAST_TEST") == "false" {
-			deleteKindTestCluster()
+			testCluster.EnsureDeleted()
 		}
 	})
 	Context("When Host controller manager has started without DpuOperatorConfig CR", func() {
@@ -314,7 +225,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := appsv1.DaemonSet{}
-				WaitForDaemonSetReady(&daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
+				testutils.WaitForDaemonSetReady(&daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
 				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(cr.Spec.Mode))
 			})
 			It("should not have the network function NAD created by controller manager", func() {
@@ -339,15 +250,15 @@ var _ = Describe("Main Controller", Ordered, func() {
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := &appsv1.DaemonSet{}
 				Eventually(func() string {
-					WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
+					testutils.WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
 					return daemonSet.Spec.Template.Spec.Containers[0].Args[1]
-				}, testAPITimeout*2, testRetryInterval).Should(Equal(cr.Spec.Mode))
+				}, testutils.TestAPITimeout*2, testutils.TestRetryInterval).Should(Equal(cr.Spec.Mode))
 			})
 			It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}
 				Eventually(func() error {
 					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, nad)
-				}, testAPITimeout, testRetryInterval).ShouldNot(HaveOccurred())
+				}, testutils.TestAPITimeout, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {
 				ns := dpuOperatorNameSpace()
