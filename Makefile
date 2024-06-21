@@ -109,6 +109,22 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+TMP_FOLDER = tmp
+.PHONY: generate
+generate-check: controller-gen
+	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." +output:dir=$(TMP_FOLDER)
+	
+	@echo "Comparing files in ./$(TMP_FOLDER)..."
+	@for file in ./$(TMP_FOLDER)/*; do \
+		filename=$$(basename $$file); \
+		found_file=$$(find . -type f -name $$filename -not -path "./$(TMP_FOLDER)/*" -not -path "./vendor/*" | head -n 1); \
+		if [ -n "$$found_file" ]; then \
+			echo "Generate will change $$found_file"; \
+			diff $$file $$found_file || :; \
+		fi \
+	done	
+	rm -rf ./$(TMP_FOLDER)
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
