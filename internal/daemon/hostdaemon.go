@@ -41,6 +41,7 @@ type HostDaemon struct {
 	cniserver     *cniserver.Server
 	sm            sriov.Manager
 	manager       ctrl.Manager
+	startedWg     sync.WaitGroup
 }
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -175,6 +176,7 @@ func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result,
 }
 
 func (d *HostDaemon) Listen() (net.Listener, error) {
+	d.startedWg.Add(1)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.cniServerPath)
 
 	addr, port, err := d.vsp.Start()
@@ -247,9 +249,10 @@ func (d *HostDaemon) ListenAndServe() error {
 }
 
 func (d *HostDaemon) Serve(listener net.Listener) error {
+	defer d.startedWg.Done()
 	err := d.cniserver.Serve(listener)
 	if err != nil {
-		d.log.Error(err, "Error starting CNI server for shim")
+		d.log.Error(err, "Error from CNI server while serving shim")
 		return err
 	}
 	return nil
@@ -261,6 +264,7 @@ func (d *HostDaemon) Stop() {
 		defer cancel()
 		d.cniserver.Shutdown(ctx)
 		d.cniserver = nil
+		d.startedWg.Wait()
 	}
 }
 
