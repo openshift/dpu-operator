@@ -1,7 +1,10 @@
 package daemon
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -17,6 +20,9 @@ import (
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	"google.golang.org/grpc"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -91,6 +97,45 @@ func (m SriovManagerStub) CmdDel(req *cnitypes.PodRequest) error {
 	return nil
 }
 
+type DummyDpuDaemon struct {
+	pb.UnimplementedBridgePortServiceServer
+	server      *grpc.Server
+	bridgePorts int
+}
+
+func (s *DummyDpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
+	s.bridgePorts += 1
+	return &pb.BridgePort{}, nil
+}
+
+func (s *DummyDpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBridgePortRequest) (*emptypb.Empty, error) {
+	s.bridgePorts -= 1
+	return &emptypb.Empty{}, nil
+}
+
+func (d *DummyDpuDaemon) Listen() (net.Listener, error) {
+	addr := "127.0.0.1"
+	port := 50051
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
+	if err != nil {
+		return lis, fmt.Errorf("Failed to start to listen on addr %v port %v", addr, port)
+	}
+	return lis, nil
+}
+
+func (d *DummyDpuDaemon) Serve(listen net.Listener) error {
+	d.server = grpc.NewServer()
+	pb.RegisterBridgePortServiceServer(d.server, d)
+	if err := d.server.Serve(listen); err != nil {
+		return fmt.Errorf("Fialed to start serving: %v", err)
+	}
+	return nil
+}
+
+func (d *DummyDpuDaemon) Stop() {
+	d.server.Stop()
+}
+
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\", \"OrigVfState\": {\"EffectiveMac\": \"00:11:22:33:44:55\"}, \"vlan\": 7}"
 	cmdArgs := &skel.CmdArgs{
@@ -132,7 +177,7 @@ var _ = g.Describe("Main", func() {
 		tmpDir           string
 		err              error
 		serverSocketPath string
-		dpuDaemon        *DpuDaemon
+		fakeDpuDaemon    *DummyDpuDaemon
 		hostDaemon       *HostDaemon
 	)
 	g.BeforeEach(func() {
@@ -140,8 +185,7 @@ var _ = g.Describe("Main", func() {
 		Expect(err).NotTo(HaveOccurred())
 		serverSocketPath = filepath.Join(tmpDir, "server.socket")
 
-		dummyPluginDPU := NewDummyPlugin()
-		dpuDaemon = NewDpuDaemon(dummyPluginDPU, &DummyDevicePlugin{})
+		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
 		hostDaemon = NewHostDaemon(dummyPluginHost, &DummyDevicePlugin{}).
@@ -152,16 +196,16 @@ var _ = g.Describe("Main", func() {
 	g.AfterEach(func() {
 		klog.Info("Cleaning up")
 		os.RemoveAll(tmpDir)
-		dpuDaemon.Stop()
+		fakeDpuDaemon.Stop()
 		hostDaemon.Stop()
 	})
 
 	g.Context("Host daemon", func() {
 		g.It("should respond to CNI calls", func() {
-			dpuListen, err := dpuDaemon.Listen()
+			dpuListen, err := fakeDpuDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				err = dpuDaemon.Serve(dpuListen)
+				err = fakeDpuDaemon.Serve(dpuListen)
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
@@ -180,6 +224,8 @@ var _ = g.Describe("Main", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ver).To(Equal(cniVersion))
 			Expect(resp.Result).To(Equal(expectedResult))
+
+			Expect(fakeDpuDaemon.bridgePorts).To(Equal(1))
 		})
 	})
 })
