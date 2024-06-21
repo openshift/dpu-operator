@@ -28,6 +28,7 @@ type nfDeviceHandler struct {
 	conn *grpc.ClientConn
 }
 
+// ensureConnected makes sure we are connected to the VSP's gRPC
 func (nf *nfDeviceHandler) ensureConnected() error {
 	if nf.client != nil {
 		return nil
@@ -50,6 +51,7 @@ func (nf *nfDeviceHandler) ensureConnected() error {
 	return nil
 }
 
+// GetDevices for NFs come from the VSP which will handle the detection of the devices
 func (nf *nfDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	err := nf.ensureConnected()
 	if err != nil {
@@ -70,8 +72,20 @@ func (nf *nfDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	return &devices, nil
 }
 
+// Currently NF devices do not require any setup outside the VSP
+func (nf *nfDeviceHandler) SetupDevices() error {
+	return nil
+}
+
 func NewNfDeviceHandler() *nfDeviceHandler {
-	return &nfDeviceHandler{
+	devHandler := &nfDeviceHandler{
 		log: ctrl.Log.WithName("NfDeviceHandler"),
 	}
+
+	err := devHandler.SetupDevices()
+	if err != nil {
+		devHandler.log.Error(err, "Failed to setup devices")
+	}
+
+	return devHandler
 }
