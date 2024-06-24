@@ -98,12 +98,14 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	err := r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
 	if err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
+		return ctrl.Result{}, err
 	}
 
 	if dpuOperatorConfig.Spec.Mode == "dpu" {
 		err = r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig)
 		if err != nil {
 			logger.Error(err, "Failed to create Network Function NAD")
+			return ctrl.Result{}, err
 		}
 	}
 
