@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
@@ -36,6 +37,11 @@ type DpuDaemon struct {
 	cniserver     *cniserver.Server
 	manager       ctrl.Manager
 	macStore      map[string][]string
+	wg            sync.WaitGroup
+	startedWg     sync.WaitGroup
+	cancelManager context.CancelFunc
+	done          chan error
+	client        *rest.Config
 }
 
 func (s *DpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
@@ -49,13 +55,36 @@ func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBrid
 	return &emptypb.Empty{}, err
 }
 
-func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *DpuDaemon {
-	return &DpuDaemon{
+func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, opts ...func(*DpuDaemon)) *DpuDaemon {
+	d := &DpuDaemon{
 		vsp:           vsp,
 		dp:            dp,
 		cniServerPath: cnitypes.ServerSocketPath,
 		log:           ctrl.Log.WithName("DpuDaemon"),
 		macStore:      make(map[string][]string),
+		done:          make(chan error, 4),
+	}
+
+	for _, opt := range opts {
+		opt(d)
+	}
+
+	// use the auto-detected client from the env if it's not explicitely specified
+	if d.client == nil {
+		d.client = ctrl.GetConfigOrDie()
+	}
+	return d
+}
+
+func WithClient(client *rest.Config) func(*DpuDaemon) {
+	return func(d *DpuDaemon) {
+		d.client = client
+	}
+}
+
+func WithCniServerPath(serverPath string) func(*DpuDaemon) {
+	return func(d *DpuDaemon) {
+		d.cniServerPath = serverPath
 	}
 }
 
@@ -97,6 +126,7 @@ func (d *DpuDaemon) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.Result
 }
 
 func (d *DpuDaemon) Listen() (net.Listener, error) {
+	d.startedWg.Add(1)
 	d.log.Info("starting DpuDaemon")
 	addr, port, err := d.vsp.Start()
 	if err != nil {
@@ -131,9 +161,6 @@ func (d *DpuDaemon) Listen() (net.Listener, error) {
 }
 
 func (d *DpuDaemon) ListenAndServe() error {
-	var wg sync.WaitGroup
-	done := make(chan error, 1)
-
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -141,73 +168,72 @@ func (d *DpuDaemon) ListenAndServe() error {
 		return err
 	}
 
-	wg.Add(1)
+	return d.Serve(listener)
+}
+
+func (d *DpuDaemon) Serve(listener net.Listener) error {
+
+	d.wg.Add(1)
 	go func() {
-		d.log.Info("Starging OPI server")
-		if err := d.Serve(listener); err != nil {
-			done <- err
+		d.log.Info("Starting OPI server")
+		d.server = grpc.NewServer()
+		pb.RegisterBridgePortServiceServer(d.server, d)
+		if err := d.server.Serve(listener); err != nil {
+			d.done <- fmt.Errorf("Failed to start serving: %v", err)
 		} else {
-			done <- nil
+			d.done <- nil
 		}
-		wg.Done()
+		d.log.Info("Stopping OPI server")
+		d.wg.Done()
 	}()
 
-	wg.Add(1)
+	d.wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
-			done <- err
+			d.done <- err
 		} else {
-			done <- nil
+			d.done <- nil
 		}
-		wg.Done()
+		d.log.Info("Stopping CNI server")
+		d.wg.Done()
 	}()
 
 	d.setupReconcilers()
-	wg.Add(1)
-
 	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
+	d.wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
-
 		if err := d.manager.Start(ctx); err != nil {
-			done <- err
+			d.done <- err
 		} else {
-			done <- nil
+			d.done <- nil
 		}
-		wg.Done()
+		d.log.Info("Stopping manager")
+		d.wg.Done()
 	}()
 
-	err = <-done
+	d.cancelManager = cancelManager
 
-	cancelManager()
+	err := <-d.done
+	d.cancelManager()
 	d.cniserver.Shutdown(context.TODO())
 	d.server.Stop()
-	wg.Wait()
-
+	d.wg.Wait()
+	d.startedWg.Done()
 	return err
 }
 
-func (d *DpuDaemon) Serve(listen net.Listener) error {
-	d.server = grpc.NewServer()
-	pb.RegisterBridgePortServiceServer(d.server, d)
-	if err := d.server.Serve(listen); err != nil {
-		d.log.Error(err, "Failed to start serving")
-		return err
-	}
-	return nil
-}
-
 func (d *DpuDaemon) Stop() {
-	if d.server != nil {
-		d.server.GracefulStop()
-		d.server = nil
-	}
+	d.done <- nil
+	d.startedWg.Wait()
 }
 
 func (d *DpuDaemon) setupReconcilers() {
 	if d.manager == nil {
-		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		t := time.Duration(0)
+
+		mgr, err := ctrl.NewManager(d.client, ctrl.Options{
 			Scheme: scheme,
 			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				opts.DefaultNamespaces = map[string]cache.Config{
@@ -215,6 +241,8 @@ func (d *DpuDaemon) setupReconcilers() {
 				}
 				return cache.New(config, opts)
 			},
+			// A timout needs to be specified, or else the mananger will wait indefinitely on stop()
+			GracefulShutdownTimeout: &t,
 		})
 		if err != nil {
 			d.log.Error(err, "unable to start manager")

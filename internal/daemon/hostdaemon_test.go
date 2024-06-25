@@ -171,7 +171,7 @@ var _ = g.BeforeSuite(func() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 })
 
-var _ = g.Describe("Main", func() {
+var _ = g.Describe("Host Daemon", func() {
 	var (
 		tmpDir           string
 		err              error
