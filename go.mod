@@ -11,7 +11,7 @@ require (
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.5.0
 	github.com/k8snetworkplumbingwg/sriov-network-operator v1.2.0
-	github.com/onsi/ginkgo/v2 v2.15.0
+	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.32.0
 	github.com/openshift/dpu-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openshift/dpu-operator/dpu-api v0.0.0-20240301140229-ca0f19ca135b
