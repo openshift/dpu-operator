@@ -146,7 +146,6 @@ func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 		Path:        "fakepath",
 		StdinData:   []byte(cniConfig),
 	}
-	os.Clearenv()
 	os.Setenv("CNI_COMMAND", command)
 	os.Setenv("CNI_ARGS", "K8S_POD_NAMESPACE=x;K8S_POD_NAME=y;K8S_POD_UID=z")
 	os.Setenv("CNI_CONTAINERID", cmdArgs.ContainerID)
