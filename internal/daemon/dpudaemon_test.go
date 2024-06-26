@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"os"
-	"path/filepath"
 	"time"
 
 	g "github.com/onsi/ginkgo/v2"
@@ -10,6 +9,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/dpu-operator/internal/testutils"
+	"github.com/openshift/dpu-operator/internal/utils"
 )
 
 var _ = g.Describe("Main", func() {
@@ -31,16 +31,12 @@ var _ = g.Describe("Main", func() {
 
 	g.Context("Host daemon", func() {
 		g.It("should respond to CNI calls", func() {
-			tempDir, err := os.MkdirTemp("", "mytempdir")
-			Expect(err).NotTo(HaveOccurred())
-			defer os.RemoveAll(tempDir)
-
-			serverSocketPath := filepath.Join(tempDir, "server.socket")
+			pathManager := *utils.NewPathManager(testCluster.TempDirPath())
 
 			dummyPluginDPU := NewDummyPlugin()
 			dpuDaemon = NewDpuDaemon(dummyPluginDPU, &DummyDevicePlugin{},
 				WithClient(client),
-				WithCniServerPath(serverSocketPath))
+				WithPathManager(pathManager))
 			dpuListen, err := dpuDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {

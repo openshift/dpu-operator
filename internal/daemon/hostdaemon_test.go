@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 
 	g "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap/zapcore"
@@ -19,6 +18,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
+	"github.com/openshift/dpu-operator/internal/testutils"
+	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
@@ -173,28 +174,27 @@ var _ = g.BeforeSuite(func() {
 
 var _ = g.Describe("Host Daemon", func() {
 	var (
-		tmpDir           string
-		err              error
-		serverSocketPath string
-		fakeDpuDaemon    *DummyDpuDaemon
-		hostDaemon       *HostDaemon
+		err           error
+		fakeDpuDaemon *DummyDpuDaemon
+		hostDaemon    *HostDaemon
+		testCluster   *testutils.TestCluster
+		pathManager   *utils.PathManager
 	)
 	g.BeforeEach(func() {
-		tmpDir, err = os.MkdirTemp("", "cniserver")
+		testCluster = &testutils.TestCluster{Name: "dpu-operator-test-cluster"}
+		testCluster.EnsureExists()
+		pathManager = utils.NewPathManager(testCluster.TempDirPath())
 		Expect(err).NotTo(HaveOccurred())
-		serverSocketPath = filepath.Join(tmpDir, "server.socket")
-
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
 		hostDaemon = NewHostDaemon(dummyPluginHost, &DummyDevicePlugin{}).
-			WithCniServerPath(serverSocketPath).
+			WithPathManager(pathManager).
 			WithSriovManager(m)
 	})
 
 	g.AfterEach(func() {
 		klog.Info("Cleaning up")
-		os.RemoveAll(tmpDir)
 		fakeDpuDaemon.Stop()
 		hostDaemon.Stop()
 	})
@@ -219,7 +219,7 @@ var _ = g.Describe("Host Daemon", func() {
 				CNIVersion: cniVersion,
 			}
 
-			resp, ver, err := cmdAdd(cniVersion, serverSocketPath)
+			resp, ver, err := cmdAdd(cniVersion, pathManager.CNIServerPath())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ver).To(Equal(cniVersion))
 			Expect(resp.Result).To(Equal(expectedResult))

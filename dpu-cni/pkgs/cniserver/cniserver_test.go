@@ -3,7 +3,6 @@ package cniserver_test
 import (
 	"net"
 	"os"
-	"path/filepath"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	g "github.com/onsi/ginkgo/v2"
@@ -11,10 +10,11 @@ import (
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
+	"github.com/openshift/dpu-operator/internal/testutils"
+	"github.com/openshift/dpu-operator/internal/utils"
 
 	current "github.com/containernetworking/cni/pkg/types/100"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
-	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
@@ -39,23 +39,27 @@ func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 
 var _ = g.Describe("Cniserver", func() {
 	var (
-		tmpDir           string
 		plugin           *cni.Plugin
 		cniServer        *cniserver.Server
-		serverSocketPath string
 		listener         net.Listener
 		addHandlerCalled bool
 		delHandlerCalled bool
+		testCluster      testutils.TestCluster
 	)
 
+	g.BeforeEach(func() {
+		testCluster = testutils.TestCluster{Name: "dpu-operator-test-cluster"}
+		testCluster.EnsureExists()
+	})
+
+	g.AfterEach(func() {
+		if os.Getenv("FAST_TEST") == "false" {
+			testCluster.EnsureDeleted()
+		}
+	})
 	g.Context("CNI Server APIs", func() {
 		g.BeforeEach(func() {
 			var err error
-			// Create a tmp directory in the test container
-			tmpDir, err = utiltesting.MkTmpdir("cniserver")
-			o.Expect(err).NotTo(o.HaveOccurred())
-
-			serverSocketPath = filepath.Join(tmpDir, filepath.Base(cnitypes.ServerSocketPath))
 			addHandlerCalled = false
 			delHandlerCalled = false
 			addHandler := func(request *cnitypes.PodRequest) (*current.Result, error) {
@@ -77,20 +81,20 @@ var _ = g.Describe("Cniserver", func() {
 				return result, nil
 			}
 
+			pathManager := utils.NewPathManager(testCluster.TempDirPath())
 			cniServer = cniserver.NewCNIServer(addHandler, delHandler,
-				cniserver.WithSocketPath(serverSocketPath))
+				cniserver.WithPathManager(*pathManager))
 			listener, err = cniServer.Listen()
 			o.Expect(err).NotTo(o.HaveOccurred())
 			go utilwait.Forever(func() {
 				cniServer.Serve(listener)
 			}, 0)
 
-			plugin = &cni.Plugin{SocketPath: serverSocketPath}
+			plugin = &cni.Plugin{SocketPath: pathManager.CNIServerPath()}
 		})
 
 		g.AfterEach(func() {
 			listener.Close()
-			os.RemoveAll(tmpDir)
 		})
 
 		g.Context("CNI Server APIs", func() {
