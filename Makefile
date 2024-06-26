@@ -115,15 +115,17 @@ generate-check: controller-gen
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." +output:dir=$(TMP_FOLDER)
 	
 	@echo "Comparing files in ./$(TMP_FOLDER)..."
-	@for file in ./$(TMP_FOLDER)/*; do \
+	@result=0; \
+	for file in ./$(TMP_FOLDER)/*; do \
 		filename=$$(basename $$file); \
 		found_file=$$(find . -type f -name $$filename -not -path "./$(TMP_FOLDER)/*" -not -path "./vendor/*" | head -n 1); \
 		if [ -n "$$found_file" ]; then \
 			echo "Generate will change $$found_file"; \
-			diff $$file $$found_file || :; \
+			diff $$file $$found_file || result=1; \
 		fi \
-	done	
-	rm -rf ./$(TMP_FOLDER)
+	done; \
+	rm -rf ./$(TMP_FOLDER); \
+	exit $$result
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
