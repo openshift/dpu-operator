@@ -17,6 +17,7 @@ import (
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	sfcreconciler "github.com/openshift/dpu-operator/internal/daemon/sfc-reconciler"
+	"github.com/openshift/dpu-operator/internal/utils"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -33,7 +34,6 @@ type DpuDaemon struct {
 	dp            deviceplugin.DevicePlugin
 	log           logr.Logger
 	server        *grpc.Server
-	cniServerPath string
 	cniserver     *cniserver.Server
 	manager       ctrl.Manager
 	macStore      map[string][]string
@@ -42,6 +42,7 @@ type DpuDaemon struct {
 	cancelManager context.CancelFunc
 	done          chan error
 	client        *rest.Config
+	pathManager   utils.PathManager
 }
 
 func (s *DpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
@@ -57,12 +58,12 @@ func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBrid
 
 func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, opts ...func(*DpuDaemon)) *DpuDaemon {
 	d := &DpuDaemon{
-		vsp:           vsp,
-		dp:            dp,
-		cniServerPath: cnitypes.ServerSocketPath,
-		log:           ctrl.Log.WithName("DpuDaemon"),
-		macStore:      make(map[string][]string),
-		done:          make(chan error, 4),
+		vsp:         vsp,
+		dp:          dp,
+		pathManager: *utils.NewPathManager("/"),
+		log:         ctrl.Log.WithName("DpuDaemon"),
+		macStore:    make(map[string][]string),
+		done:        make(chan error, 4),
 	}
 
 	for _, opt := range opts {
@@ -82,9 +83,9 @@ func WithClient(client *rest.Config) func(*DpuDaemon) {
 	}
 }
 
-func WithCniServerPath(serverPath string) func(*DpuDaemon) {
+func WithPathManager(pathManager utils.PathManager) func(*DpuDaemon) {
 	return func(d *DpuDaemon) {
-		d.cniServerPath = serverPath
+		d.pathManager = pathManager
 	}
 }
 
@@ -155,7 +156,7 @@ func (d *DpuDaemon) Listen() (net.Listener, error) {
 		return d.cniCmdNfDelHandler(r)
 	}
 
-	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithSocketPath(d.cniServerPath))
+	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithPathManager(d.pathManager))
 
 	return lis, err
 }

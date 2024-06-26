@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnihelper"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -25,12 +26,12 @@ import (
 // code has not been implemented.
 
 type processRequestFunc func(request *cnitypes.PodRequest) (*cni100.Result, error)
+
 type Server struct {
 	http.Server
 	cniCmdAddHandler processRequestFunc
 	cniCmdDelHandler processRequestFunc
-	runDir           string
-	socketPath       string
+	pathManager      utils.PathManager
 }
 
 // ensureRunDirExists makes sure that the socket being created is only accessible to root.
@@ -71,16 +72,16 @@ func ensureRunDirExists(serverSocketPath string) error {
 
 // Listen creates a listener to a unix socket located in `socketPath`
 func (s *Server) Listen() (net.Listener, error) {
-	err := ensureRunDirExists(s.socketPath)
+	err := ensureRunDirExists(s.pathManager.CNIServerPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run directory for DPU CNI socket: %v", err)
 	}
-	listener, err := net.Listen("unix", filepath.Join(s.runDir, s.socketPath))
+	listener, err := net.Listen("unix", s.pathManager.CNIServerPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on DPU CNI socket: %v", err)
 	}
-	klog.Info("Listen on socket path: ", s.socketPath)
-	if err := os.Chmod(s.socketPath, 0o600); err != nil {
+	klog.Info("Listen on socket path: ", s.pathManager.CNIServerPath())
+	if err := os.Chmod(s.pathManager.CNIServerPath(), 0o600); err != nil {
 		_ = listener.Close()
 		return nil, fmt.Errorf("failed to set file permissions on DPU CNI socket: %v", err)
 	}
@@ -325,7 +326,6 @@ func NewCNIServer(addHandler processRequestFunc, delHandler processRequestFunc, 
 		},
 		cniCmdAddHandler: addHandler,
 		cniCmdDelHandler: delHandler,
-		socketPath:       cnitypes.ServerSocketPath,
 	}
 
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
@@ -338,8 +338,8 @@ func NewCNIServer(addHandler processRequestFunc, delHandler processRequestFunc, 
 	return s
 }
 
-func WithSocketPath(socketPath string) func(*Server) {
+func WithPathManager(pathManager utils.PathManager) func(*Server) {
 	return func(s *Server) {
-		s.socketPath = socketPath
+		s.pathManager = pathManager
 	}
 }

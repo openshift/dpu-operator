@@ -17,6 +17,7 @@ import (
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	sfcreconciler "github.com/openshift/dpu-operator/internal/daemon/sfc-reconciler"
+	"github.com/openshift/dpu-operator/internal/utils"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -29,19 +30,19 @@ import (
 )
 
 type HostDaemon struct {
-	dev           bool
-	log           logr.Logger
-	conn          *grpc.ClientConn
-	client        pb.BridgePortServiceClient
-	vsp           plugin.VendorPlugin
-	dp            deviceplugin.DevicePlugin
-	addr          string
-	port          int32
-	cniServerPath string
-	cniserver     *cniserver.Server
-	sm            sriov.Manager
-	manager       ctrl.Manager
-	startedWg     sync.WaitGroup
+	dev         bool
+	log         logr.Logger
+	conn        *grpc.ClientConn
+	client      pb.BridgePortServiceClient
+	vsp         plugin.VendorPlugin
+	dp          deviceplugin.DevicePlugin
+	addr        string
+	port        int32
+	cniserver   *cniserver.Server
+	sm          sriov.Manager
+	manager     ctrl.Manager
+	startedWg   sync.WaitGroup
+	pathManager utils.PathManager
 }
 
 func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -82,16 +83,16 @@ func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) erro
 
 func NewHostDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *HostDaemon {
 	return &HostDaemon{
-		vsp:           vsp,
-		dp:            dp,
-		log:           ctrl.Log.WithName("HostDaemon"),
-		cniServerPath: cnitypes.ServerSocketPath,
-		sm:            sriov.NewSriovManager(),
+		vsp:         vsp,
+		dp:          dp,
+		log:         ctrl.Log.WithName("HostDaemon"),
+		sm:          sriov.NewSriovManager(),
+		pathManager: *utils.NewPathManager("/"),
 	}
 }
 
-func (d *HostDaemon) WithCniServerPath(serverPath string) *HostDaemon {
-	d.cniServerPath = serverPath
+func (d *HostDaemon) WithPathManager(pathManager *utils.PathManager) *HostDaemon {
+	d.pathManager = *pathManager
 	return d
 }
 
@@ -177,7 +178,7 @@ func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result,
 
 func (d *HostDaemon) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
-	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.cniServerPath)
+	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
 	addr, port, err := d.vsp.Start()
 	if err != nil {
@@ -198,7 +199,7 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 		return d.cniCmdDelHandler(r)
 	}
 
-	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithSocketPath(d.cniServerPath))
+	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithPathManager(d.pathManager))
 
 	return d.cniserver.Listen()
 }
