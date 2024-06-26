@@ -1,6 +1,9 @@
 package testutils
 
 import (
+	"path/filepath"
+	"runtime"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -16,6 +19,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
@@ -32,12 +37,22 @@ var (
 	setupLog                  = ctrl.Log.WithName("setup")
 )
 
+func relativeToAbs(path string) string {
+	_, file, _, _ := runtime.Caller(0)
+	file, err := filepath.Abs(file)
+	Expect(err).NotTo(HaveOccurred())
+	return filepath.Join(filepath.Dir(file), path)
+}
+
 func bootstrapTestEnv(restConfig *rest.Config) {
 	var err error
 	trueVal := true
 	By("bootstrapping test environment")
 	testEnv := &envtest.Environment{
-		CRDDirectoryPaths:     []string{"../../config/crd/bases", "../../test/crd"},
+		CRDDirectoryPaths: []string{
+			relativeToAbs("../../config/crd/bases"),
+			relativeToAbs("../../test/crd"),
+		},
 		ErrorIfCRDPathMissing: true,
 		UseExistingCluster:    &trueVal,
 		Config:                restConfig,
@@ -52,14 +67,44 @@ type TestCluster struct {
 	Name string
 }
 
+func (t *TestCluster) TempDirPath() string {
+	return filepath.Join("/tmp", t.Name)
+}
+
+func (t *TestCluster) ensureTempDir() error {
+	dirPath := t.TempDirPath()
+	_, err := os.Stat(dirPath)
+	if err == nil {
+		return nil
+	} else if os.IsNotExist(err) {
+		err = os.MkdirAll(dirPath, 0755)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return err
+}
+
+func (t *TestCluster) ensureTempDirDeleted() error {
+	dirPath := t.TempDirPath()
+	err := os.RemoveAll(dirPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete temporary directory %s: %w", dirPath, err)
+	}
+	return nil
+}
+
 func (t *TestCluster) EnsureExists() *rest.Config {
-	client := prepareTestCluster(t.Name)
+	client := t.prepareTestCluster()
 	bootstrapTestEnv(client)
 	return client
 }
 
 func (t *TestCluster) EnsureDeleted() {
 	deleteKindTestCluster(t.Name)
+	err := t.ensureTempDirDeleted()
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func deleteKindTestCluster(name string) {
@@ -103,18 +148,46 @@ func clusterExists(p *cluster.Provider, name string) bool {
 	return false
 }
 
-func prepareTestCluster(name string) *rest.Config {
+func (t *TestCluster) prepareTestCluster() *rest.Config {
 	var cfg []byte
 	var err error
 
 	cfg, err = envToKubeConfig()
 	if err != nil {
 		provider := cluster.NewProvider()
-		if !clusterExists(provider, name) {
-			err := provider.Create(name)
+		if !clusterExists(provider, t.Name) {
+			t.ensureTempDirDeleted()
+			err := t.ensureTempDir()
+			Expect(err).NotTo(HaveOccurred())
+			kubeletPath := filepath.Join(t.TempDirPath(), "/var/lib/kubelet")
+			err = os.MkdirAll(kubeletPath, 0755)
+			Expect(err).NotTo(HaveOccurred())
+			c := v1alpha4.Cluster{
+				TypeMeta: v1alpha4.TypeMeta{
+					Kind:       "Cluster",
+					APIVersion: "kind.x-k8s.io/v1alpha4",
+				},
+				Name: t.Name,
+				Nodes: []v1alpha4.Node{
+					{
+						Role: v1alpha4.NodeRole("control-plane"),
+						ExtraMounts: []v1alpha4.Mount{
+							{
+								HostPath:      kubeletPath,
+								ContainerPath: "/var/lib/kubelet/",
+							},
+						},
+					},
+				},
+			}
+			v1alpha4.SetDefaultsCluster(&c)
+
+			err = provider.Create(t.Name,
+				cluster.CreateWithV1Alpha4Config(&c),
+				cluster.CreateWithWaitForReady(time.Minute))
 			Expect(err).NotTo(HaveOccurred())
 		}
-		cfgString, err := provider.KubeConfig(name, false)
+		cfgString, err := provider.KubeConfig(t.Name, false)
 		Expect(err).NotTo(HaveOccurred())
 		cfg = []byte(cfgString)
 	}
