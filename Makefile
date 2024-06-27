@@ -105,6 +105,18 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	GOFLAGS='' $(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: prow-ci-manifests-check
+prow-ci-manifests-check: manifests
+	@changed_files=$$(git diff --name-only); \
+	for file in $$changed_files; do \
+		diff_output=$$(git diff -- $$file); \
+		echo "$$diff_output"; \
+	done; \
+	if [ -n "$$changed_files" ]; then \
+		echo "Please run 'make manifests', the following files changed: $$changed_files"; \
+		exit 1; \
+	fi
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -316,6 +328,22 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 	cp bundle/manifests/* manifests/stable
+
+.PHONY: prow-ci-bundle-check
+prow-ci-bundle-check: bundle
+	@changed_files=$$(git diff --name-only); \
+	non_timestamp_change=0; \
+	for file in $$changed_files; do \
+		diff_output=$$(git diff -U0 -- $$file); \
+		if echo "$$diff_output" | grep '^[+-]' | grep -Ev '^(--- a/|\+\+\+ b/)' | grep -v "createdAt" | grep -q "."; then \
+			echo "$$diff_output"; \
+			non_timestamp_change=1; \
+		fi; \
+	done; \
+	if [ $$non_timestamp_change -ne 0 ]; then \
+		echo "Please run 'make bundle', detected non timestamp changes"; \
+		exit 1; \
+	fi
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
