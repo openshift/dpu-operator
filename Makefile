@@ -329,6 +329,22 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(OPERATOR_SDK) bundle validate ./bundle
 	cp bundle/manifests/* manifests/stable
 
+.PHONY: prow-ci-bundle-check
+prow-ci-bundle-check: bundle
+	@changed_files=$$(git diff --name-only); \
+	non_timestamp_change=0; \
+	for file in $$changed_files; do \
+		diff_output=$$(git diff -U0 -- $$file); \
+		if echo "$$diff_output" | grep '^[+-]' | grep -Ev '^(--- a/|\+\+\+ b/)' | grep -v "createdAt" | grep -q "."; then \
+			echo "$$diff_output"; \
+			non_timestamp_change=1; \
+		fi; \
+	done; \
+	if [ $$non_timestamp_change -ne 0 ]; then \
+		echo "Please run 'make bundle', detected non timestamp changes"; \
+		exit 1; \
+	fi
+
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
