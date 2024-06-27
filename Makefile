@@ -105,6 +105,18 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	GOFLAGS='' $(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: prow-ci-manifests-check
+prow-ci-manifests-check: manifests
+	@changed_files=$$(git diff --name-only); \
+	for file in $$changed_files; do \
+		diff_output=$$(git diff -- $$file); \
+		echo "$$diff_output"; \
+	done; \
+	if [ -n "$$changed_files" ]; then \
+		echo "Please run 'make manifests', the following files changed: $$changed_files"; \
+		exit 1; \
+	fi
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
