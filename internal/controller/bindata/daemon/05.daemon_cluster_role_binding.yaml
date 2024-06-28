@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dpu-daemon-cluster-rolebinding
+roleRef:
+  name: dpu-daemon-cluster-role
+  kind: ClusterRole
+subjects:
+- kind: ServiceAccount
+  name: dpu-daemon-sa
+  namespace: openshift-dpu-operator

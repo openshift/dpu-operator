@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"path/filepath"
 )
 
@@ -13,28 +14,33 @@ func NewPathManager(rootDir string) *PathManager {
 }
 
 func (p *PathManager) CNIServerPath() string {
-	DaemonBaseDir := "/var/run/dpu-daemon/"
-	ServerSocketPath := DaemonBaseDir + "dpu-cni/dpu-cni-server.sock"
-
-	return filepath.Join(p.rootDir, ServerSocketPath)
+	return p.wrap("/var/run/dpu-daemon/dpu-cni/dpu-cni-server.sock")
 }
 
 func (p *PathManager) KubeletEndPoint() string {
-	// KubeEndPoint is kubelet socket name
-	KubeEndPoint := "kubelet.sock"
 	// SockDir is the default Kubelet device plugin socket directory
 	// SockDir = "/var/lib/kubelet/plugins_registry"
-	// DeprecatedSockDir is the deprecated Kubelet device plugin socket directory
-	DeprecatedSockDir := "/var/lib/kubelet/device-plugins"
-	return filepath.Join(p.rootDir, DeprecatedSockDir, KubeEndPoint)
+	// The following path uses the deprecated Kubelet device plugin socket directory
+	return p.wrap("/var/lib/kubelet/device-plugins/sriovNet.sock")
 }
 
 func (p *PathManager) PluginEndpoint() string {
-	pluginEndpoint := "sriovNet.sock"
-	pluginMountPath := "/var/lib/kubelet/device-plugins"
-	return filepath.Join(p.rootDir, pluginMountPath, pluginEndpoint)
+	return p.wrap("/var/lib/kubelet/device-plugins/sriovNet.sock")
 }
 
-func (p *PathManager) DefaultCNIPATH() string {
-	return filepath.Join(p.rootDir, "cni")
+func (p *PathManager) CniPath(flavour Flavour) (string, error) {
+	// Some k8s cluster flavours use /var/lib (in the case of RHCOS based)
+	// and some use /opt (in the case of RHEL based)
+	switch flavour {
+	case MicroShiftFlavour:
+		return p.wrap("/opt/cni/bin/dpu-cni"), nil
+	case OpenShiftFlavour:
+		return p.wrap("/var/lib/cni/bin/dpu-cni"), nil
+	default:
+		return "", fmt.Errorf("unknown flavour")
+	}
+}
+
+func (p *PathManager) wrap(path string) string {
+	return filepath.Join(p.rootDir, path)
 }

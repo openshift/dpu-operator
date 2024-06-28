@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"io"
@@ -12,9 +13,14 @@ import (
 	sriovdevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/sriov-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"go.uber.org/zap/zapcore"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
@@ -37,13 +43,13 @@ func isDpuMode(mode string) (bool, error) {
 	}
 }
 
-func createDaemon(dpuMode bool) (Daemon, error) {
+func createDaemon(dpuMode bool, config *rest.Config) (Daemon, error) {
 	plugin := plugin.NewGrpcPlugin(dpuMode)
 
 	if dpuMode {
 		deviceHandler := nfdevicehandler.NewNfDeviceHandler()
 		dp := deviceplugin.NewDevicePlugin(deviceHandler)
-		return daemon.NewDpuDaemon(plugin, dp), nil
+		return daemon.NewDpuDaemon(plugin, dp, config), nil
 	} else {
 		deviceHandler := sriovdevicehandler.NewSriovDeviceHandler()
 		dp := deviceplugin.NewDevicePlugin(deviceHandler)
@@ -108,30 +114,40 @@ func main() {
 	flag.Parse()
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	v1.AddToScheme(scheme.Scheme)
 	log := ctrl.Log.WithName("Daemon Init")
 	log.Info("Daemon init")
+	config := ctrl.GetConfigOrDie()
+	client, err := client.New(config, client.Options{
+		Scheme: scheme.Scheme,
+	})
 
-	// Some k8s clusters use /var/lib (in the case of RHCOS based)
-	// and some use /opt (in the case of RHEL based)
-	// FIXME: In the future we should detect the cluster and move the
-	// binaries to the expected locations only.
-	err = prepareCni("/var/lib/cni/bin/dpu-cni")
+	ce := utils.NewClusterEnvironment(client)
+	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
-		log.Error(err, "Failed to prepare CNI binary in /var/lib")
-		/* Don't return on error for now */
+		log.Error(err, "Failed to get cluster flavour")
+		return
 	}
-	err = prepareCni("/opt/cni/bin/dpu-cni")
+	log.Info("Detected OpenShift", "flavour", flavour)
+	pm := utils.NewPathManager("/")
+	cniPath, err := pm.CniPath(flavour)
 	if err != nil {
-		log.Error(err, "Failed to prepare CNI binary in /opt")
-		/* Don't return on error for now */
+		log.Error(err, "Failed to get cni path")
+		return
 	}
+	err = prepareCni(cniPath)
+	if err != nil {
+		log.Error(err, "Failed to prepare CNI binary", "path", cniPath)
+		return
+	}
+	log.Info("Prepared CNI binary", "path", cniPath)
 
 	dpuMode, err = isDpuMode(mode)
 	if err != nil {
 		log.Error(err, "Failed to parse mode")
 		return
 	}
-	daemon, err := createDaemon(dpuMode)
+	daemon, err := createDaemon(dpuMode, config)
 	if err != nil {
 		log.Error(err, "Failed to start daemon")
 		return
