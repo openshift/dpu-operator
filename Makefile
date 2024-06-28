@@ -212,7 +212,7 @@ images-buildx: ## Build all container images necessary to run the whole operator
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 
 .PHONY: images-push
-images-push: test ## Push all container images necessary to run the whole operator
+images-push: ## Push all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) push $(DPU_OPERATOR_IMAGE)
 	$(CONTAINER_TOOL) push $(DPU_DAEMON_IMAGE)
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
