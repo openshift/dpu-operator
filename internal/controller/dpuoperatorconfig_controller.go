@@ -120,7 +120,7 @@ func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperator
 	data := map[string]string{
 		"Namespace":              "openshift-dpu-operator",
 		"ImagePullPolicy":        r.imagePullPolicy,
-		"Mode":                   cfg.Spec.Mode,
+		"Mode":                   "auto",
 		"DpuOperatorDaemonImage": r.dpuDaemonImage,
 		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
 	}
