@@ -12,7 +12,7 @@ spec:
     listKind: DpuOperatorConfigList
     plural: dpuoperatorconfigs
     singular: dpuoperatorconfig
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1
     schema:
