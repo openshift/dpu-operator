@@ -31,7 +31,7 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "dpu-operator-system",
+			Namespace: "openshift-dpu-operator",
 			Annotations: map[string]string{
 				"k8s.v1.cni.cncf.io/networks": "dpunfcni-conf, dpunfcni-conf",
 			},

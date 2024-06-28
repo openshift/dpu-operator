@@ -238,7 +238,7 @@ func (d *DpuDaemon) setupReconcilers() {
 			Scheme: scheme,
 			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				opts.DefaultNamespaces = map[string]cache.Config{
-					"dpu-operator-system": {},
+					"openshift-dpu-operator": {},
 				}
 				return cache.New(config, opts)
 			},
