@@ -15,12 +15,12 @@ import (
 var _ = g.Describe("Main", func() {
 	var (
 		dpuDaemon   *DpuDaemon
-		client      *rest.Config
+		config      *rest.Config
 		testCluster testutils.TestCluster
 	)
 	g.BeforeEach(func() {
 		testCluster = testutils.TestCluster{Name: "dpu-operator-test-cluster"}
-		client = testCluster.EnsureExists()
+		config = testCluster.EnsureExists()
 	})
 
 	g.AfterEach(func() {
@@ -34,8 +34,7 @@ var _ = g.Describe("Main", func() {
 			pathManager := *utils.NewPathManager(testCluster.TempDirPath())
 
 			dummyPluginDPU := NewDummyPlugin()
-			dpuDaemon = NewDpuDaemon(dummyPluginDPU, &DummyDevicePlugin{},
-				WithClient(client),
+			dpuDaemon = NewDpuDaemon(dummyPluginDPU, &DummyDevicePlugin{}, config,
 				WithPathManager(pathManager))
 			dpuListen, err := dpuDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())

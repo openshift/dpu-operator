@@ -1,0 +1,14 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dpu-daemon-role-binding
+  namespace: kube-public
+subjects:
+- kind: ServiceAccount
+  name: dpu-daemon-sa
+  namespace: openshift-dpu-operator
+roleRef:
+  kind: Role
+  name: dpu-daemon-role-kube-public
+  apiGroup: rbac.authorization.k8s.io
+

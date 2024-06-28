@@ -41,7 +41,7 @@ type DpuDaemon struct {
 	startedWg     sync.WaitGroup
 	cancelManager context.CancelFunc
 	done          chan error
-	client        *rest.Config
+	config        *rest.Config
 	pathManager   utils.PathManager
 }
 
@@ -56,7 +56,7 @@ func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBrid
 	return &emptypb.Empty{}, err
 }
 
-func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, opts ...func(*DpuDaemon)) *DpuDaemon {
+func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, config *rest.Config, opts ...func(*DpuDaemon)) *DpuDaemon {
 	d := &DpuDaemon{
 		vsp:         vsp,
 		dp:          dp,
@@ -64,23 +64,14 @@ func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, opts ..
 		log:         ctrl.Log.WithName("DpuDaemon"),
 		macStore:    make(map[string][]string),
 		done:        make(chan error, 4),
+		config:      config,
 	}
 
 	for _, opt := range opts {
 		opt(d)
 	}
 
-	// use the auto-detected client from the env if it's not explicitely specified
-	if d.client == nil {
-		d.client = ctrl.GetConfigOrDie()
-	}
 	return d
-}
-
-func WithClient(client *rest.Config) func(*DpuDaemon) {
-	return func(d *DpuDaemon) {
-		d.client = client
-	}
 }
 
 func WithPathManager(pathManager utils.PathManager) func(*DpuDaemon) {
@@ -234,7 +225,7 @@ func (d *DpuDaemon) setupReconcilers() {
 	if d.manager == nil {
 		t := time.Duration(0)
 
-		mgr, err := ctrl.NewManager(d.client, ctrl.Options{
+		mgr, err := ctrl.NewManager(d.config, ctrl.Options{
 			Scheme: scheme,
 			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				opts.DefaultNamespaces = map[string]cache.Config{
