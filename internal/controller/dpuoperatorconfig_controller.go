@@ -115,7 +115,7 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]string {
 	// All the CRs will be in the same namespace as the operator config
 	data := map[string]string{
-		"Namespace":              cfg.Namespace,
+		"Namespace":              "openshift-dpu-operator",
 		"ImagePullPolicy":        r.imagePullPolicy,
 		"Mode":                   cfg.Spec.Mode,
 		"DpuOperatorDaemonImage": r.dpuDaemonImage,

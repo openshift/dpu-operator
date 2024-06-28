@@ -14,7 +14,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    operatorframework.io/suggested-namespace: dpu-operator-system
+    operatorframework.io/suggested-namespace: openshift-dpu-operator
   name: dpu-operator.v0.0.0
   namespace: placeholder
 spec:
