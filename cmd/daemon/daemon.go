@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -13,9 +14,11 @@ import (
 	sriovdevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/sriov-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/go-logr/logr"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -33,11 +36,19 @@ type Daemon interface {
 	Stop()
 }
 
-func isDpuMode(mode string) (bool, error) {
+func isDpuMode(log logr.Logger, mode string) (bool, error) {
 	if mode == "host" {
 		return false, nil
 	} else if mode == "dpu" {
 		return true, nil
+	} else if mode == "auto" {
+		pi := platform.PlatformInfo{}
+		detectedDpuMode, err := pi.IsDPU()
+		if err != nil {
+			return false, fmt.Errorf("Failed to query platform info: %v", err)
+		}
+		log.Info("Autodetected mode", "isDPU", detectedDpuMode)
+		return detectedDpuMode, nil
 	} else {
 		return false, errors.New("Invalid mode")
 	}
@@ -141,8 +152,7 @@ func main() {
 		return
 	}
 	log.Info("Prepared CNI binary", "path", cniPath)
-
-	dpuMode, err = isDpuMode(mode)
+	dpuMode, err = isDpuMode(log, mode)
 	if err != nil {
 		log.Error(err, "Failed to parse mode")
 		return

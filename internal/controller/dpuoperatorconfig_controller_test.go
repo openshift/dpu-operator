@@ -223,7 +223,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := appsv1.DaemonSet{}
 				testutils.WaitForDaemonSetReady(&daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
-				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal(cr.Spec.Mode))
+				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal("auto"))
 			})
 			It("should not have the network function NAD created by controller manager", func() {
 				nad := netattdefv1.NetworkAttachmentDefinition{}
@@ -249,7 +249,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 				Eventually(func() string {
 					testutils.WaitForDaemonSetReady(daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
 					return daemonSet.Spec.Template.Spec.Containers[0].Args[1]
-				}, testutils.TestAPITimeout*2, testutils.TestRetryInterval).Should(Equal(cr.Spec.Mode))
+				}, testutils.TestAPITimeout*2, testutils.TestRetryInterval).Should(Equal("auto"))
 			})
 			It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}
