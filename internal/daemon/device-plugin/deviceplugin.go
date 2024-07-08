@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -17,20 +18,16 @@ import (
 )
 
 const (
-	// Device plugin settings.
-	pluginMountPath = "/var/lib/kubelet/device-plugins"
-	kubeletEndpoint = "kubelet.sock"
-	pluginEndpoint  = "sriovNet.sock"
-	resourceName    = "openshift.io/dpu"
+	resourceName = "openshift.io/dpu"
 )
 
 // dpServer manages the k8s Device Plugin Server
 type dpServer struct {
-	socketFile string
 	devices    map[string]pluginapi.Device // for Kubelet DP API
 	grpcServer *grpc.Server
 	pluginapi.DevicePluginServer
 	log           logr.Logger
+	pathManager   utils.PathManager
 	deviceHandler DeviceHandler
 }
 
@@ -135,7 +132,7 @@ func (dp *dpServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest
 }
 
 func (dp *dpServer) RegisterDevicePlugin() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, dp.socketFile)
+	pluginEndpoint := dp.pathManager.PluginEndpoint()
 	dp.log.Info("Starting Device Plugin server at:", "pluginEndpoint", pluginEndpoint)
 	lis, err := net.Listen("unix", pluginEndpoint)
 	if err != nil {
@@ -143,7 +140,7 @@ func (dp *dpServer) RegisterDevicePlugin() error {
 	}
 	dp.grpcServer = grpc.NewServer()
 
-	kubeletEndpoint := filepath.Join("unix:", DeprecatedSockDir, KubeEndPoint)
+	kubeletEndpoint := filepath.Join("unix:", dp.pathManager.KubeletEndPoint())
 	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("resource %s unable connect to Kubelet: %v", resourceName, err)
@@ -171,7 +168,7 @@ func (dp *dpServer) RegisterDevicePlugin() error {
 
 	request := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
-		Endpoint:     dp.socketFile,
+		Endpoint:     utils.PluginEndpointSocket,
 		ResourceName: resourceName,
 	}
 
@@ -245,7 +242,7 @@ func (dp *dpServer) connectWithRetry(endpoint string) (*grpc.ClientConn, error) 
 // }
 
 func (dp *dpServer) cleanup() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, dp.socketFile)
+	pluginEndpoint := dp.pathManager.PluginEndpoint()
 	if err := os.Remove(pluginEndpoint); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -263,11 +260,23 @@ func (dp *dpServer) GetDevicePluginOptions(ctx context.Context, empty *pluginapi
 	}, nil
 }
 
-func NewDevicePlugin(dh DeviceHandler) *dpServer {
-	return &dpServer{
+func WithPathManager(pathManager utils.PathManager) func(*dpServer) {
+	return func(d *dpServer) {
+		d.pathManager = pathManager
+	}
+}
+
+func NewDevicePlugin(dh DeviceHandler, opts ...func(*dpServer)) *dpServer {
+	dp := &dpServer{
 		log:           ctrl.Log.WithName("DevicePlugin"),
+		pathManager:   *utils.NewPathManager("/"),
 		devices:       make(map[string]pluginapi.Device),
-		socketFile:    pluginEndpoint,
 		deviceHandler: dh,
 	}
+
+	for _, opt := range opts {
+		opt(dp)
+	}
+
+	return dp
 }

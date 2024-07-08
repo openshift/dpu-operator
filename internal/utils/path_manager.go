@@ -9,6 +9,10 @@ type PathManager struct {
 	rootDir string
 }
 
+const (
+	PluginEndpointSocket = "sriovNet.sock"
+)
+
 func NewPathManager(rootDir string) *PathManager {
 	return &PathManager{rootDir: rootDir}
 }
@@ -18,14 +22,12 @@ func (p *PathManager) CNIServerPath() string {
 }
 
 func (p *PathManager) KubeletEndPoint() string {
-	// SockDir is the default Kubelet device plugin socket directory
-	// SockDir = "/var/lib/kubelet/plugins_registry"
 	// The following path uses the deprecated Kubelet device plugin socket directory
-	return p.wrap("/var/lib/kubelet/device-plugins/sriovNet.sock")
+	return p.wrap("/var/lib/kubelet/device-plugins/kubelet.sock")
 }
 
 func (p *PathManager) PluginEndpoint() string {
-	return p.wrap("/var/lib/kubelet/device-plugins/sriovNet.sock")
+	return p.wrap(filepath.Join("/var/lib/kubelet/device-plugins", PluginEndpointSocket))
 }
 
 func (p *PathManager) CniPath(flavour Flavour) (string, error) {
