@@ -125,6 +125,7 @@ rules:
   - clusterroles
   verbs:
   - create
+  - get
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
