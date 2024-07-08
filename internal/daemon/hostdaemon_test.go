@@ -199,7 +199,7 @@ var _ = g.Describe("Host Daemon", func() {
 		hostDaemon.Stop()
 	})
 
-	g.Context("Host daemon", func() {
+	g.Context("CNI Server", func() {
 		g.It("should respond to CNI calls", func() {
 			dpuListen, err := fakeDpuDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
