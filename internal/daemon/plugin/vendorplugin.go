@@ -6,15 +6,11 @@ import (
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
+	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	ctrl "sigs.k8s.io/controller-runtime"
-)
-
-const (
-	VendorPluginSocketPath string = cnitypes.DaemonBaseDir + "vendor-plugin/vendor-plugin.sock"
 )
 
 type VendorPlugin interface {
@@ -27,12 +23,13 @@ type VendorPlugin interface {
 }
 
 type GrpcPlugin struct {
-	log       logr.Logger
-	client    pb.LifeCycleServiceClient
-	opiClient opi.BridgePortServiceClient
-	nfclient  pb.NetworkFunctionServiceClient
-	dpuMode   bool
-	conn      *grpc.ClientConn
+	log         logr.Logger
+	client      pb.LifeCycleServiceClient
+	opiClient   opi.BridgePortServiceClient
+	nfclient    pb.NetworkFunctionServiceClient
+	dpuMode     bool
+	conn        *grpc.ClientConn
+	pathManager utils.PathManager
 }
 
 func (g *GrpcPlugin) Start() (string, int32, error) {
@@ -51,11 +48,24 @@ func (g *GrpcPlugin) Stop() {
 	g.conn.Close()
 }
 
-func NewGrpcPlugin(dpuMode bool) *GrpcPlugin {
-	return &GrpcPlugin{
-		dpuMode: dpuMode,
-		log:     ctrl.Log.WithName("GrpcPlugin"),
+func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
+	return func(d *GrpcPlugin) {
+		d.pathManager = pathManager
 	}
+}
+
+func NewGrpcPlugin(dpuMode bool, opts ...func(*GrpcPlugin)) *GrpcPlugin {
+	gp := &GrpcPlugin{
+		dpuMode:     dpuMode,
+		log:         ctrl.Log.WithName("GrpcPlugin"),
+		pathManager: *utils.NewPathManager("/"),
+	}
+
+	for _, opt := range opts {
+		opt(gp)
+	}
+
+	return gp
 }
 
 func (g *GrpcPlugin) ensureConnected() error {
@@ -69,7 +79,7 @@ func (g *GrpcPlugin) ensureConnected() error {
 		}),
 	}
 
-	conn, err := grpc.DialContext(context.Background(), VendorPluginSocketPath, dialOptions...)
+	conn, err := grpc.DialContext(context.Background(), g.pathManager.VendorPluginSocket(), dialOptions...)
 
 	if err != nil {
 		g.log.Error(err, "Failed to connect to vendor plugin")

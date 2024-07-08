@@ -187,11 +187,6 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 	d.addr = addr
 	d.port = port
 
-	err = d.dp.Start()
-	if err != nil {
-		d.log.Error(err, "device plugin call failed")
-	}
-
 	add := func(r *cnitypes.PodRequest) (*cni100.Result, error) {
 		return d.cniCmdAddHandler(r)
 	}
@@ -206,7 +201,7 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 
 func (d *HostDaemon) ListenAndServe() error {
 	var wg sync.WaitGroup
-	done := make(chan error, 1)
+	done := make(chan error, 3)
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -222,27 +217,42 @@ func (d *HostDaemon) ListenAndServe() error {
 		} else {
 			done <- nil
 		}
+		d.log.Info("Stopping CNI server")
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		d.log.Info("Starting Device Plugin server")
+		if err := d.dp.ListenAndServe(); err != nil {
+			done <- err
+		} else {
+			done <- nil
+		}
+		d.log.Info("Stopping Device Plugin server")
 		wg.Done()
 	}()
 
 	d.setupReconcilers()
-	wg.Add(1)
-
 	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
-
 		if err := d.manager.Start(ctx); err != nil {
 			done <- err
 		} else {
 			done <- nil
 		}
+		d.log.Info("Stopping manager")
 		wg.Done()
 	}()
 
+	// Block on any go routines writing to the done channel when an error occurs or they
+	// are forced to exit.
 	err = <-done
 
 	cancelManager()
+	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
 	wg.Wait()
 
