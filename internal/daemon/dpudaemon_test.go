@@ -12,7 +12,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 )
 
-var _ = g.Describe("Main", func() {
+var _ = g.Describe("DPU Daemon", func() {
 	var (
 		dpuDaemon   *DpuDaemon
 		config      *rest.Config
@@ -29,7 +29,7 @@ var _ = g.Describe("Main", func() {
 		}
 	})
 
-	g.Context("Host daemon", func() {
+	g.Context("CNI server", func() {
 		g.It("should respond to CNI calls", func() {
 			pathManager := *utils.NewPathManager(testCluster.TempDirPath())
 
