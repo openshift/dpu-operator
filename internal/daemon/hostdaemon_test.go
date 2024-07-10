@@ -35,6 +35,10 @@ func (d *DummyDevicePlugin) Start() error {
 	return nil
 }
 
+func (d *DummyDevicePlugin) Stop() error {
+	return nil
+}
+
 type DummyPlugin struct {
 }
 

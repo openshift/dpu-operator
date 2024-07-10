@@ -33,6 +33,7 @@ type dpServer struct {
 
 type DevicePlugin interface {
 	Start() error
+	Stop() error
 }
 
 func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *DeviceList) error {
@@ -229,17 +230,17 @@ func (dp *dpServer) connectWithRetry(endpoint string) (*grpc.ClientConn, error) 
 	return conn, nil
 }
 
-// func (dp *dpServer) Stop() error {
-// 	fmt.Printf("Stopping Device Plugin gRPC server..")
-// 	if dp.grpcServer == nil {
-// 		return nil
-// 	}
+func (dp *dpServer) Stop() error {
+	dp.log.Info("Stopping Device Plugin...")
+	if dp.grpcServer == nil {
+		return nil
+	}
 
-// 	dp.grpcServer.Stop()
-// 	dp.grpcServer = nil
+	dp.grpcServer.Stop()
+	dp.grpcServer = nil
 
-// 	return dp.cleanup()
-// }
+	return dp.cleanup()
+}
 
 func (dp *dpServer) cleanup() error {
 	pluginEndpoint := dp.pathManager.PluginEndpoint()

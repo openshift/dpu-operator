@@ -209,6 +209,7 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 
 	err := <-d.done
 	d.cancelManager()
+	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
 	d.server.Stop()
 	d.wg.Wait()
