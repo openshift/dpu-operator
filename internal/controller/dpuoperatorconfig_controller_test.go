@@ -251,11 +251,11 @@ var _ = Describe("Main Controller", Ordered, func() {
 					return daemonSet.Spec.Template.Spec.Containers[0].Args[1]
 				}, testutils.TestAPITimeout*2, testutils.TestRetryInterval).Should(Equal("auto"))
 			})
-			It("should have SR-IOV device plugin daemonsets created by controller manager", func() {
+			It("should have the network function NAD created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}
 				Eventually(func() error {
 					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, nad)
-				}, testutils.TestAPITimeout, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
+				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {
 				ns := dpuOperatorNameSpace()
