@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/go-logr/logr"
@@ -36,12 +37,14 @@ type GrpcPlugin struct {
 }
 
 func (g *GrpcPlugin) Start() (string, int32, error) {
-	g.ensureConnected()
+	err := g.ensureConnected()
+	if err != nil {
+		return "", 0, fmt.Errorf("Failed to ensure GRPC connection on grpcPlugin start: %v", err)
+	}
 	ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode})
 
 	if err != nil {
-		g.log.Error(err, "Failed to start serving")
-		return "", 0, err
+		return "", 0, fmt.Errorf("Failed to start serving on grpcPlugin start: %v", err)
 	}
 
 	return ipPort.Ip, ipPort.Port, nil
@@ -84,28 +87,40 @@ func (g *GrpcPlugin) ensureConnected() error {
 }
 
 func (g *GrpcPlugin) CreateBridgePort(createRequest *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
-	g.ensureConnected()
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("CreateBridgePort failed to ensure GRPC connection: %v", err)
+	}
 	return g.opiClient.CreateBridgePort(context.TODO(), createRequest)
 }
 
 func (g *GrpcPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortRequest) error {
-	g.ensureConnected()
-	_, err := g.opiClient.DeleteBridgePort(context.TODO(), deleteRequest)
+	err := g.ensureConnected()
+	if err != nil {
+		return fmt.Errorf("DeleteBridgePort failed to ensure GRPC connection: %v", err)
+	}
+	_, err = g.opiClient.DeleteBridgePort(context.TODO(), deleteRequest)
 	return err
 }
 
 func (g *GrpcPlugin) CreateNetworkFunction(input string, output string) error {
 	g.log.Info("CreateNetworkFunction", "input", input, "output", output)
-	g.ensureConnected()
+	err := g.ensureConnected()
+	if err != nil {
+		return fmt.Errorf("CreateNetworkFunction failed to ensure GRPC connection: %v", err)
+	}
 	req := pb.NFRequest{Input: input, Output: output}
-	_, err := g.nfclient.CreateNetworkFunction(context.TODO(), &req)
+	_, err = g.nfclient.CreateNetworkFunction(context.TODO(), &req)
 	return err
 }
 
 func (g *GrpcPlugin) DeleteNetworkFunction(input string, output string) error {
 	g.log.Info("DeleteNetworkFunction", "input", input, "output", output)
-	g.ensureConnected()
+	err := g.ensureConnected()
+	if err != nil {
+		return fmt.Errorf("DeleteNetworkFunction failed to ensure GRPC connection: %v", err)
+	}
 	req := pb.NFRequest{Input: input, Output: output}
-	_, err := g.nfclient.DeleteNetworkFunction(context.TODO(), &req)
+	_, err = g.nfclient.DeleteNetworkFunction(context.TODO(), &req)
 	return err
 }
