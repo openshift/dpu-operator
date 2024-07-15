@@ -225,7 +225,10 @@ func (d *HostDaemon) ListenAndServe() error {
 		wg.Done()
 	}()
 
-	d.setupReconcilers()
+	err = d.setupReconcilers()
+	if err != nil {
+		return err
+	}
 	wg.Add(1)
 
 	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
@@ -253,8 +256,7 @@ func (d *HostDaemon) Serve(listener net.Listener) error {
 	defer d.startedWg.Done()
 	err := d.cniserver.Serve(listener)
 	if err != nil {
-		d.log.Error(err, "Error from CNI server while serving shim")
-		return err
+		return fmt.Errorf("Error from CNI server while serving shim: %v", err)
 	}
 	return nil
 }
@@ -279,7 +281,7 @@ func init() {
 	utilruntime.Must(configv1.AddToScheme(scheme))
 }
 
-func (d *HostDaemon) setupReconcilers() {
+func (d *HostDaemon) setupReconcilers() error {
 	if d.manager == nil {
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme: scheme,
@@ -291,7 +293,7 @@ func (d *HostDaemon) setupReconcilers() {
 			},
 		})
 		if err != nil {
-			d.log.Error(err, "unable to start manager")
+			return fmt.Errorf("Unable to start manager: %v", err)
 		}
 
 		sfcReconciler := &sfcreconciler.SfcReconciler{
@@ -300,8 +302,9 @@ func (d *HostDaemon) setupReconcilers() {
 		}
 
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
-			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
+			return fmt.Errorf("unable to create controller: %v", err)
 		}
 		d.manager = mgr
 	}
+	return nil
 }

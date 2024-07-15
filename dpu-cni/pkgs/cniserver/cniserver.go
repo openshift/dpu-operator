@@ -270,8 +270,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 		result, err = s.cniCmdDelHandler(req)
 	}
 	if err != nil {
-		klog.Errorf("Error occured in handler: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("Error occured in handler: %v", err)
 	}
 
 	response := &cnitypes.Response{Result: result}
@@ -305,13 +304,12 @@ func (s *Server) ListenAndServe() error {
 	klog.Infof("Starting DPU CNI Server")
 	listener, err := s.Listen()
 	if err != nil {
-		klog.Errorf("Failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
+		return fmt.Errorf("Failed to start the CNI server using socket '%s': %v", cnitypes.ServerSocketPath, err)
 	}
 
 	klog.Infof("DPU CNI Server is now serving requests.")
 	if err := s.Serve(listener); err != nil {
-		klog.Errorf("DPU CNI server Serve() failed: %v", err)
-		return err
+		return fmt.Errorf("DPU CNI server Serve failed: %v", err)
 	}
 	return nil
 }

@@ -511,7 +511,7 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 		// Return nil when LoadConfFromCache fails since the rest
 		// of cmdDel() code relies on netconf as input argument
 		// and there is no meaning to continue.
-		klog.Errorf("Cannot load config file from cache %v", err)
+		klog.Warningf("Cannot load config file from cache: %v", err)
 		return nil
 	}
 
