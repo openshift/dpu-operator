@@ -71,8 +71,8 @@ CONTAINER_TOOL ?= podman
 
 # Use the image urls from the yaml that is used with Kustomize for local
 # development.
-DPU_OPERATOR_IMAGE := $(shell yq -r .spec.template.spec.containers[0].image config/dev/local-images.yaml)
-DPU_DAEMON_IMAGE := $(shell yq -r .spec.template.spec.containers[0].env[0].value config/dev/local-images.yaml)
+# DPU_OPERATOR_IMAGE := $(shell yq -r .spec.template.spec.containers[0].image config/dev/local-images.yaml)
+# DPU_DAEMON_IMAGE := $(shell yq -r .spec.template.spec.containers[0].env[0].value config/dev/local-images.yaml)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -251,8 +251,18 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
+.PHONY: tools
+tools: 
+	cd tools && go build -o ../bin/config config.go 
+
+REGISTRY_URL ?= $(shell hostname)
+.PHONY: prep-local-deploy
+prep-local-deploy: tools
+	./bin/config -registry-url $(REGISTRY_URL) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
+	cp config/dev/kustomization.yaml bin
+
 .PHONY: local-deploy
-local-deploy: manifests kustomize ## Deploy controller with images hosted on local registry
+local-deploy: tools manifests kustomize ## Deploy controller with images hosted on local registry
 	$(KUSTOMIZE) build config/dev | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
