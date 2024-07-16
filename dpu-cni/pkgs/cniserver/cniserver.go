@@ -8,9 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
@@ -34,45 +32,9 @@ type Server struct {
 	pathManager      utils.PathManager
 }
 
-// ensureRunDirExists makes sure that the socket being created is only accessible to root.
-func ensureRunDirExists(serverSocketPath string) error {
-	runDir := filepath.Dir(serverSocketPath)
-	// Remove and re-create the socket directory with root-only permissions
-	klog.Infof("Removing %v", runDir)
-	if err := os.RemoveAll(runDir); err != nil && !os.IsNotExist(err) {
-		info, err := os.Stat(runDir)
-		if err != nil {
-			return fmt.Errorf("failed to stat old pod info socket directory %s: %v", runDir, err)
-		}
-		// Owner must be root
-		tmp := info.Sys()
-		statt, ok := tmp.(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("failed to read pod info socket directory stat info: %T", tmp)
-		}
-		if statt.Uid != 0 {
-			return fmt.Errorf("insecure owner of pod info socket directory %s: %v", runDir, statt.Uid)
-		}
-
-		// Check permissions
-		if info.Mode()&0o777 != 0o700 {
-			return fmt.Errorf("insecure permissions on pod info socket directory %s: %v", runDir, info.Mode())
-		}
-		// Finally remove the socket file so we can re-create it
-		if err := os.Remove(serverSocketPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove old pod info socket %s: %v", serverSocketPath, err)
-		}
-	}
-	klog.Infof("Creating %v", runDir)
-	if err := os.MkdirAll(runDir, 0o700); err != nil {
-		return fmt.Errorf("failed to create pod info socket directory %s: %v", runDir, err)
-	}
-	return nil
-}
-
 // Listen creates a listener to a unix socket located in `socketPath`
 func (s *Server) Listen() (net.Listener, error) {
-	err := ensureRunDirExists(s.pathManager.CNIServerPath())
+	err := s.pathManager.EnsureSocketDirExists(s.pathManager.CNIServerPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run directory for DPU CNI socket: %v", err)
 	}

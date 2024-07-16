@@ -31,7 +31,11 @@ import (
 
 type DummyDevicePlugin struct{}
 
-func (d *DummyDevicePlugin) Start() error {
+func (d *DummyDevicePlugin) ListenAndServe() error {
+	return nil
+}
+
+func (d *DummyDevicePlugin) Stop() error {
 	return nil
 }
 

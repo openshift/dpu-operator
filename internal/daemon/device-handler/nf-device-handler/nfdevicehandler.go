@@ -7,16 +7,12 @@ import (
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
-)
-
-const (
-	VendorPluginSocketPath string = cnitypes.DaemonBaseDir + "vendor-plugin/vendor-plugin.sock"
 )
 
 // nfDeviceHandler handles NF networking devices
@@ -25,7 +21,8 @@ type nfDeviceHandler struct {
 	// Connection client to the API for the VSP DeviceService
 	client pb.DeviceServiceClient
 	// Connection to the VSP
-	conn *grpc.ClientConn
+	conn        *grpc.ClientConn
+	pathManager utils.PathManager
 }
 
 // ensureConnected makes sure we are connected to the VSP's gRPC
@@ -40,7 +37,7 @@ func (nf *nfDeviceHandler) ensureConnected() error {
 		}),
 	}
 
-	conn, err := grpc.DialContext(context.Background(), VendorPluginSocketPath, dialOptions...)
+	conn, err := grpc.DialContext(context.Background(), nf.pathManager.VendorPluginSocket(), dialOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to connect to vendor plugin: %v", err)
 	}
@@ -77,7 +74,13 @@ func (nf *nfDeviceHandler) SetupDevices() error {
 	return nil
 }
 
-func NewNfDeviceHandler() *nfDeviceHandler {
+func WithPathManager(pathManager utils.PathManager) func(*nfDeviceHandler) {
+	return func(d *nfDeviceHandler) {
+		d.pathManager = pathManager
+	}
+}
+
+func NewNfDeviceHandler(opts ...func(*nfDeviceHandler)) *nfDeviceHandler {
 	devHandler := &nfDeviceHandler{
 		log: ctrl.Log.WithName("NfDeviceHandler"),
 	}
@@ -85,6 +88,10 @@ func NewNfDeviceHandler() *nfDeviceHandler {
 	err := devHandler.SetupDevices()
 	if err != nil {
 		devHandler.log.Error(err, "Failed to setup devices")
+	}
+
+	for _, opt := range opts {
+		opt(devHandler)
 	}
 
 	return devHandler

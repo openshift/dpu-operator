@@ -63,7 +63,7 @@ func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, config 
 		pathManager: *utils.NewPathManager("/"),
 		log:         ctrl.Log.WithName("DpuDaemon"),
 		macStore:    make(map[string][]string),
-		done:        make(chan error, 4),
+		done:        make(chan error, 5),
 		config:      config,
 	}
 
@@ -119,15 +119,12 @@ func (d *DpuDaemon) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.Result
 
 func (d *DpuDaemon) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
-	d.log.Info("starting DpuDaemon")
+	d.log.Info("Starting DpuDaemon")
+	d.setupReconcilers()
+
 	addr, port, err := d.vsp.Start()
 	if err != nil {
 		d.log.Error(err, "Failed to get addr:port from VendorPlugin")
-	}
-
-	err = d.dp.Start()
-	if err != nil {
-		d.log.Error(err, "device plugin call failed")
 	}
 
 	d.server = grpc.NewServer()
@@ -181,6 +178,18 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 
 	d.wg.Add(1)
 	go func() {
+		d.log.Info("Starting Device Plugin server")
+		if err := d.dp.ListenAndServe(); err != nil {
+			d.done <- err
+		} else {
+			d.done <- nil
+		}
+		d.log.Info("Stopping Device Plugin server")
+		d.wg.Done()
+	}()
+
+	d.wg.Add(1)
+	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
 			d.done <- err
@@ -191,7 +200,6 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 		d.wg.Done()
 	}()
 
-	d.setupReconcilers()
 	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
 	d.wg.Add(1)
 	go func() {
@@ -204,11 +212,14 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 		d.log.Info("Stopping manager")
 		d.wg.Done()
 	}()
-
 	d.cancelManager = cancelManager
 
+	// Block on any go routines writing to the done channel when an error occurs or they
+	// are forced to exit.
 	err := <-d.done
+
 	d.cancelManager()
+	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
 	d.server.Stop()
 	d.wg.Wait()

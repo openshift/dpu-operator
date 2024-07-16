@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -17,25 +19,22 @@ import (
 )
 
 const (
-	// Device plugin settings.
-	pluginMountPath = "/var/lib/kubelet/device-plugins"
-	kubeletEndpoint = "kubelet.sock"
-	pluginEndpoint  = "sriovNet.sock"
-	resourceName    = "openshift.io/dpu"
+	DpuResourceName = "openshift.io/dpu"
 )
 
 // dpServer manages the k8s Device Plugin Server
 type dpServer struct {
-	socketFile string
 	devices    map[string]pluginapi.Device // for Kubelet DP API
 	grpcServer *grpc.Server
 	pluginapi.DevicePluginServer
 	log           logr.Logger
+	pathManager   utils.PathManager
 	deviceHandler DeviceHandler
 }
 
 type DevicePlugin interface {
-	Start() error
+	ListenAndServe() error
+	Stop() error
 }
 
 func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *DeviceList) error {
@@ -134,65 +133,109 @@ func (dp *dpServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest
 	return resp, nil
 }
 
-func (dp *dpServer) RegisterDevicePlugin() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, dp.socketFile)
+func (dp *dpServer) listen() (net.Listener, error) {
+	pluginEndpoint := dp.pathManager.PluginEndpoint()
+
+	err := dp.cleanup()
+	if err != nil {
+		return nil, fmt.Errorf("failed to cleanup Device Plugin server endpoint: %v", err)
+	}
+
 	dp.log.Info("Starting Device Plugin server at:", "pluginEndpoint", pluginEndpoint)
 	lis, err := net.Listen("unix", pluginEndpoint)
 	if err != nil {
-		return fmt.Errorf("resource %s failed to listen to Device Plugin server: %v", resourceName, err)
+		return nil, fmt.Errorf("resource %s failed to listen to Device Plugin server: %v", DpuResourceName, err)
 	}
-	dp.grpcServer = grpc.NewServer()
-
-	kubeletEndpoint := filepath.Join("unix:", DeprecatedSockDir, KubeEndPoint)
-	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return fmt.Errorf("resource %s unable connect to Kubelet: %v", resourceName, err)
-	}
-	defer conn.Close()
 
 	pluginapi.RegisterDevicePluginServer(dp.grpcServer, dp)
 
-	client := pluginapi.NewRegistrationClient(conn)
+	return lis, nil
+}
 
+func (dp *dpServer) serve(lis net.Listener) error {
+	// EXCEPTIONAL CODE!!! (DO NOT COPY): The issue is that Kubelet was written
+	// in a way that uses deprecated gRPC DialOptions specifically "WithBlock".
+	// This means that the gRPC Register() function blocks until the device plugin
+	// starts serving.
+	// References:
+	// 	kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1/server.go (Register() func)
+	// 	kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1/client.go (dial() func)
+	//
+	// Therefore we have the following workaround to make sure we start serving which includes trying
+	// to connect to ourselves in "ensureDevicePluginServerStarted" before registering with Kubelet.
+	var err error
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		err := dp.grpcServer.Serve(lis)
-		if err != nil {
-			dp.log.Error(err, "Serving Device Plugin incoming requests failed.")
-		}
+		err = dp.grpcServer.Serve(lis)
+		wg.Done()
 	}()
 
-	// Use connectWithRetry for the pluginEndpoint call
-	conn, err = dp.connectWithRetry("unix:" + pluginEndpoint)
+	err = dp.ensureDevicePluginServerStarted()
 	if err != nil {
-		return fmt.Errorf("resource %s unable to establish test connection with gRPC server: %v", resourceName, err)
-	}
-	dp.log.Info("Device plugin endpoint started serving:", "resourceName", resourceName)
-	conn.Close()
-
-	request := &pluginapi.RegisterRequest{
-		Version:      pluginapi.Version,
-		Endpoint:     dp.socketFile,
-		ResourceName: resourceName,
+		return fmt.Errorf("failed to ensure Device Plugin server started: %v", err)
 	}
 
-	if _, err = client.Register(context.Background(), request); err != nil {
-		return fmt.Errorf("unable to register resource %s with Kubelet: %v", resourceName, err)
+	err = dp.registerWithKubelet()
+	if err != nil {
+		return fmt.Errorf("failed to register the Device Plugin server with Kubelet: %v", err)
 	}
-	dp.log.Info("Device plugin registered with Kubelet", "resourceName", resourceName)
 
+	// The "serve" design paradigm must be a blocking call. Thus we wait here.
+	wg.Wait()
+
+	if err != nil {
+		return fmt.Errorf("serving Device Plugin incoming requests failed: %v", err)
+	}
 	return nil
 }
 
-func (dp *dpServer) Start() error {
-	err := dp.cleanup()
+func (dp *dpServer) ListenAndServe() error {
+	listener, err := dp.listen()
 	if err != nil {
-		return fmt.Errorf("failed to cleanup: %v", err)
+		dp.log.Error(err, "failed to listen on the Device Plugin server.")
 	}
 
-	err = dp.RegisterDevicePlugin()
-	if err != nil {
-		return fmt.Errorf("failed to register the device plugin: %v", err)
+	dp.log.Info("Device Plugin server is now serving requests.")
+	if err := dp.serve(listener); err != nil {
+		dp.log.Error(err, "Device Plugin server Serve() failed.")
+		return err
 	}
+	return nil
+
+}
+
+func (dp *dpServer) ensureDevicePluginServerStarted() error {
+	pluginEndpoint := dp.pathManager.PluginEndpoint()
+	conn, err := dp.connectWithRetry("unix:" + pluginEndpoint)
+	if err != nil {
+		return fmt.Errorf("resource %s unable to establish test connection with gRPC server: %v", DpuResourceName, err)
+	}
+	dp.log.Info("Device plugin endpoint started serving:", "DpuResourceName", DpuResourceName)
+	conn.Close()
+	return nil
+}
+
+func (dp *dpServer) registerWithKubelet() error {
+	kubeletEndpoint := filepath.Join("unix:", dp.pathManager.KubeletEndPoint())
+	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("resource %s unable connect to Kubelet: %v", DpuResourceName, err)
+	}
+	defer conn.Close()
+
+	client := pluginapi.NewRegistrationClient(conn)
+
+	request := &pluginapi.RegisterRequest{
+		Version:      pluginapi.Version,
+		Endpoint:     dp.pathManager.PluginEndpointFilename(),
+		ResourceName: DpuResourceName,
+	}
+
+	if _, err = client.Register(context.Background(), request); err != nil {
+		return fmt.Errorf("unable to register resource %s with Kubelet: %v", DpuResourceName, err)
+	}
+	dp.log.Info("Device plugin registered with Kubelet", "DpuResourceName", DpuResourceName)
 
 	return nil
 }
@@ -232,20 +275,20 @@ func (dp *dpServer) connectWithRetry(endpoint string) (*grpc.ClientConn, error) 
 	return conn, nil
 }
 
-// func (dp *dpServer) Stop() error {
-// 	fmt.Printf("Stopping Device Plugin gRPC server..")
-// 	if dp.grpcServer == nil {
-// 		return nil
-// 	}
+func (dp *dpServer) Stop() error {
+	dp.log.Info("Stopping Device Plugin...")
+	if dp.grpcServer == nil {
+		return nil
+	}
 
-// 	dp.grpcServer.Stop()
-// 	dp.grpcServer = nil
+	dp.grpcServer.Stop()
+	dp.grpcServer = nil
 
-// 	return dp.cleanup()
-// }
+	return dp.cleanup()
+}
 
 func (dp *dpServer) cleanup() error {
-	pluginEndpoint := filepath.Join(pluginapi.DevicePluginPath, dp.socketFile)
+	pluginEndpoint := dp.pathManager.PluginEndpoint()
 	if err := os.Remove(pluginEndpoint); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -263,11 +306,24 @@ func (dp *dpServer) GetDevicePluginOptions(ctx context.Context, empty *pluginapi
 	}, nil
 }
 
-func NewDevicePlugin(dh DeviceHandler) *dpServer {
-	return &dpServer{
-		log:           ctrl.Log.WithName("DevicePlugin"),
+func WithPathManager(pathManager utils.PathManager) func(*dpServer) {
+	return func(d *dpServer) {
+		d.pathManager = pathManager
+	}
+}
+
+func NewDevicePlugin(dh DeviceHandler, opts ...func(*dpServer)) *dpServer {
+	dp := &dpServer{
 		devices:       make(map[string]pluginapi.Device),
-		socketFile:    pluginEndpoint,
+		grpcServer:    grpc.NewServer(),
+		log:           ctrl.Log.WithName("DevicePlugin"),
+		pathManager:   *utils.NewPathManager("/"),
 		deviceHandler: dh,
 	}
+
+	for _, opt := range opts {
+		opt(dp)
+	}
+
+	return dp
 }
