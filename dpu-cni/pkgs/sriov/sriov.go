@@ -504,23 +504,22 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 
 	netConf, cRefPath, err := sriovconfig.LoadConfFromCache(req.ContainerId, req.IfName)
 	if err != nil {
-		// If cmdDel() fails, cached netconf is cleaned up by
-		// the followed defer call. However, subsequence calls
-		// of cmdDel() from kubelet fail in a dead loop due to
-		// cached netconf doesn't exist.
-		// Return nil when LoadConfFromCache fails since the rest
-		// of cmdDel() code relies on netconf as input argument
-		// and there is no meaning to continue.
+		// This might happen if the cache has already been cleaned up. Kubelet
+		// can call delete multiple times, and to avoid a retry loop, return
+		// nil instead
 		klog.Warningf("Cannot load config file from cache: %v", err)
 		return nil
+	} 
+
+	err = sm.cleanup(req, netConf, cRefPath)
+	if err == nil && cRefPath != "" {
+		_ = sriovutils.CleanCachedNetConf(cRefPath)
 	}
+	return err
+}
 
-	defer func() {
-		if err == nil && cRefPath != "" {
-			_ = sriovutils.CleanCachedNetConf(cRefPath)
-		}
-	}()
-
+func (sm *sriovManager) cleanup(req *cnitypes.PodRequest, netConf *cnitypes.NetConf, cRefPath string) error {
+	var err error
 	if netConf.IPAM.Type != "" {
 		err = ipam.ExecDel(netConf.IPAM.Type, req.CNIReq.Config)
 		if err != nil {
