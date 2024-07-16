@@ -9,6 +9,32 @@ This operator will manage and configure data processing unit (DPUs) to be used i
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
+### Building and testing against a local cluster
+If you want to start from the source, follow the steps below to build containers, push them to a local registry, and deploying to a cluster.
+
+1. Configure and Build Containers
+
+Run the following command to configure and build all the containers:
+```sh
+make local-buildx
+```
+2. Push Built Images to a Local Registry
+
+Run the following command to push the built images to a local registry:
+```sh
+make local-pushx
+```
+3. Deploy to the Cluster
+
+Run the following command to deploy the YAML files to the cluster based on `KUBECONFIG`:
+```sh
+make local-deploy
+```
+
+4. To deploy from a different registry, define the `REGISTERY` variable:
+
+`make local-deploy REGISTERY=...`
+
 ### Running on the cluster
 1. Install Instances of Custom Resources:
 
