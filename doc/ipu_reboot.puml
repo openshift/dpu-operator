@@ -1,0 +1,41 @@
+@startuml reboot
+
+actor user
+autonumber
+
+participant Host
+participant DPU
+
+'top reboot'
+'Coredon the node'
+'reboot'
+'uncordon the node'
+' user -> Host: top level reboot
+
+'need a box around this'
+user -> Host: coredon the node
+user -> Host: reboot
+user -> Host: uncoredon the node
+
+'bottom reboot'
+'somehow needs to tell top to coredon the node'
+'liveliness check?'
+'go routine from top doing this'
+'over gRPC'
+
+user -> DPU: low level reboot
+Host -> DPU: go routine checking liveliness check
+Host -> Host: Host detects that a reboot is gonna happen
+Host -> Host: coredon the node
+Host -> DPU: ready to reboot (through API)
+activate DPU
+DPU -> DPU: update PDB
+DPU -> DPU: reboot
+deactivate DPU
+Host -> DPU: Host reconnects to DPU
+activate DPU
+' Host -> DPU: reboot done (API) pod disruption budget
+DPU -> DPU: update PDB
+deactivate DPU
+Host -> Host: uncoredon the node
+@enduml
