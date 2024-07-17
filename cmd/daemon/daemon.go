@@ -41,7 +41,7 @@ func isDpuMode(log logr.Logger, mode string) (bool, error) {
 	} else if mode == "dpu" {
 		return true, nil
 	} else if mode == "auto" {
-		platform := platform.PlatformInfo{}
+		platform := platform.NewPlatformInfo()
 		detectedDpuMode, err := platform.IsDpu()
 		if err != nil {
 			return false, fmt.Errorf("Failed to query platform info: %v", err)
@@ -54,7 +54,7 @@ func isDpuMode(log logr.Logger, mode string) (bool, error) {
 }
 
 func createDaemon(dpuMode bool, config *rest.Config) (Daemon, error) {
-	platform := platform.PlatformInfo{}
+	platform := platform.NewPlatformInfo()
 	plugin, err := platform.VspPlugin(dpuMode)
 	if err != nil {
 		return nil, err

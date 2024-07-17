@@ -49,9 +49,6 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 		return nil, nil, errors.Errorf("Error getting PCI info: %v", err)
 	}
 
-	if err != nil {
-		return nil, nil, err
-	}
 	var dpuDevices []ghw.PCIDevice
 	var activeDetectors []VendorDetector
 	for _, pci := range pci.ListDevices() {
@@ -77,9 +74,7 @@ func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
 		if len(dpuDevices) == 0 {
 			return nil, fmt.Errorf("Failed to detect any DPU devices")
 		}
-		if len(dpuDevices) != 1 {
-			return nil, fmt.Errorf("%v DPU devices detected. Currently only supporting exactly 1 DPU per node", len(dpuDevices))
-		}
+		// FIXME: We need to find a good way to determine VF from PF with the Intel DPU versus different DPU vendors.
 		return detectors[0].VspPlugin(dpuMode), nil
 	}
 }

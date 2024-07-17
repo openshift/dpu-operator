@@ -17,7 +17,7 @@ func NewIntelDetector() *IntelDetector {
 }
 
 func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) bool {
-	return pci.Class.Name == "Ethernet controller" &&
+	return pci.Class.Name == "Network controller" &&
 		pci.Vendor.Name == "Intel Corporation" &&
 		pci.Product.Name == "Infrastructure Data Path Function"
 }
