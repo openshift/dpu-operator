@@ -53,17 +53,17 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 		return nil, nil, err
 	}
 	var dpuDevices []ghw.PCIDevice
-	var detectors []VendorDetector
+	var activeDetectors []VendorDetector
 	for _, pci := range pci.ListDevices() {
 		for _, detector := range pi.Detectors {
 			if detector.IsDPU(*pci) {
 				dpuDevices = append(dpuDevices, *pci)
-				detectors = append(detectors, detector)
+				activeDetectors = append(activeDetectors, detector)
 				break
 			}
 		}
 	}
-	return dpuDevices, detectors, nil
+	return dpuDevices, activeDetectors, nil
 }
 
 func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
