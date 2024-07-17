@@ -1,0 +1,47 @@
+@startuml infra_agent
+actor user
+participant Infra_Admin
+participant IMC
+participant RH_Update
+participant ACC
+participant CDN
+participant iso_server
+participant microshift
+participant operator
+participant daemon
+participant microshift
+' participant node_labeller ' 
+participant vendor_plugin
+
+autonumber
+Infra_Admin -> IMC: update
+Infra_Admin -> RH_Update: download customised iso
+Infra_Admin -> IMC: Redfish install (iso)
+IMC -> iso_server: get iso
+IMC -> IMC: set boot cfg = iso
+IMC -> ACC: boot ACC (copies into ram, point uefi to RAM)
+ACC-> CDN: get artefacts
+ACC -> ACC: install
+ACC -> ACC: reboot to new OS
+ACC -> microshift: start microshift
+microshift -> ACC: get DPU operator
+operator -> operator: reconcile CFG CR
+'implied that daemon is doing a watch?'
+operator -> microshift: start DS
+daemon -> daemon: detect DPU type
+' operator -> microshift: start node labeller
+'implied that daemon is doing a watch?'
+daemon -> daemon: labels node
+operator -> microshift: start vendor plugin
+daemon -> vendor_plugin: init plugin DPU side
+'multiple gateways'
+vendor_plugin -> vendor_plugin:Install deps? (libraries) container.
+'containerise all deps our plugin will require'
+vendor_plugin -> vendor_plugin: sets IP for comms route
+'vendor plugin : install p4 deps, setting comms channel, starting IPU Plugin'
+'send message on interface so host will know interface'
+vendor_plugin -> vendor_plugin: star LL grpc server
+'LL = low level'
+daemon -> daemon: start GRPC server (Host -> DPU)
+
+@enduml

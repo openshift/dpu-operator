@@ -1,0 +1,45 @@
+@startuml cluster_admin
+actor user
+
+box "Host"
+participant k8s_api_host
+participant daemon_host
+end box
+box "DPU"
+participant daemon_ipu
+participant vendor_plugin
+participant k8s_api_ipu
+participant cni_ipu
+box end
+
+autonumber
+' only used to specify vlan, could be part of chain instead'
+user -> k8s_api_host : classifier.yaml 
+user -> k8s_api_host: chain.yaml 
+'reconcile and gRPC call should be on same line, 3 and 3.1 ?'
+k8s_api_host -> daemon_host: reconcile
+activate k8s_api_host
+daemon_host -> daemon_ipu: opi api chain.yaml (gRPC call)
+activate daemon_host
+loop NF's in the chain
+' activate daemon_ipu
+daemon_ipu -> k8s_api_ipu: create (pod spec)
+activate daemon_ipu
+k8s_api_ipu -> cni_ipu: cniAdd (bridge port)
+activate k8s_api_ipu
+cni_ipu -> daemon_ipu: create bridge port (grpc)
+deactivate k8s_api_ipu
+k8s_api_ipu -> cni_ipu: cniAdd (bridge port)
+activate k8s_api_ipu
+cni_ipu -> daemon_ipu: create bridge port (grpc)
+deactivate k8s_api_ipu
+deactivate daemon_ipu
+'this is FXP part'
+end loop
+loop linking x with y for each NF
+daemon_ipu -> vendor_plugin: link (x with y)
+deactivate k8s_api_host
+end loop
+daemon_ipu -> daemon_host: progress of chain
+deactivate daemon_host
+@enduml

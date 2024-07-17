@@ -1,0 +1,25 @@
+@startuml cluster_admin
+actor user
+participant cluster_admin
+participant BMC_x86
+participant operator
+participant daemon
+participant openshift_api
+participant vendor_plugin
+' participant node_labeller
+
+autonumber
+
+cluster_admin -> BMC_x86: RF install iso
+operator -> openshift_api: starts Daemonset
+' operator -> openshift_api: start labeller
+daemon -> daemon: detect DPU type
+daemon -> openshift_api: label node
+openshift_api -> operator: get label (reconcile changes to node spec)
+operator -> openshift_api: start vendor plugin (pod)
+' operator -> openshift_api: get label from openshift api
+vendor_plugin -> vendor_plugin: start grpc
+daemon-> vendor_plugin: init (returns ip:port)
+' daemon -> daemon: 
+'node labeller moves into daemonset..... merged'
+@enduml

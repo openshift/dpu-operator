@@ -353,6 +353,10 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
+.PHONY: sequence-diagrams
+sequence-diagrams:
+	for f in doc/*.puml; do plantuml -tpng $$f; done
+
 .PHONY: opm
 OPM = $(LOCALBIN)/opm
 opm: ## Download opm locally if necessary.

@@ -1,0 +1,20 @@
+@startuml reboot
+
+actor user
+autonumber
+
+participant Host
+' participant DPU
+
+'top reboot'
+'Coredon the node'
+'reboot'
+'uncordon the node'
+' user -> Host: top level reboot
+
+'need a box around this'
+user -> Host: coredon the node
+user -> Host: reboot
+user -> Host: uncoredon the node
+
+@enduml
