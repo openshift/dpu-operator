@@ -2,6 +2,8 @@ package platform
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
@@ -63,6 +65,18 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 	return dpuDevices, activeDetectors, nil
 }
 
+func isVirtualFunction(device string) (bool, error) {
+	physfnPath := filepath.Join("/sys/bus/pci/devices", device, "physfn")
+
+	if _, err := os.Stat(physfnPath); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, fmt.Errorf("Error when stating path %s: %v", device, err)
+	}
+}
+
 func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
 	if dpuMode {
 		return plugin.NewGrpcPlugin(dpuMode), nil
@@ -74,7 +88,25 @@ func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
 		if len(dpuDevices) == 0 {
 			return nil, fmt.Errorf("Failed to detect any DPU devices")
 		}
-		// FIXME: We need to find a good way to determine VF from PF with the Intel DPU versus different DPU vendors.
-		return detectors[0].VspPlugin(dpuMode), nil
+
+		var pfDevices []*ghw.PCIDevice
+		var pfDetectors []VendorDetector
+
+		for i, device := range dpuDevices {
+			isVF, err := isVirtualFunction(device.Address)
+			if err != nil {
+				return nil, fmt.Errorf("Error determining if device %s is a VF or PF: %v", device.Address, err)
+			}
+			if !isVF {
+				pfDevices = append(pfDevices, &device)
+				pfDetectors = append(pfDetectors, detectors[i])
+			}
+		}
+
+		if len(pfDevices) != 1 {
+			return nil, fmt.Errorf("%v DPU devices detected. Currently only supporting exactly 1 DPU per node", len(pfDevices))
+		}
+
+		return pfDetectors[0].VspPlugin(dpuMode), nil
 	}
 }
