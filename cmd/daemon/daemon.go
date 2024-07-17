@@ -13,7 +13,6 @@ import (
 	nfdevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/nf-device-handler"
 	sriovdevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/sriov-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
-	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"go.uber.org/zap/zapcore"
@@ -42,8 +41,8 @@ func isDpuMode(log logr.Logger, mode string) (bool, error) {
 	} else if mode == "dpu" {
 		return true, nil
 	} else if mode == "auto" {
-		pi := platform.PlatformInfo{}
-		detectedDpuMode, err := pi.IsDPU()
+		platform := platform.PlatformInfo{}
+		detectedDpuMode, err := platform.IsDpu()
 		if err != nil {
 			return false, fmt.Errorf("Failed to query platform info: %v", err)
 		}
@@ -55,7 +54,11 @@ func isDpuMode(log logr.Logger, mode string) (bool, error) {
 }
 
 func createDaemon(dpuMode bool, config *rest.Config) (Daemon, error) {
-	plugin := plugin.NewGrpcPlugin(dpuMode)
+	platform := platform.PlatformInfo{}
+	plugin, err := platform.VspPlugin(dpuMode)
+	if err != nil {
+		return nil, err
+	}
 
 	if dpuMode {
 		deviceHandler := nfdevicehandler.NewNfDeviceHandler()
