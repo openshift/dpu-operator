@@ -74,8 +74,11 @@ func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
 		if err != nil {
 			return nil, errors.Errorf("Failed to get VspPlugin from platform: %v", err)
 		}
+		if len(dpuDevices) == 0 {
+			return nil, fmt.Errorf("Failed to detect any DPU devices")
+		}
 		if len(dpuDevices) != 1 {
-			return nil, fmt.Errorf("Failed to detect which vsp to use")
+			return nil, fmt.Errorf("%v DPU devices detected. Currently only supporting exactly 1 DPU per node", len(dpuDevices))
 		}
 		return detectors[0].VspPlugin(dpuMode), nil
 	}
