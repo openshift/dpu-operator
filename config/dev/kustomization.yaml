@@ -1,4 +1,4 @@
 resources:
-- ../default
+- ../config/default
 patchesStrategicMerge:
 - local-images.yaml
