@@ -1,6 +1,9 @@
 package platform
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jaypipes/ghw"
@@ -16,10 +19,29 @@ func NewIntelDetector() *IntelDetector {
 	return &IntelDetector{Name: "Intel IPU"}
 }
 
-func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) bool {
-	return pci.Class.Name == "Network controller" &&
+func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
+	physfnPath := filepath.Join("/sys/bus/pci/devices", device, "physfn")
+
+	if _, err := os.Stat(physfnPath); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, fmt.Errorf("Error when stating path %s: %v", device, err)
+	}
+}
+
+func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
+	// VFs for the Intel IPU have the same PCIe info as the PF
+	isVF, err := d.isVirtualFunction(pci.Address)
+	if err != nil {
+		return false, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
+	}
+
+	return !isVF &&
+		pci.Class.Name == "Network controller" &&
 		pci.Vendor.Name == "Intel Corporation" &&
-		pci.Product.Name == "Infrastructure Data Path Function"
+		pci.Product.Name == "Infrastructure Data Path Function", nil
 }
 
 func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
