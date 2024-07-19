@@ -98,7 +98,12 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	err := r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
+	err := r.ensureMarvellCommChannel(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to ensure Marvell Communication Channel")
+	}
+
+	err = r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
 	if err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
 		return ctrl.Result{}, err
@@ -182,6 +187,12 @@ func (r *DpuOperatorConfigReconciler) applyAllFromBinData(logger logr.Logger, bi
 		}
 	}
 	return nil
+}
+
+func (r *DpuOperatorConfigReconciler) ensureMarvellCommChannel(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Ensuring Marvell Communication Channel")
+	return r.applyAllFromBinData(logger, "marvell", cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {

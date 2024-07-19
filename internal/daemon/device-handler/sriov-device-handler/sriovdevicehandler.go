@@ -124,6 +124,7 @@ func (s *sriovDeviceHandler) SetupDevices() error {
 
 	// TODO: The VSP should pass the hardcoded parameters to create a filter
 	s.vfFilterFunc = CreatePcieDevFilter("8086", "145c", "idpf")
+	//s.vfFilterFunc = CreatePcieDevFilter("177d", "b900", "octeon_ep")
 
 	// TODO: The VSP should pass in the PF
 	err = s.SetSriovNumVfs("0000:06:00.0", 8)
