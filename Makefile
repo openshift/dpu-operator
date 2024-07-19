@@ -119,7 +119,7 @@ TMP_FOLDER = tmp
 .PHONY: generate
 generate-check: controller-gen
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." +output:dir=$(TMP_FOLDER)
-	
+
 	@echo "Comparing files in ./$(TMP_FOLDER)..."
 	@result=0; \
 	for file in ./$(TMP_FOLDER)/*; do \
@@ -190,7 +190,7 @@ REGISTRY ?= $(shell hostname)
 # Use the image urls from the yaml that is used with Kustomize for local
 # development.
 DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
-DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon-image:dev
+DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
 
 .PHONY: local-deploy-prep
 prep-local-deploy: tools
@@ -267,8 +267,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: tools
-tools: 
-	cd tools && go build -o ../bin/config config.go 
+tools:
+	cd tools && go build -o ../bin/config config.go
 
 ##@ Build Dependencies
 
