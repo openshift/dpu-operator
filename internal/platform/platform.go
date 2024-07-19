@@ -25,6 +25,7 @@ func NewPlatformInfo() *PlatformInfo {
 	return &PlatformInfo{
 		Detectors: []VendorDetector{
 			NewIntelDetector(),
+			NewMarvellDetector(),
 			// add more detectors here
 		},
 	}

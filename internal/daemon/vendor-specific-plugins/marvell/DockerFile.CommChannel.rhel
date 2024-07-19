@@ -1,0 +1,9 @@
+FROM ubuntu:22.04
+
+RUN DEBIAN_FRONTEND=noninteractive \
+  apt-get update \
+  && apt-get install net-tools kmod pciutils make iputils-ping iproute2 -y
+
+COPY ./mrvl-commchannel /mrvl-commchannel
+
+ENTRYPOINT [ "/mrvl-commchannel" ]
