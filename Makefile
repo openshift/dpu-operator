@@ -190,7 +190,7 @@ REGISTRY ?= $(shell hostname)
 # Use the image urls from the yaml that is used with Kustomize for local
 # development.
 DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
-DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon-image:dev
+DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
 
 .PHONY: local-deploy-prep
 prep-local-deploy: tools
