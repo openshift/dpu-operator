@@ -95,12 +95,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	vspImage := os.Getenv("VSP_IMAGE")
+	if vspImage == "" {
+		setupLog.Error(err, "Failed to set VSP_IMAGE env var")
+		os.Exit(1)
+	}
+
 	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
 	if dpuDaemonImage == "" {
 		setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
+		os.Exit(1)
 	}
 
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage)
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImage)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)

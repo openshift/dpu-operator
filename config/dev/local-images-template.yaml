@@ -20,6 +20,8 @@ spec:
         env:
         - name: DPU_DAEMON_IMAGE
           value: {{ .RegistryURL }}:5000/dpu-daemon:dev
+        - name: VSP_IMAGE
+          value: {{ .RegistryURL }}:5000/vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
         image: {{ .RegistryURL }}:5000/dpu-operator:dev

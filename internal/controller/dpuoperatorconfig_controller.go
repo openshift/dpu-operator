@@ -45,14 +45,16 @@ type DpuOperatorConfigReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
 	dpuDaemonImage  string
+	vspImage        string
 	imagePullPolicy string
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImage string) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
 		Client:          client,
 		Scheme:          scheme,
 		dpuDaemonImage:  dpuDaemonImage,
+		vspImage:        vspImage,
 		imagePullPolicy: "IfNotPresent",
 	}
 }
@@ -98,7 +100,13 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	err := r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
+	err := r.ensureVendorSpecificPlugin(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to ensure Vendor Specific Plugin is running")
+		return ctrl.Result{}, err
+	}
+
+	err = r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
 	if err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
 		return ctrl.Result{}, err
@@ -118,11 +126,12 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]string {
 	// All the CRs will be in the same namespace as the operator config
 	data := map[string]string{
-		"Namespace":              "openshift-dpu-operator",
-		"ImagePullPolicy":        r.imagePullPolicy,
-		"Mode":                   "auto",
-		"DpuOperatorDaemonImage": r.dpuDaemonImage,
-		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
+		"Namespace":                 "openshift-dpu-operator",
+		"ImagePullPolicy":           r.imagePullPolicy,
+		"Mode":                      "auto",
+		"DpuOperatorDaemonImage":    r.dpuDaemonImage,
+		"VendorSpecificPluginImage": r.vspImage,
+		"ResourceName":              "openshift.io/dpu", // FIXME: Hardcode for now
 	}
 	return data
 }
@@ -182,6 +191,12 @@ func (r *DpuOperatorConfigReconciler) applyAllFromBinData(logger logr.Logger, bi
 		}
 	}
 	return nil
+}
+
+func (r *DpuOperatorConfigReconciler) ensureVendorSpecificPlugin(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Ensuring VSP DaemonSet", "image", r.vspImage)
+	return r.applyAllFromBinData(logger, "vsp-ds", cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
