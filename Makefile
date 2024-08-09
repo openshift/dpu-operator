@@ -247,6 +247,30 @@ docker-buildx: test ## Build and push docker image for the manager for cross-pla
 	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 	rm Dockerfile.cross
 
+# Build and Push VSP
+# NOTE: This implementation is IPU-specific since its the only vendor specific plugin at this time, but can expand when others are available.
+VSP_REPO ?= https://github.com/intel/ipu-opi-plugins.git
+VSP_VENDOR ?= intel
+VSP_WORKING_DIR := $(shell pwd)/internal/daemon/vendor-specific-plugins/$(VSP_VENDOR)
+VSP_IMAGE := $(REGISTRY):5000/ipu-plugin:dpu
+VSP_DOCKERFILE := $(VSP_WORKING_DIR)/ipu-plugin/images/Dockerfile
+
+.PHONY: local-build-vsp
+local-build-vsp:  vsp_build_image vsp_tag_and_push
+
+.PHONY: vsp_build_image
+vsp_build_image:
+	rm -rf $(VSP_WORKING_DIR)
+	git clone $(VSP_REPO) $(VSP_WORKING_DIR)
+	# Parse and Pull Golang Image
+	$(CONTAINER_TOOL) pull docker.io/library/$$(grep -m1 -oP '^FROM \K[^ ]+' $(VSP_DOCKERFILE))
+	cd $(VSP_WORKING_DIR)/ipu-plugin && export IMGTOOL=$(CONTAINER_TOOL) && make image
+
+.PHONY: vsp_tag_and_push
+vsp_tag_and_push:
+	$(CONTAINER_TOOL) tag vsp-plugin:latest $(VSP_IMAGE)
+	$(CONTAINER_TOOL) push $(VSP_IMAGE)
+
 ##@ Deployment
 
 ifndef ignore-not-found
