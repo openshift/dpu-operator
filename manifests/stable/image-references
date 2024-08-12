@@ -6,11 +6,11 @@ spec:
   - name: dpu-operator
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-dpu-operator:4.16
+      name: quay.io/openshift/origin-dpu-operator:4.17
   - name: dpu-daemon
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-dpu-daemon:4.16
+      name: quay.io/openshift/origin-dpu-daemon:4.17
   - name: kube-rbac-proxy
     from:
       kind: DockerImage
