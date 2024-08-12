@@ -8,6 +8,7 @@ import (
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
@@ -56,8 +57,9 @@ func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
 	return false, nil
 }
 
-func (pi *IntelDetector) VspPlugin(dpuMode bool) *plugin.GrpcPlugin {
-	return plugin.NewGrpcPlugin(dpuMode)
+func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin {
+	intelVspImage := vspImages["IntelVspImage"]
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(intelVspImage))
 }
 
 func (d *IntelDetector) GetVendorName() string {

@@ -76,6 +76,9 @@ spec:
         env:
         - name: DPU_DAEMON_IMAGE
           value: quay.io/openshift/origin-dpu-daemon:4.18
+        #TODO: We will need pointers to all supported VSP images so we can dynamically detect the correct vendor to support at runtime
+        # - name: IntelVspImage
+        #   value: quay.io/openshift/origin-intel-vsp-image:4.16
         image: quay.io/openshift/origin-dpu-operator:4.18
         name: manager
         securityContext:

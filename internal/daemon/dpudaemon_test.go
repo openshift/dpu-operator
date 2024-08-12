@@ -66,6 +66,7 @@ var _ = g.Describe("DPU Daemon", Ordered, func() {
 		}()
 
 		dpuPlugin := plugin.NewGrpcPlugin(true,
+			client,
 			plugin.WithPathManager(pathManager))
 		nfDeviceHandler := nfdevicehandler.NewNfDeviceHandler(
 			nfdevicehandler.WithPathManager(pathManager))

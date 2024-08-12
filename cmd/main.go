@@ -35,6 +35,7 @@ import (
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/controller"
+	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -95,12 +96,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	vspImages := make(map[string]string)
+
+	for _, vspImageName := range plugin.VspImages {
+		value := os.Getenv(vspImageName)
+		if value == "" {
+			setupLog.Info("VspImage env var not set", "VspImage", vspImageName)
+		}
+		vspImages[vspImageName] = value
+	}
+
 	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
 	if dpuDaemonImage == "" {
 		setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
+		os.Exit(1)
 	}
 
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage)
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)
