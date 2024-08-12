@@ -52,7 +52,7 @@ metadata:
     operatorframework.io/suggested-namespace: openshift-dpu-operator
     operators.operatorframework.io/builder: operator-sdk-v1.34.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: dpu-operator.v4.16.0
+  name: dpu-operator.v4.18.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
