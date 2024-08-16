@@ -396,4 +396,4 @@ spec:
   provider:
     name: Red Hat
     url: www.redhat.com
-  version: 4.16.0
+  version: 4.17.0
