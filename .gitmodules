@@ -1,0 +1,3 @@
+[submodule "cluster-deployment-automation"]
+	path = cluster-deployment-automation
+	url = https://github.com/bn222/cluster-deployment-automation
