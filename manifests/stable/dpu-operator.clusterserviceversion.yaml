@@ -303,8 +303,8 @@ spec:
                 - /manager
                 env:
                 - name: DPU_DAEMON_IMAGE
-                  value: quay.io/openshift/origin-dpu-daemon:4.16
-                image: quay.io/openshift/origin-dpu-operator:4.16
+                  value: quay.io/openshift/origin-dpu-daemon:4.17
+                image: quay.io/openshift/origin-dpu-operator:4.17
                 livenessProbe:
                   httpGet:
                     path: /healthz
