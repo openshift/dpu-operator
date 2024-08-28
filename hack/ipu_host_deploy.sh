@@ -1,5 +1,6 @@
 cd cluster-deployment-automation
-source ocp-venv/bin/activate
+python3.11 -m venv /tmp/ocp-venv
+source /tmp/ocp-venv/bin/activate
 
 export PATH=$PATH:"/usr/local/go/bin"
 
@@ -14,7 +15,7 @@ else
     branch="main"
 fi
 
-python3.11 cda.py ../cluster_configs/config-dpu-host.yaml deploy
+python3.11 cda.py --secret /root/pull_secret.json ../cluster_configs/config-dpu-host.yaml deploy 
 
 ret=$?
 if [ $ret == 0 ]; then

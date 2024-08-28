@@ -11,7 +11,7 @@ git checkout "$CDA_BRANCH"
 
 systemctl restart libvirtd
 
-python3.11 -m venv ocp-venv
-source ocp-venv/bin/activate
-./dependencies.sh
+python3.11 -m venv /tmp/ocp-venv
+source /tmp/ocp-venv/bin/activate
+sh ./dependencies.sh
 
