@@ -1,0 +1,23 @@
+clusters:
+  - name : "iso_cluster"
+    api_vip: "192.168.122.99"
+    ingress_vip: "192.168.122.101"
+    network_api_port: "eno12409"
+    kind: "iso"
+    install_iso: "{{iso()}}"
+    masters:
+    - name: "{{worker_number(0)}}-acc"
+      node: "localhost"
+      type: "physical"
+      bmc: "{{IMC_hostname(0)}}"
+      bmc_user: "root"
+      bmc_password: "redhat"
+      ip: "192.168.3.16"
+      mac: "{{IPU_mac_address(0)}}"
+    postconfig:
+    - name: "rh_subscription"
+      organization_id: "{{organization_id()}}"
+      activation_key: "{{activation_key()}}"
+    - name: "microshift"
+    - name: "dpu_operator_dpu"
+      rebuild_dpu_operators_images: false
