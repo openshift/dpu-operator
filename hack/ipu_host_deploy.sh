@@ -8,12 +8,9 @@ export PATH=$PATH:"/usr/local/go/bin"
 # Specifically, we want the local container registry to persist so we do not need to rebuild images each time we run a new job.
 export BUILD_ID=dontKillMe
 
-if [ -z "$pullnumber" ]; then
-    json_blob=$(curl https://api.github.com/repos/openshift/dpu-operator/pulls/$pullnumber)
-    branch=$(echo $json_blob | jq -r '.head.ref')
-else
-    branch="main"
-fi
+current_pwd=$(pwd)
+
+path=${current_pwd%/cluster-deployment-automation}
 
 python3.11 cda.py --secret /root/pull_secret.json ../cluster_configs/config-dpu-host.yaml deploy 
 
