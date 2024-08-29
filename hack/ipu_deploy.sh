@@ -2,14 +2,6 @@
 cd cluster-deployment-automation
 source ocp-venv/bin/activate
 
-# We need to overwrite the buildID to ensure that Jenkin's ProcessTreeKiller does not clean up the containers spawned by CDA on job completion. https://wiki.jenkins.io/display/JENKINS/ProcessTreeKiller
-# Specifically, we want the local container registry to persist so we do not need to rebuild images each time we run a new job.
-export BUILD_ID=dontKillMe
-
-current_pwd=$(pwd)
-
-path=${current_pwd%/cluster-deployment-automation}
-
 python3.11 cda.py ../cluster_configs/config-dpu.yaml deploy
 
 ret=$?
