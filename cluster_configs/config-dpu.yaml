@@ -20,5 +20,5 @@ clusters:
       activation_key: "{{activation_key()}}"
     - name: "microshift"
     - name: "dpu_operator_dpu"
-      dpu_operator_path: "$path"
+      dpu_operator_path: "../"
       rebuild_dpu_operators_images: false
