@@ -12,7 +12,11 @@ current_pwd=$(pwd)
 
 path=${current_pwd%/cluster-deployment-automation}
 
-python3.11 cda.py --secret /root/pull_secret.json ../cluster_configs/config-dpu-host.yaml deploy 
+export path
+
+envsubst < ../cluster_configs/config-dpu-host.yaml > config-dpu-host-cluster.yaml
+
+python3.11 cda.py --secret /root/pull_secret.json config-dpu-host.yaml deploy
 
 ret=$?
 if [ $ret == 0 ]; then
