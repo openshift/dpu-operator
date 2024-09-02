@@ -77,6 +77,7 @@ SHELL = /usr/bin/env bash -o pipefail
 PREPARE_SCRIPT = hack/prepare.sh
 IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
 IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
+DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
 
 .PHONY: prepare
 prepare:
@@ -90,8 +91,11 @@ ipu_host:
 ipu_deploy:
 	bash $(IPU_DEPLOY_SCRIPT)
 
+.PHONY: deploy_tft_tests
+	bash $(DEPLOY_TFT_SCRIPT)
+
 .PHONY: e2e_test
-e2e-test: ipu_host ipu_deploy
+e2e-test: ipu_host ipu_deploy deploy_tft_tests
 	@echo "E2E Test Completed"
 
 .PHONY: all

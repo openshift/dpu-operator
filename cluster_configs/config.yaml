@@ -1,0 +1,25 @@
+tft:
+  - name: "Test 1"
+    namespace: "default"
+    # test cases can be specified individually i.e "1,2,3,6" or as a range i.e. "1-9,15-19"
+    test_cases: "1"
+    duration: "30"
+    # Location of artifacts from run can be specified: default <working-dir>/ft-logs/
+    # logs: "/tmp/ft-logs"
+    connections:
+      - name: "Connection_1"
+        # supported types: iperf-tcp, iperf-udp, netperf-tcp-stream, netperf-tcp-rr
+        type: "iperf-tcp"
+        instances: 1
+        server:
+          - name: "$worker"
+            sriov: "true"
+        client:
+          - name: "$worker"
+            sriov: "true"
+        plugins:
+          - name: validate_offload
+        secondary_network_nad: "sriov-net1"
+        resource_name: "openshift.io/dpu"
+kubeconfig: "/root/kubeconfig.ocpcluster"
+kubeconfig_infra: "/var/lib/microshift/resources/kubeadmin/$acc/kubeconfig"
