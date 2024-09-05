@@ -1,8 +1,9 @@
 #!/bin/bash
 cd cluster-deployment-automation
-source ocp-venv/bin/activate
+python3.11 -m venv /tmp/ocp-venv
+source /tmp/ocp-venv/bin/activate
 
-python3.11 cda.py ../cluster_configs/config-dpu.yaml deploy
+python3.11 cda.py --secret /root/pull_secret.json ../cluster_configs/config-dpu.yaml deploy
 
 ret=$?
 if [ $ret == 0 ]; then
