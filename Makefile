@@ -243,7 +243,7 @@ local-buildx: ## Build all container images necessary to run the whole operator
 	buildah build --authfile /root/config.json --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
 
 .PHONY: local-pushx
-local-pushx: local-buildx ## Push all container images necessary to run the whole operator
+local-pushx: ## Push all container images necessary to run the whole operator
 	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 
