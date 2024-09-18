@@ -10,6 +10,7 @@ import (
 	"github.com/jaypipes/ghw"
 	devicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
+	"github.com/openshift/dpu-operator/internal/platform"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -123,10 +124,20 @@ func (s *sriovDeviceHandler) SetupDevices() error {
 	}
 
 	// TODO: The VSP should pass the hardcoded parameters to create a filter
-	s.vfFilterFunc = CreatePcieDevFilter("8086", "145c", "idpf")
+	pi := platform.NewPlatformInfo()
+	vendorName, _ := pi.Getvendorname()
+	var pfAddr string
+	if vendorName == "marvell" {
+		vendorID, deviceID, pfaddr, _ := pi.GetPcieDevFilter()
+		pfAddr = pfaddr
+		s.vfFilterFunc = CreatePcieDevFilter(vendorID, deviceID, "octeon_ep")
+	} else {
+		s.vfFilterFunc = CreatePcieDevFilter("8086", "145c", "idpf")
+		pfAddr = "0000:06:00.0"
+	}
 
 	// TODO: The VSP should pass in the PF
-	err = s.SetSriovNumVfs("0000:06:00.0", 8)
+	err = s.SetSriovNumVfs(pfAddr, 8)
 	if err != nil {
 		return fmt.Errorf("failed to set sriov numVfs: %v", err)
 	}

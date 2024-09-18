@@ -59,3 +59,7 @@ func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
 func (pi *IntelDetector) VspPlugin(dpuMode bool) *plugin.GrpcPlugin {
 	return plugin.NewGrpcPlugin(dpuMode)
 }
+
+func (d *IntelDetector) GetVendorName() string {
+	return "intel"
+}
