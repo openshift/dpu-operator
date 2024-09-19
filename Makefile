@@ -78,6 +78,9 @@ PREPARE_SCRIPT = hack/prepare.sh
 IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
 IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
 
+.PHONY: default
+default: build
+
 .PHONY: prepare
 prepare:
 	bash $(PREPARE_SCRIPT)
