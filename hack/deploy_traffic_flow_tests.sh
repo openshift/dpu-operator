@@ -1,5 +1,5 @@
 cd ocp-traffic-flow-tests
-source ocp-venv/bin/activate
+source /tmp/ocp-venv/bin/activate
 
 export KUBECONFIG=/root/kubeconfig.ocpcluster
 nodes=$(oc get nodes)
