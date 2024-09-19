@@ -79,6 +79,9 @@ IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
 IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
 DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
 
+.PHONY: default
+default: build
+
 .PHONY: prepare
 prepare:
 	bash $(PREPARE_SCRIPT)
