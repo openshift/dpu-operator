@@ -97,16 +97,8 @@ func (pi *PlatformInfo) GetPcieDevFilter() (string, string, string, error) {
 }
 
 func (pi *PlatformInfo) IsDpu() (bool, error) {
-	for _, detector := range pi.Detectors {
-		isDpu, err := detector.IsDpuPlatform()
-		if err != nil {
-			return false, err
-		}
-		if isDpu {
-			return true, nil
-		}
-	}
-	return false, nil
+	detector, err := pi.detectDpuPlatform(false)
+	return detector != nil, err
 }
 
 func (pi *PlatformInfo) detectDpuPlatform(required bool) (VendorDetector, error) {
