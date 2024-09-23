@@ -1,6 +1,7 @@
 package platform
 
 import (
+	stderrors "errors"
 	"fmt"
 
 	"github.com/jaypipes/ghw"
@@ -108,6 +109,35 @@ func (pi *PlatformInfo) IsDpu() (bool, error) {
 	return false, nil
 }
 
+func (pi *PlatformInfo) detectDpuPlatform(required bool) (VendorDetector, error) {
+	var activeDetectors []VendorDetector
+	var errResult error
+
+	for _, detector := range pi.Detectors {
+		isDPU, err := detector.IsDpuPlatform()
+		if err != nil {
+			errResult = stderrors.Join(errResult, err)
+			continue
+		}
+		if isDPU {
+			activeDetectors = append(activeDetectors, detector)
+		}
+	}
+	if errResult != nil {
+		return nil, errors.Errorf("Failed to detect DPU platform: %v", errResult)
+	}
+	if len(activeDetectors) != 1 {
+		if len(activeDetectors) != 0 {
+			return nil, errors.Errorf("Failed to detect DPU platform unambiguously: %v", activeDetectors)
+		}
+		if required {
+			return nil, errors.Errorf("Failed to detect any DPU platform")
+		}
+		return nil, nil
+	}
+	return activeDetectors[0], nil
+}
+
 func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, error) {
 	pci, err := ghw.PCI()
 	if err != nil {
@@ -154,8 +184,7 @@ func (pi *PlatformInfo) VspPlugin(dpuMode bool, vspImages map[string]string, cli
 	var err error
 
 	if dpuMode {
-		// TODO: We need to also detect the platform in dpuMode
-		detector = NewIntelDetector()
+		detector, err = pi.detectDpuPlatform(true)
 	} else {
 		detector, err = pi.detectDpuSystem(true)
 	}
