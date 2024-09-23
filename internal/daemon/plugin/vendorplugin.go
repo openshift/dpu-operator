@@ -2,17 +2,29 @@ package plugin
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"net"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/utils"
+	"github.com/openshift/dpu-operator/pkgs/render"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+//go:embed bindata/*
+var binData embed.FS
+
+var VspImages = []string{
+	"IntelVspImage",
+	"MarvellVspImage",
+	// TODO: Add future supported vendor plugins here
+}
 
 type VendorPlugin interface {
 	Start() (string, int32, error)
@@ -26,11 +38,24 @@ type VendorPlugin interface {
 type GrpcPlugin struct {
 	log         logr.Logger
 	client      pb.LifeCycleServiceClient
+	k8sClient   client.Client
 	opiClient   opi.BridgePortServiceClient
 	nfclient    pb.NetworkFunctionServiceClient
 	dpuMode     bool
+	vspImage    string
 	conn        *grpc.ClientConn
 	pathManager utils.PathManager
+}
+
+func (g *GrpcPlugin) createCommonData(vspImage string) map[string]string {
+	// All the CRs will be in the same namespace as the operator config
+	data := map[string]string{
+		"Namespace":                 "openshift-dpu-operator",
+		"ImagePullPolicy":           "Always",
+		"VendorSpecificPluginImage": vspImage,
+	}
+
+	return data
 }
 
 func (g *GrpcPlugin) Start() (string, int32, error) {
@@ -57,15 +82,34 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 	}
 }
 
-func NewGrpcPlugin(dpuMode bool, opts ...func(*GrpcPlugin)) *GrpcPlugin {
+func WithVspImage(vspImage string) func(*GrpcPlugin) {
+	return func(d *GrpcPlugin) {
+		d.vspImage = vspImage
+		d.log.Info("VSP Image", "vspImage", d.vspImage)
+		data := d.createCommonData(d.vspImage)
+
+		err := render.ApplyAllFromBinData(d.log, "vsp-ds", data, binData, d.k8sClient, nil, nil)
+		if err != nil {
+			d.log.Error(err, "Failed to start vendor plugin container", "vspImage", d.vspImage)
+		}
+	}
+}
+
+func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)) *GrpcPlugin {
 	gp := &GrpcPlugin{
 		dpuMode:     dpuMode,
+		vspImage:    "",
+		k8sClient:   client,
 		log:         ctrl.Log.WithName("GrpcPlugin"),
 		pathManager: *utils.NewPathManager("/"),
 	}
 
 	for _, opt := range opts {
 		opt(gp)
+	}
+
+	if gp.vspImage == "" {
+		gp.log.Info("WARNING: VSP Image not set, skipping vendor plugin container startup")
 	}
 
 	return gp

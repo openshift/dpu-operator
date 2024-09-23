@@ -6,6 +6,7 @@ import (
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
@@ -14,7 +15,7 @@ type PlatformInfoProvider interface {
 
 type VendorDetector interface {
 	IsDpuPlatform() (bool, error)
-	VspPlugin(dpuMode bool) *plugin.GrpcPlugin
+	VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin
 	IsDPU(pci ghw.PCIDevice) (bool, error)
 	GetVendorName() string
 }
@@ -131,9 +132,11 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 	return dpuDevices, activeDetectors, nil
 }
 
-func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
+func (pi *PlatformInfo) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+	var detector VendorDetector
 	if dpuMode {
-		return plugin.NewGrpcPlugin(dpuMode), nil
+		// TODO: We need to also detect the platform in dpuMode
+		detector = NewIntelDetector()
 	} else {
 		dpuDevices, detectors, err := pi.listDpuDevices()
 		if err != nil {
@@ -146,6 +149,7 @@ func (pi *PlatformInfo) VspPlugin(dpuMode bool) (*plugin.GrpcPlugin, error) {
 			return nil, fmt.Errorf("%v DPU devices detected. Currently only supporting exactly 1 DPU per node", len(dpuDevices))
 		}
 
-		return detectors[0].VspPlugin(dpuMode), nil
+		detector = detectors[0]
 	}
+	return detector.VspPlugin(dpuMode, vspImages, client), nil
 }

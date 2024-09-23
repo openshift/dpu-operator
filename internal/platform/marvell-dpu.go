@@ -3,6 +3,7 @@ package platform
 import (
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
@@ -50,8 +51,9 @@ func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
 	return false, nil
 }
 
-func (pi *MarvellDetector) VspPlugin(dpuMode bool) *plugin.GrpcPlugin {
-	return plugin.NewGrpcPlugin(dpuMode)
+func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin {
+	MarvellVspImage := vspImages["MarvellVspImage"]
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(MarvellVspImage))
 }
 
 // GetVendorName returns the name of the vendor
