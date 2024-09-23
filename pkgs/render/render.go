@@ -5,11 +5,11 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"html/template"
 	"io"
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/go-logr/logr"
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
