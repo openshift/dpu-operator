@@ -58,8 +58,8 @@ func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin {
-	intelVspImage := vspImages["IntelVspImage"]
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(intelVspImage))
+	template_vars := plugin.CreateVspImageVars(vspImages["IntelVspImage"])
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(template_vars))
 }
 
 func (d *IntelDetector) GetVendorName() string {
