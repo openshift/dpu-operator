@@ -132,24 +132,35 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 	return dpuDevices, activeDetectors, nil
 }
 
+func (pi *PlatformInfo) detectDpuSystem(required bool) (VendorDetector, error) {
+	dpuDevices, detectors, err := pi.listDpuDevices()
+	if err != nil {
+		return nil, errors.Errorf("Failed to get VspPlugin from platform: %v", err)
+	}
+	if len(dpuDevices) != 1 {
+		if len(dpuDevices) != 0 {
+			return nil, fmt.Errorf("%v DPU devices detected. Currently only supporting exactly 1 DPU per node", len(dpuDevices))
+		}
+		if required {
+			return nil, fmt.Errorf("Failed to detect any DPU devices")
+		}
+		return nil, nil
+	}
+	return detectors[0], nil
+}
+
 func (pi *PlatformInfo) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
 	var detector VendorDetector
+	var err error
+
 	if dpuMode {
 		// TODO: We need to also detect the platform in dpuMode
 		detector = NewIntelDetector()
 	} else {
-		dpuDevices, detectors, err := pi.listDpuDevices()
-		if err != nil {
-			return nil, errors.Errorf("Failed to get VspPlugin from platform: %v", err)
-		}
-		if len(dpuDevices) == 0 {
-			return nil, fmt.Errorf("Failed to detect any DPU devices")
-		}
-		if len(dpuDevices) != 1 {
-			return nil, fmt.Errorf("%v DPU devices detected. Currently only supporting exactly 1 DPU per node", len(dpuDevices))
-		}
-
-		detector = detectors[0]
+		detector, err = pi.detectDpuSystem(true)
+	}
+	if err != nil {
+		return nil, err
 	}
 	return detector.VspPlugin(dpuMode, vspImages, client), nil
 }
