@@ -72,6 +72,8 @@ func CreateVspImageVars(vspImage string) map[string]string {
 		"Namespace":                 "openshift-dpu-operator",
 		"ImagePullPolicy":           "Always",
 		"VendorSpecificPluginImage": vspImage,
+		"Command":                   "[ ]",
+		"Args":                      "[ ]",
 	}
 }
 

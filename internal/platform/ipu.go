@@ -59,6 +59,8 @@ func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin {
 	template_vars := plugin.CreateVspImageVars(vspImages["IntelVspImage"])
+	template_vars["Command"] = `[ "/usr/bin/ipuplugin" ]`
+	template_vars["Args"] = `[ "-v=debug" ]`
 	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(template_vars))
 }
 

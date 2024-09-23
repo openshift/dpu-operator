@@ -53,6 +53,7 @@ func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
 
 func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin {
 	template_vars := plugin.CreateVspImageVars(vspImages["MarvellVspImage"])
+	template_vars["Command"] = `[ "/vsp-mrvl" ]`
 	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(template_vars))
 }
 
