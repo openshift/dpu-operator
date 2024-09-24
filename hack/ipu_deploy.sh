@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 cd cluster-deployment-automation
 python3.11 -m venv /tmp/ocp-venv
 source /tmp/ocp-venv/bin/activate
@@ -12,4 +13,3 @@ else
     echo "cluster-deployment-automation deployment failed with error code $ret"
     exit $ret
 fi
-
