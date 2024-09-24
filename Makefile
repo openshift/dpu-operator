@@ -73,30 +73,24 @@ CONTAINER_TOOL ?= podman
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-# Define the scripts with their paths in the hack folder
-PREPARE_SCRIPT = hack/prepare.sh
-IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
-IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
-DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
-
 .PHONY: default
 default: build
 
 .PHONY: prepare
 prepare:
-	bash $(PREPARE_SCRIPT)
+	./hack/prepare.sh
 
 .PHONY: ipu_host
 ipu_host:
-	bash $(IPU_HOST_SCRIPT)
+	./hack/ipu_host_deploy.sh
 
 .PHONY: ipu_deploy
 ipu_deploy:
-	bash $(IPU_DEPLOY_SCRIPT)
+	./hack/ipu_deploy.sh
 
 .PHONY: deploy_tft_tests
 deploy_tft_tests:
-	bash $(DEPLOY_TFT_SCRIPT)
+	./hack/deploy_traffic_flow_tests.sh
 
 .PHONY: e2e_test
 e2e-test: ipu_host ipu_deploy
