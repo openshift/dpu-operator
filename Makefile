@@ -73,12 +73,6 @@ CONTAINER_TOOL ?= podman
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-# Define the scripts with their paths in the hack folder
-IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
-IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
-DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
-MAKE_E2E_FAST = hack/deploy_fast.sh
-
 .PHONY: default
 default: build
 
@@ -87,25 +81,25 @@ SUBMODULES ?= true
 .PHONY: prepare-e2e-test
 prepare-e2e-test:
 ifeq ($(SUBMODULES), true)
-	hack/prepare-submodules.sh
+	./hack/prepare-submodules.sh
 endif
-	hack/prepare-venv.sh
+	./hack/prepare-venv.sh
 
 .PHONY: ipu_host
 ipu_host: prepare-e2e-test
-	bash $(IPU_HOST_SCRIPT)
+	./hack/ipu_host_deploy.sh
 
 .PHONY: ipu_deploy
 ipu_deploy: prepare-e2e-test
-	bash $(IPU_DEPLOY_SCRIPT)
+	./hack/ipu_deploy.sh
 
 .PHONY: deploy_tft_tests
 deploy_tft_tests:
-	bash $(DEPLOY_TFT_SCRIPT)
+	./hack/deploy_traffic_flow_tests.sh
 
 .PHONY: fast_e2e_test
 fast_e2e_test: prepare-e2e-test
-	bash $(MAKE_E2E_FAST)
+	./hack/deploy_fast.sh
 
 .PHONY: e2e_test
 e2e-test: ipu_host ipu_deploy deploy_tft_tests
