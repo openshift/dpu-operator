@@ -25,3 +25,5 @@ doc/*.png
 *.swp
 *.swo
 *~
+
+/.tmp/

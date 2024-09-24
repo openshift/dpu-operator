@@ -2,8 +2,9 @@
 
 set -e
 
+source ./.tmp/ocp-venv/bin/activate
+
 cd ocp-traffic-flow-tests
-source /tmp/ocp-venv/bin/activate
 
 export KUBECONFIG=/root/kubeconfig.ocpcluster
 nodes=$(oc get nodes)
