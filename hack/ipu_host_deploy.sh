@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd cluster-deployment-automation
 python3.11 -m venv /tmp/ocp-venv
 source /tmp/ocp-venv/bin/activate

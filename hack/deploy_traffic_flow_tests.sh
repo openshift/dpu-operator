@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd ocp-traffic-flow-tests
 source /tmp/ocp-venv/bin/activate
 
