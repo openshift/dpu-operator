@@ -1,4 +1,4 @@
-#!/bin/bin/env bash
+#!/usr/bin/env bash
 
 cd cluster-deployment-automation
 python3.11 -m venv /tmp/cda-venv

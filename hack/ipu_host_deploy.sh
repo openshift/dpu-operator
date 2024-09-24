@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 cd cluster-deployment-automation
 python3.11 -m venv /tmp/cda-venv
 source /tmp/cda-venv/bin/activate
@@ -11,4 +13,3 @@ else
     echo "cluster-deployment-automation deployment failed with error code $ret"
     exit $ret
 fi
-

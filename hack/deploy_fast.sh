@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 check_ocp() {
     local KUBECONFIG_PATH=$1
 
     export KUBECONFIG=$KUBECONFIG_PATH
-    
+
     if oc get nodes; then
         return 0
     else
@@ -38,4 +38,3 @@ else
     echo "Cluster config is not proper... deploying cluster and dpu operator"
     deploy_cluster_and_dpu_operator
 fi
-
