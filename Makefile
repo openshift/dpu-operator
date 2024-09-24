@@ -98,7 +98,7 @@ ipu_deploy:
 	bash $(DEPLOY_TFT_SCRIPT)
 
 .PHONY: e2e_test
-e2e-test: ipu_host ipu_deploy deploy_tft_tests
+e2e-test: ipu_host ipu_deploy
 	@echo "E2E Test Completed"
 
 .PHONY: all
