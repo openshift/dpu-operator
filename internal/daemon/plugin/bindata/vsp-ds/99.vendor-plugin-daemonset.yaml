@@ -22,9 +22,8 @@ spec:
         imagePullPolicy: {{.ImagePullPolicy}}
         securityContext:
           privileged: true
-        #TODO: These should be passed as arguments based on the particular vsp being deployed or automatically build into the image
-        command: [ "/usr/bin/ipuplugin" ]
-        args: [ "--bridgeType=linux", "--interface=enp0s1f0d3", "--portMuxVsi=0x0e", "--ovsCliDir=/opt/p4/p4-cp-nws", "-v=debug"]
+        command: {{.Command}}
+        args: {{.Args}}
         volumeMounts:
         - name: vendor-plugin-sock
           mountPath: /var/run/dpu-daemon/

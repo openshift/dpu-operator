@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
@@ -24,6 +25,24 @@ var VspImages = []string{
 	"IntelVspImage",
 	"MarvellVspImage",
 	// TODO: Add future supported vendor plugins here
+}
+
+func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
+	vspImages := make(map[string]string)
+
+	for _, vspImageName := range VspImages {
+		var value string
+
+		if fromEnv {
+			value = os.Getenv(vspImageName)
+			if value == "" {
+				logger.Info("VspImage env var not set", "VspImage", vspImageName)
+			}
+		}
+		vspImages[vspImageName] = value
+	}
+
+	return vspImages
 }
 
 type VendorPlugin interface {
@@ -47,15 +66,15 @@ type GrpcPlugin struct {
 	pathManager utils.PathManager
 }
 
-func (g *GrpcPlugin) createCommonData(vspImage string) map[string]string {
+func CreateVspImageVars(vspImage string) map[string]string {
 	// All the CRs will be in the same namespace as the operator config
-	data := map[string]string{
+	return map[string]string{
 		"Namespace":                 "openshift-dpu-operator",
 		"ImagePullPolicy":           "Always",
 		"VendorSpecificPluginImage": vspImage,
+		"Command":                   "[ ]",
+		"Args":                      "[ ]",
 	}
-
-	return data
 }
 
 func (g *GrpcPlugin) Start() (string, int32, error) {
@@ -82,13 +101,12 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 	}
 }
 
-func WithVspImage(vspImage string) func(*GrpcPlugin) {
+func WithVspImage(template_vars map[string]string) func(*GrpcPlugin) {
 	return func(d *GrpcPlugin) {
+		vspImage := template_vars["VendorSpecificPluginImage"]
 		d.vspImage = vspImage
 		d.log.Info("VSP Image", "vspImage", d.vspImage)
-		data := d.createCommonData(d.vspImage)
-
-		err := render.ApplyAllFromBinData(d.log, "vsp-ds", data, binData, d.k8sClient, nil, nil)
+		err := render.ApplyAllFromBinData(d.log, "vsp-ds", template_vars, binData, d.k8sClient, nil, nil)
 		if err != nil {
 			d.log.Error(err, "Failed to start vendor plugin container", "vspImage", d.vspImage)
 		}

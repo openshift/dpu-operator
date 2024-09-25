@@ -54,17 +54,6 @@ func isDpuMode(log logr.Logger, mode string) (bool, error) {
 	}
 }
 
-func getVspImagesFromEnv() map[string]string {
-	vspImages := make(map[string]string)
-
-	for _, vspImageName := range plugin.VspImages {
-		value := os.Getenv(vspImageName)
-		vspImages[vspImageName] = value
-	}
-
-	return vspImages
-}
-
 func createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (Daemon, error) {
 	platform := platform.NewPlatformInfo()
 	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
@@ -172,7 +161,7 @@ func main() {
 		log.Error(err, "Failed to parse mode")
 		return
 	}
-	vspImages := getVspImagesFromEnv()
+	vspImages := plugin.CreateVspImagesMap(true, log)
 	daemon, err := createDaemon(dpuMode, config, vspImages, client)
 	if err != nil {
 		log.Error(err, "Failed to start daemon")
