@@ -106,9 +106,11 @@ func WithVspImage(template_vars map[string]string) func(*GrpcPlugin) {
 		vspImage := template_vars["VendorSpecificPluginImage"]
 		d.vspImage = vspImage
 		d.log.Info("VSP Image", "vspImage", d.vspImage)
-		err := render.ApplyAllFromBinData(d.log, "vsp-ds", template_vars, binData, d.k8sClient, nil, nil)
-		if err != nil {
-			d.log.Error(err, "Failed to start vendor plugin container", "vspImage", d.vspImage)
+		if vspImage != "" {
+			err := render.ApplyAllFromBinData(d.log, "vsp-ds", template_vars, binData, d.k8sClient, nil, nil)
+			if err != nil {
+				d.log.Error(err, "Failed to start vendor plugin container", "vspImage", d.vspImage)
+			}
 		}
 	}
 }
