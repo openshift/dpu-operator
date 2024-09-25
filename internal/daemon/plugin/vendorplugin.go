@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
@@ -24,6 +25,24 @@ var VspImages = []string{
 	"IntelVspImage",
 	"MarvellVspImage",
 	// TODO: Add future supported vendor plugins here
+}
+
+func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
+	vspImages := make(map[string]string)
+
+	for _, vspImageName := range VspImages {
+		var value string
+
+		if fromEnv {
+			value = os.Getenv(vspImageName)
+			if value == "" {
+				logger.Info("VspImage env var not set", "VspImage", vspImageName)
+			}
+		}
+		vspImages[vspImageName] = value
+	}
+
+	return vspImages
 }
 
 type VendorPlugin interface {

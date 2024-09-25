@@ -96,15 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	vspImages := make(map[string]string)
-
-	for _, vspImageName := range plugin.VspImages {
-		value := os.Getenv(vspImageName)
-		if value == "" {
-			setupLog.Info("VspImage env var not set", "VspImage", vspImageName)
-		}
-		vspImages[vspImageName] = value
-	}
+	vspImages := plugin.CreateVspImagesMap(true, setupLog)
 
 	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
 	if dpuDaemonImage == "" {
