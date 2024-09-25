@@ -21,9 +21,12 @@ import (
 //go:embed bindata/*
 var binData embed.FS
 
+const VspImageIntel string = "IntelVspImage"
+const VspImageMarvell string = "MarvellVspImage"
+
 var VspImages = []string{
-	"IntelVspImage",
-	"MarvellVspImage",
+	VspImageIntel,
+	VspImageMarvell,
 	// TODO: Add future supported vendor plugins here
 }
 
