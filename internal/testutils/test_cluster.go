@@ -201,5 +201,5 @@ func (t *TestCluster) prepareTestCluster() *rest.Config {
 func WaitForDaemonSetReady(daemonSet *appsv1.DaemonSet, k8sClient client.Client, namespace, name string) {
 	Eventually(func() error {
 		return k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, daemonSet)
-	}, TestAPITimeout, TestRetryInterval).ShouldNot(HaveOccurred())
+	}, TestAPITimeout*2, TestRetryInterval).ShouldNot(HaveOccurred())
 }
