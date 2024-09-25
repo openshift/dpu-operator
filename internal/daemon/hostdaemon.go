@@ -183,6 +183,7 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 	addr, port, err := d.vsp.Start()
 	if err != nil {
 		d.log.Error(err, "VSP init returned error")
+		return nil, err
 	}
 	d.addr = addr
 	d.port = port
