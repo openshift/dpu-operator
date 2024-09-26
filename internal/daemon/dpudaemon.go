@@ -125,6 +125,7 @@ func (d *DpuDaemon) Listen() (net.Listener, error) {
 	addr, port, err := d.vsp.Start()
 	if err != nil {
 		d.log.Error(err, "Failed to get addr:port from VendorPlugin")
+		return nil, err
 	}
 
 	d.server = grpc.NewServer()
