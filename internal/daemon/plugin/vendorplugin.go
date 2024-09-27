@@ -64,19 +64,36 @@ type GrpcPlugin struct {
 	opiClient   opi.BridgePortServiceClient
 	nfclient    pb.NetworkFunctionServiceClient
 	dpuMode     bool
-	vspImage    string
+	vsp         VspTemplateVars
 	conn        *grpc.ClientConn
 	pathManager utils.PathManager
 }
 
-func CreateVspImageVars(vspImage string) map[string]string {
-	// All the CRs will be in the same namespace as the operator config
+func NewVspTemplateVars() VspTemplateVars {
+	return VspTemplateVars{
+		VendorSpecificPluginImage: "",
+		Namespace:                 "openshift-dpu-operator",
+		ImagePullPolicy:           "Always",
+		Command:                   "[ ]",
+		Args:                      "[ ]",
+	}
+}
+
+type VspTemplateVars struct {
+	VendorSpecificPluginImage string
+	Namespace                 string
+	ImagePullPolicy           string
+	Command                   string
+	Args                      string
+}
+
+func (v VspTemplateVars) ToMap() map[string]string {
 	return map[string]string{
-		"Namespace":                 "openshift-dpu-operator",
-		"ImagePullPolicy":           "Always",
-		"VendorSpecificPluginImage": vspImage,
-		"Command":                   "[ ]",
-		"Args":                      "[ ]",
+		"VendorSpecificPluginImage": v.VendorSpecificPluginImage,
+		"Namespace":                 v.Namespace,
+		"ImagePullPolicy":           v.ImagePullPolicy,
+		"Command":                   v.Command,
+		"Args":                      v.Args,
 	}
 }
 
@@ -104,24 +121,31 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 	}
 }
 
-func WithVspImage(template_vars map[string]string) func(*GrpcPlugin) {
+func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
 	return func(d *GrpcPlugin) {
-		vspImage := template_vars["VendorSpecificPluginImage"]
-		d.vspImage = vspImage
-		d.log.Info("VSP Image", "vspImage", d.vspImage)
-		if vspImage != "" {
-			err := render.ApplyAllFromBinData(d.log, "vsp-ds", template_vars, binData, d.k8sClient, nil, nil)
-			if err != nil {
-				d.log.Error(err, "Failed to start vendor plugin container", "vspImage", d.vspImage)
-			}
+		d.vsp = template_vars
+		d.log.Info("Deploying with VSP", "vsp", d.vsp.VendorSpecificPluginImage)
+	}
+}
+
+func (gp *GrpcPlugin) deployVsp() {
+	vspImage := gp.vsp.VendorSpecificPluginImage
+
+	if vspImage != "" {
+		gp.log.Info("Deploying VSP", "vspImage", vspImage, "command", gp.vsp.Command, "args", gp.vsp.Args)
+		err := render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, nil, nil)
+		if err != nil {
+			gp.log.Error(err, "Failed to start vendor plugin container", "vspImage", gp.vsp.VendorSpecificPluginImage)
 		}
+	} else {
+		gp.log.Info("WARNING: VSP Image not set, skipping vendor plugin container startup")
 	}
 }
 
 func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)) *GrpcPlugin {
 	gp := &GrpcPlugin{
 		dpuMode:     dpuMode,
-		vspImage:    "",
+		vsp:         VspTemplateVars{},
 		k8sClient:   client,
 		log:         ctrl.Log.WithName("GrpcPlugin"),
 		pathManager: *utils.NewPathManager("/"),
@@ -131,9 +155,7 @@ func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)
 		opt(gp)
 	}
 
-	if gp.vspImage == "" {
-		gp.log.Info("WARNING: VSP Image not set, skipping vendor plugin container startup")
-	}
+	gp.deployVsp()
 
 	return gp
 }
