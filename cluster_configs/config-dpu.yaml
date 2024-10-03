@@ -8,7 +8,7 @@ clusters:
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
-      type: "physical"
+      kind: "ipu"
       bmc: "{{IMC_hostname(0)}}"
       bmc_user: "root"
       bmc_password: "redhat"
