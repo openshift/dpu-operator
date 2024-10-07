@@ -26,5 +26,7 @@ spec:
           value: {{ .RegistryURL }}:5000/mrvl-vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
+        - name: WEBHOOK_IMAGE
+          value: {{ .RegistryURL }}:5000/webhook:dev  
         image: {{ .RegistryURL }}:5000/dpu-operator:dev
         imagePullPolicy: Always
