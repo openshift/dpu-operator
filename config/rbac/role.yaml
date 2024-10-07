@@ -19,6 +19,18 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
   - serviceaccounts
   verbs:
   - create
@@ -29,6 +41,18 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - '*'
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - '*'
+- apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
@@ -38,6 +62,18 @@ rules:
   - apps
   resources:
   - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
   verbs:
   - create
   - delete
@@ -122,8 +158,10 @@ rules:
   - clusterrolebindings
   verbs:
   - create
+  - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io
@@ -131,7 +169,10 @@ rules:
   - clusterroles
   verbs:
   - create
+  - delete
   - get
+  - patch
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
