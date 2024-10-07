@@ -1,0 +1,12 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /workspace
+COPY . .
+RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-network-resources-injector
+
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+ARG TARGETARCH
+WORKDIR /
+
+COPY --from=builder /workspace/bin/nri.${TARGETARCH} /webhook

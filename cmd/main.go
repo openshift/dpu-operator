@@ -95,7 +95,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, vspExtraData)
+	networkResourcesInjectorImage := os.Getenv("NETWORK_RESOURCES_INJECTOR_IMAGE")
+	if networkResourcesInjectorImage == "" {
+		setupLog.Error(err, "Failed to set NETWORK_RESOURCES_INJECTOR_IMAGE env var")
+		os.Exit(1)
+	}
+
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, vspExtraData, networkResourcesInjectorImage)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)
