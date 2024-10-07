@@ -218,11 +218,12 @@ REGISTRY ?= $(shell hostname)
 # development.
 DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
 DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
+ADMISSION_CONTROLLERS_CERTIFICATES_INJECTOR_CA_CRT ?= $(shell kubectl get configmap -n kube-system extension-apiserver-authentication -o=jsonpath='{.data.client-ca-file}' | base64 --w=0)
 MARVELL_VSP_IMAGE := $(REGISTRY):5000/mrvl-vsp:dev
 
 .PHONY: local-deploy-prep
 prep-local-deploy: tools
-	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
+	./bin/config -registry-url $(REGISTRY) -admissions-controllers-ca-crt $(ADMISSION_CONTROLLERS_CERTIFICATES_INJECTOR_CA_CRT) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: local-deploy
@@ -245,13 +246,13 @@ local-buildx: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
 	buildah manifest rm $(DPU_OPERATOR_IMAGE)-manifest || true
 	buildah manifest create $(DPU_OPERATOR_IMAGE)-manifest
-	buildah build --authfile /root/config.json --manifest $(DPU_OPERATOR_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	buildah build --authfile /root/config.json --manifest $(DPU_OPERATOR_IMAGE)-manifest --platform linux/amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
 	buildah manifest rm $(DPU_DAEMON_IMAGE)-manifest || true
 	buildah manifest create $(DPU_DAEMON_IMAGE)-manifest
-	buildah build --authfile /root/config.json --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	buildah build --authfile /root/config.json --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
 	buildah manifest rm $(MARVELL_VSP_IMAGE)-manifest || true
 	buildah manifest create $(MARVELL_VSP_IMAGE)-manifest
-	buildah build --authfile /root/config.json --manifest $(MARVELL_VSP_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
+	buildah build --authfile /root/config.json --manifest $(MARVELL_VSP_IMAGE)-manifest --platform linux/amd64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
 
 .PHONY: local-pushx
 local-pushx: ## Push all container images necessary to run the whole operator

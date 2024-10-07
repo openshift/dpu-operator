@@ -39,6 +39,7 @@ metadata:
       ]
     capabilities: Basic Install
     createdAt: "2024-10-15T19:06:53Z"
+    createdAt: "2024-10-11T15:10:43Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -113,6 +114,18 @@ spec:
           - apps
           resources:
           - daemonsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
           verbs:
           - create
           - delete
