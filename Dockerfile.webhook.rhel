@@ -1,0 +1,7 @@
+# Build the manager binary
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.19 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} GOBIN=$PWD go install github.com/k8snetworkplumbingwg/network-resources-injector/cmd/webhook@latest
+CMD ["webhook"]

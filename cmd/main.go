@@ -93,7 +93,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages)
+	webhookImage := os.Getenv("WEBHOOK_IMAGE")
+        if webhookImage == "" {
+                setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
+                os.Exit(1)
+        }
+
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, webhookImage)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)
