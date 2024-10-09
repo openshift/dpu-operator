@@ -16,6 +16,7 @@ rules:
   - config.openshift.io
   resources:
   - servicefunctionchains
+  - servicefunctionchains/finalizers
   verbs:
   - create
   - delete
@@ -28,6 +29,7 @@ rules:
   - ""
   resources:
   - serviceaccounts
+  - pods
   verbs:
   - get
   - list
