@@ -95,6 +95,7 @@ ipu_deploy:
 	bash $(IPU_DEPLOY_SCRIPT)
 
 .PHONY: deploy_tft_tests
+deploy_tft_tests:
 	bash $(DEPLOY_TFT_SCRIPT)
 
 .PHONY: e2e_test
