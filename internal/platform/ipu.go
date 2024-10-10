@@ -58,10 +58,11 @@ func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin {
-	template_vars := plugin.CreateVspImageVars(vspImages[plugin.VspImageIntel])
-	template_vars["Command"] = `[ "/usr/bin/ipuplugin" ]`
-	template_vars["Args"] = `[ "-v=debug" ]`
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVspImage(template_vars))
+	template_vars := plugin.NewVspTemplateVars()
+	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
+	template_vars.Command = `[ "/usr/bin/ipuplugin" ]`
+	template_vars.Args = `[ "-v=debug" ]`
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
 }
 
 func (d *IntelDetector) GetVendorName() string {
