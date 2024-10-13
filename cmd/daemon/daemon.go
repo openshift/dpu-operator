@@ -18,7 +18,8 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -53,9 +54,9 @@ func isDpuMode(log logr.Logger, mode string) (bool, error) {
 	}
 }
 
-func createDaemon(dpuMode bool, config *rest.Config) (Daemon, error) {
+func createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (Daemon, error) {
 	platform := platform.NewPlatformInfo()
-	plugin, err := platform.VspPlugin(dpuMode)
+	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +161,8 @@ func main() {
 		log.Error(err, "Failed to parse mode")
 		return
 	}
-	daemon, err := createDaemon(dpuMode, config)
+	vspImages := plugin.CreateVspImagesMap(true, log)
+	daemon, err := createDaemon(dpuMode, config, vspImages, client)
 	if err != nil {
 		log.Error(err, "Failed to start daemon")
 		return

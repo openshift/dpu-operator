@@ -34,6 +34,10 @@ spec:
               fieldPath: spec.nodeName
         - name: NAMESPACE
           value: {{.Namespace}}
+        - name: IntelVspImage
+          value: {{.IntelVspImage}}
+        - name: MarvellVspImage
+          value: {{.MarvellVspImage}}
         volumeMounts:
         - name: devicesock
           mountPath: /var/lib/kubelet/

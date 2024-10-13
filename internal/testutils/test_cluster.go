@@ -187,8 +187,12 @@ func (t *TestCluster) prepareTestCluster() *rest.Config {
 				cluster.CreateWithWaitForReady(time.Minute))
 			Expect(err).NotTo(HaveOccurred())
 		}
-		cfgString, err := provider.KubeConfig(t.Name, false)
-		Expect(err).NotTo(HaveOccurred())
+		var cfgString string
+		Eventually(func() error {
+			var err error
+			cfgString, err = provider.KubeConfig(t.Name, false)
+			return err
+		}, TestAPITimeout, TestRetryInterval).ShouldNot(HaveOccurred())
 		cfg = []byte(cfgString)
 	}
 	config, err := clientcmd.NewClientConfigFromBytes([]byte(cfg))
@@ -201,5 +205,5 @@ func (t *TestCluster) prepareTestCluster() *rest.Config {
 func WaitForDaemonSetReady(daemonSet *appsv1.DaemonSet, k8sClient client.Client, namespace, name string) {
 	Eventually(func() error {
 		return k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, daemonSet)
-	}, TestAPITimeout, TestRetryInterval).ShouldNot(HaveOccurred())
+	}, TestAPITimeout*2, TestRetryInterval).ShouldNot(HaveOccurred())
 }

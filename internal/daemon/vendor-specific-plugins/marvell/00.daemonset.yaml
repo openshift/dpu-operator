@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mrvl-vsp
+  namespace: {{.Namespace}}
+spec:
+  selector:
+    matchLabels:
+      app: mrvl-vsp
+  template:
+    metadata:
+      labels:
+        app: mrvl-vsp
+        component: network
+        type: infra
+    spec:
+      serviceAccountName: dpu-daemon-sa
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        dpu: "true"
+      securityContext:
+        privileged: true
+      containers:
+        - name: mrvl-vsp
+          image: {{.VspDaemonImage}}
+          securityContext:
+            privileged: true
+          imagePullPolicy: {{.ImagePullPolicy}}
+          env:
+            - name: K8S_NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NAMESPACE
+              value: {{.Namespace}}
+          volumeMounts:
+            - name: mrvl-vsp-mount
+              mountPath: /var/run/dpu-daemon/
+              mountPropagation: Bidirectional
+            - name: host-run
+              mountPath: /var/run/netns
+              mountPropagation: Bidirectional
+            - name: proc
+              mountPath: /proc
+      volumes:
+        - name: mrvl-vsp-mount
+          hostPath:
+            path: /var/run/dpu-daemon/
+        - name: host-run
+          hostPath:
+            path: /var/run/netns
+        - name: proc
+          hostPath:
+            path: /proc/

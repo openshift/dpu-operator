@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vsp
+  namespace: {{.Namespace}}
+spec:
+  selector:
+    matchLabels:
+      name: vsp
+  template:
+    metadata:
+      labels:
+        name: vsp
+    spec:
+      nodeSelector:
+        dpu: "true"
+      hostNetwork: true
+      serviceAccountName: vsp-sa
+      containers:
+      - name: appcntr1
+        image: {{.VendorSpecificPluginImage}}
+        imagePullPolicy: {{.ImagePullPolicy}}
+        securityContext:
+          privileged: true
+        command: {{.Command}}
+        args: {{.Args}}
+        volumeMounts:
+        - name: vendor-plugin-sock
+          mountPath: /var/run/dpu-daemon/
+        - name: host-opt
+          mountPath: /opt/p4
+          mountPropagation: Bidirectional
+      volumes:
+      - name: host-opt
+        hostPath:
+          path: /var/lib/containers/storage/volumes/data1/_data/
+      - name: host-libmodules
+        hostPath:
+          path: /lib/modules
+          type: DirectoryOrCreate
+      - name: vendor-plugin-sock
+        hostPath:
+          path: /var/run/dpu-daemon/
