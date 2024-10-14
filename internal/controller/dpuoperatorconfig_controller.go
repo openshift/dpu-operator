@@ -141,7 +141,16 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cf
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Create the Network Function NAD")
-	return r.createAndApplyAllFromBinData(logger, "networkfn-nad", cfg)
+	nadFile := ""
+	switch cfg.Spec.Mode {
+	case "dpu":
+		nadFile = "networkfn-nad"
+	case "host":
+		nadFile = "networkfn-nad-host"
+	default:
+		return errors.NewBadRequest("Invalid Mode!")
+	}
+	return r.createAndApplyAllFromBinData(logger, nadFile, cfg)
 }
 
 // SetupWithManager sets up the controller with the Manager.
