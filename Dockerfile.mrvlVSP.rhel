@@ -17,7 +17,6 @@ RUN mkdir -p /bin && \
 FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
 WORKDIR /
 COPY --from=builder /bin/vsp-mrvl .
-
 ENV DEBIAN_FRONTEND=noninteractive
 RUN yum update -y \
     && yum install -y \
