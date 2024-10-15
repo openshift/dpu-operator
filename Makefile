@@ -82,16 +82,16 @@ DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
 .PHONY: default
 default: build
 
-.PHONY: prepare
-prepare:
+.PHONY: prepare-e2e-test
+prepare-e2e-test:
 	bash $(PREPARE_SCRIPT)
 
 .PHONY: ipu_host
-ipu_host:
+ipu_host: prepare-e2e-test
 	bash $(IPU_HOST_SCRIPT)
 
 .PHONY: ipu_deploy
-ipu_deploy:
+ipu_deploy: prepare-e2e-test
 	bash $(IPU_DEPLOY_SCRIPT)
 
 .PHONY: deploy_tft_tests
