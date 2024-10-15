@@ -4,7 +4,7 @@ cd cluster-deployment-automation
 python3.11 -m venv /tmp/cda-venv
 source /tmp/cda-venv/bin/activate
 
-python3.11 cda.py --secret /root/pull_secret.json ../cluster_configs/config-dpu.yaml deploy
+python3.11 cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
 
 ret=$?
 if [ $ret == 0 ]; then

@@ -18,7 +18,7 @@ export KUBECONFIG=/root/kubeconfig.microshift
 nodes=$(oc get nodes)
 export acc=$(echo "$nodes" | grep -oP '^\d{3}-acc')
 
-envsubst < ../cluster_configs/config.yaml > tft_config.yaml
+envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > tft_config.yaml
 
 python3.11 main.py tft_config.yaml
 
