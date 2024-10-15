@@ -12,7 +12,7 @@ clusters:
       bmc: "{{IMC_hostname(0)}}"
       bmc_user: "root"
       bmc_password: "redhat"
-      ip: "192.168.3.16"
+      ip: "172.16.3.16"
       mac: "{{IPU_mac_address(0)}}"
     postconfig:
     - name: "rh_subscription"
