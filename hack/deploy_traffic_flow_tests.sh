@@ -1,5 +1,7 @@
+#!/usr/bin/env bash
+
 cd ocp-traffic-flow-tests
-source ocp-venv/bin/activate
+source /tmp/tft-venv/bin/activate
 
 export KUBECONFIG=/root/kubeconfig.ocpcluster
 nodes=$(oc get nodes)
