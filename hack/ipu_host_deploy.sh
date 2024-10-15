@@ -1,6 +1,6 @@
 cd cluster-deployment-automation
-python3.11 -m venv /tmp/ocp-venv
-source /tmp/ocp-venv/bin/activate
+python3.11 -m venv /tmp/cda-venv
+source /tmp/cda-venv/bin/activate
 
 python3.11 cda.py --secret /root/pull_secret.json ../cluster_configs/config-dpu-host.yaml deploy 
 
