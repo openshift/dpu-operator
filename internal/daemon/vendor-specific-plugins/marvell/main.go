@@ -372,9 +372,8 @@ func getInterfaceName(deviceID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	devices := pci.ListDevices()
 	var pciAddress string
-	for _, device := range devices {
+	for _, device := range pci.Devices {
 		if device.Vendor != nil && device.Product != nil {
 			if device.Vendor.ID == targetVendorID && device.Product.ID == targetDeviceID {
 				pciAddress = device.Address

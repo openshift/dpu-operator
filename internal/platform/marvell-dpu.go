@@ -41,7 +41,7 @@ func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
 		return false, errors.Errorf("Error getting product info: %v", err)
 	}
 
-	for _, pci := range pci.ListDevices() {
+	for _, pci := range pci.Devices {
 		if pci.Vendor.ID == MrvlVendorID &&
 			pci.Product.ID == MrvlDPUdeviceID {
 			return true, nil

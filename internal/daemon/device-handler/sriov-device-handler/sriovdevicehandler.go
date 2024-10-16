@@ -64,12 +64,11 @@ func (s *sriovDeviceHandler) GetPcieDevices() ([]*ghw.PCIDevice, error) {
 		return nil, fmt.Errorf("error getting PCI info: %v", err)
 	}
 
-	pciDevices := pci.ListDevices()
-	if len(pciDevices) == 0 {
+	if len(pci.Devices) == 0 {
 		return nil, fmt.Errorf("no PCI network device found")
 	}
 
-	return pciDevices, nil
+	return pci.Devices, nil
 }
 
 func (s *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {

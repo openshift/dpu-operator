@@ -55,7 +55,7 @@ func (pi *PlatformInfo) Getvendorname() (string, error) {
 		return "", errors.Errorf("Error getting PCI info: %v", err)
 	}
 
-	for _, pci := range pci.ListDevices() {
+	for _, pci := range pci.Devices {
 		for _, detector := range pi.Detectors {
 			isDPU, err := detector.IsDPU(*pci)
 			if err != nil {
@@ -79,7 +79,7 @@ func (pi *PlatformInfo) GetPcieDevFilter() (string, string, string, error) {
 		return "", "", "", errors.Errorf("Error getting PCI info: %v", err)
 	}
 
-	for _, pci := range PCI.ListDevices() {
+	for _, pci := range PCI.Devices {
 		for _, detector := range pi.Detectors {
 			isDPU, err := detector.IsDPU(*pci)
 			if err != nil {
@@ -138,7 +138,7 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 
 	var dpuDevices []ghw.PCIDevice
 	var activeDetectors []VendorDetector
-	for _, pci := range pci.ListDevices() {
+	for _, pci := range pci.Devices {
 		for _, detector := range pi.Detectors {
 			isDPU, err := detector.IsDPU(*pci)
 			if err != nil {
