@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 type DpuDaemon struct {
@@ -250,6 +251,9 @@ func (d *DpuDaemon) setupReconcilers() {
 			},
 			// A timout needs to be specified, or else the mananger will wait indefinitely on stop()
 			GracefulShutdownTimeout: &t,
+			Metrics: server.Options{
+				BindAddress: ":18001",
+			},
 		})
 		if err != nil {
 			d.log.Error(err, "unable to start manager")
