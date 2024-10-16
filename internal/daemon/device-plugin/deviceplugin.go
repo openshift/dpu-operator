@@ -30,6 +30,7 @@ type dpServer struct {
 	log           logr.Logger
 	pathManager   utils.PathManager
 	deviceHandler DeviceHandler
+	startedWg     sync.WaitGroup
 }
 
 type DevicePlugin interface {
@@ -149,10 +150,12 @@ func (dp *dpServer) listen() (net.Listener, error) {
 
 	pluginapi.RegisterDevicePluginServer(dp.grpcServer, dp)
 
+	dp.startedWg.Add(1)
 	return lis, nil
 }
 
 func (dp *dpServer) serve(lis net.Listener) error {
+	defer dp.startedWg.Done()
 	// EXCEPTIONAL CODE!!! (DO NOT COPY): The issue is that Kubelet was written
 	// in a way that uses deprecated gRPC DialOptions specifically "WithBlock".
 	// This means that the gRPC Register() function blocks until the device plugin
@@ -163,11 +166,13 @@ func (dp *dpServer) serve(lis net.Listener) error {
 	//
 	// Therefore we have the following workaround to make sure we start serving which includes trying
 	// to connect to ourselves in "ensureDevicePluginServerStarted" before registering with Kubelet.
+	done := make(chan error, 1)
 	var err error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		err = dp.grpcServer.Serve(lis)
+		done <- err
 		wg.Done()
 	}()
 
@@ -181,6 +186,7 @@ func (dp *dpServer) serve(lis net.Listener) error {
 		return fmt.Errorf("failed to register the Device Plugin server with Kubelet: %v", err)
 	}
 
+	err = <-done
 	// The "serve" design paradigm must be a blocking call. Thus we wait here.
 	wg.Wait()
 
@@ -194,6 +200,7 @@ func (dp *dpServer) ListenAndServe() error {
 	listener, err := dp.listen()
 	if err != nil {
 		dp.log.Error(err, "failed to listen on the Device Plugin server.")
+		return err
 	}
 
 	dp.log.Info("Device Plugin server is now serving requests.")
@@ -282,6 +289,7 @@ func (dp *dpServer) Stop() error {
 	}
 
 	dp.grpcServer.Stop()
+	dp.startedWg.Wait()
 	dp.grpcServer = nil
 
 	return dp.cleanup()

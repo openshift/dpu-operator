@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 type DpuDaemon struct {
@@ -169,7 +170,7 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 		d.server = grpc.NewServer()
 		pb.RegisterBridgePortServiceServer(d.server, d)
 		if err := d.server.Serve(listener); err != nil {
-			d.done <- fmt.Errorf("Failed to start serving: %v", err)
+			d.done <- fmt.Errorf("Error from OPI server: %v", err)
 		} else {
 			d.done <- nil
 		}
@@ -181,7 +182,7 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.ListenAndServe(); err != nil {
-			d.done <- err
+			d.done <- fmt.Errorf("Error from Device Plugin server: %v", err)
 		} else {
 			d.done <- nil
 		}
@@ -193,7 +194,7 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
-			d.done <- err
+			d.done <- fmt.Errorf("Error from CNI server: %v", err)
 		} else {
 			d.done <- nil
 		}
@@ -206,7 +207,7 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
-			d.done <- err
+			d.done <- fmt.Errorf("Error from manager: %v", err)
 		} else {
 			d.done <- nil
 		}
@@ -218,6 +219,9 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 	// Block on any go routines writing to the done channel when an error occurs or they
 	// are forced to exit.
 	err := <-d.done
+	if err != nil {
+		d.log.Error(err, "one of the go-routines failed")
+	}
 
 	d.cancelManager()
 	d.dp.Stop()
@@ -247,6 +251,9 @@ func (d *DpuDaemon) setupReconcilers() {
 			},
 			// A timout needs to be specified, or else the mananger will wait indefinitely on stop()
 			GracefulShutdownTimeout: &t,
+			Metrics: server.Options{
+				BindAddress: ":18001",
+			},
 		})
 		if err != nil {
 			d.log.Error(err, "unable to start manager")
