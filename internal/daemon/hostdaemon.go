@@ -275,8 +275,8 @@ func (d *HostDaemon) Stop() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 		d.cniserver.Shutdown(ctx)
-		d.cniserver = nil
 		d.startedWg.Wait()
+		d.cniserver = nil
 	}
 }
 
