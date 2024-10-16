@@ -219,11 +219,12 @@ REGISTRY ?= $(shell hostname)
 # development.
 DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
 DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
+ADMISSION_CONTROLLERS_CERTIFICATES_INJECTOR_CA_CRT := $(shell kubectl get configmap -n kube-system extension-apiserver-authentication -o=jsonpath='{.data.client-ca-file}' | base64 --w=0)
 MARVELL_VSP_IMAGE := $(REGISTRY):5000/mrvl-vsp:dev
 
 .PHONY: local-deploy-prep
 prep-local-deploy: tools
-	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
+	./bin/config -registry-url $(REGISTRY) -admissions-controllers-ca-crt $(ADMISSION_CONTROLLERS_CERTIFICATES_INJECTOR_CA_CRT) template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: local-deploy

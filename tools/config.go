@@ -10,15 +10,18 @@ import (
 
 var (
 	registryURL  string
+	admissionControllersCaCrt string
 	templateFile string
 	outputFile   string
 )
 
-func applyTemplate(registryURL string, templateBytes []byte) ([]byte, error) {
+func applyTemplate(registryURL string, admissionControllersCaCrt string, templateBytes []byte) ([]byte, error) {
 	templateData := struct {
 		RegistryURL string
+		AdmissionControllersCaCrt string
 	}{
 		RegistryURL: registryURL,
+		AdmissionControllersCaCrt: admissionControllersCaCrt,
 	}
 
 	t, err := template.New("example").Parse(string(templateBytes))
@@ -37,12 +40,13 @@ func applyTemplate(registryURL string, templateBytes []byte) ([]byte, error) {
 
 func main() {
 	flag.StringVar(&registryURL, "registry-url", "", "Registry URL")
+	flag.StringVar(&admissionControllersCaCrt, "admissions-controllers-ca-crt", "", "Admission Controller Cert CA Crt")
 	flag.StringVar(&templateFile, "template-file", "", "Input template file")
 	flag.StringVar(&outputFile, "output-file", "", "Output YAML file")
 	flag.Parse()
 
-	if registryURL == "" || templateFile == "" || outputFile == "" {
-		fmt.Println("Usage: -registry-url <url> -template-file <file> -output-file <file>")
+	if registryURL == "" || admissionControllersCaCrt == "" || templateFile == "" || outputFile == "" {
+		fmt.Println("Usage: -registry-url <url> -admissions-controllers-ca-crt <crt> -template-file <file> -output-file <file>")
 		return
 	}
 
@@ -51,7 +55,7 @@ func main() {
 		panic(err)
 	}
 
-	outputBytes, err := applyTemplate(registryURL, templateBytes)
+	outputBytes, err := applyTemplate(registryURL, admissionControllersCaCrt, templateBytes)
 	if err != nil {
 		panic(err)
 	}
