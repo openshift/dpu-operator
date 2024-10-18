@@ -128,14 +128,11 @@ func (s *sriovDeviceHandler) SetupDevices() error {
 	var pfAddr string
 	if vendorName == "marvell" {
 		vendorID, deviceID, pfaddr, _ := pi.GetPcieDevFilter()
+		pfAddr = pfaddr
 		s.vfFilterFunc = CreatePcieDevFilter(vendorID, deviceID, "octeon_ep")
-		pfAddr = pfaddr
-	} else if vendorName == "intel" {
-		vendorID, deviceID, pfaddr, _ := pi.GetPcieDevFilter()
-		s.vfFilterFunc = CreatePcieDevFilter(vendorID, deviceID, "idpf")
-		pfAddr = pfaddr
 	} else {
-		return fmt.Errorf("Invalid vendor name detected: %s", vendorName)
+		s.vfFilterFunc = CreatePcieDevFilter("8086", "145c", "idpf")
+		pfAddr = "0000:06:00.0"
 	}
 
 	// TODO: The VSP should pass in the PF

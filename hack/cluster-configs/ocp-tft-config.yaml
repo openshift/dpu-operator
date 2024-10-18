@@ -9,7 +9,7 @@ tft:
     connections:
       - name: "Connection_1"
         # supported types: iperf-tcp, iperf-udp, netperf-tcp-stream, netperf-tcp-rr
-        type: "iperf-tcp"
+        type: "iperf-udp"
         instances: 1
         server:
           - name: "$worker"
