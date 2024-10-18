@@ -8,6 +8,7 @@ clusters:
     postconfig:
     - name: "dpu_operator_host"
       dpu_operator_path: "../"
+      ipu_plugin_sha: "7b60c3c0c200f7487f76f80aeb77c41228924d40"
     masters:
     - name: "nicmodecluster-master-1"
       kind: "vm"

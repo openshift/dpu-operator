@@ -21,4 +21,5 @@ clusters:
     - name: "microshift"
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../"
+      ipu_plugin_sha: "7b60c3c0c200f7487f76f80aeb77c41228924d40"
       rebuild_dpu_operators_images: false
