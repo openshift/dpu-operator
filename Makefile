@@ -188,7 +188,7 @@ check-podman:
 
 .PHONY: test
 test: podman-check manifests generate fmt vet envtest ginkgo
-	FAST_TEST=false KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./... -coverprofile cover.out
+	FAST_TEST=false KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) --repeat 4 $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./... -coverprofile cover.out
 
 .PHONY: test
 fast-test: envtest ginkgo
