@@ -78,6 +78,7 @@ PREPARE_SCRIPT = hack/prepare.sh
 IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
 IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
 DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
+MAKE_E2E_FAST = hack/deploy_fast.sh
 
 .PHONY: default
 default: build
@@ -96,6 +97,10 @@ ipu_deploy: prepare-e2e-test
 
 .PHONY: deploy_tft_tests
 	bash $(DEPLOY_TFT_SCRIPT)
+
+.PHONY: fast_e2e_test
+fast_e2e_test: prepare-e2e-test
+	bash $(MAKE_E2E_FAST)
 
 .PHONY: e2e_test
 e2e-test: ipu_host ipu_deploy
