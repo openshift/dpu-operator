@@ -48,6 +48,8 @@ type ServiceFunctionChain struct {
 type ServiceFunctionChainStatus struct {
 }
 
+//+kubebuilder:object:root=true
+
 // ServiceFunctionChainList contains a list of ServiceFunctionChain
 type ServiceFunctionChainList struct {
 	metav1.TypeMeta `json:",inline"`
