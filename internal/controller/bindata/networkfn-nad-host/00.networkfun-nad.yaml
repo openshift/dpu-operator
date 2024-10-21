@@ -1,0 +1,17 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net1
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: {{.ResourceName}}
+spec:
+  config: '{
+    "type": "dpu-cni",
+    "cniVersion": "0.4.0",
+    "name": "dpu-cni",
+    "ipam": {
+      "type": "host-local",
+      "subnet": "10.56.217.0/24"
+    }
+    }'
