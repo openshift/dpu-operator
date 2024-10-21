@@ -3,8 +3,8 @@ module github.com/openshift/dpu-operator
 go 1.22.4
 
 require (
-	github.com/containernetworking/cni v1.1.2
-	github.com/containernetworking/plugins v1.4.0
+	github.com/containernetworking/cni v1.2.3
+	github.com/containernetworking/plugins v1.5.0
 	github.com/go-logr/logr v1.4.2
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.13.0
@@ -14,8 +14,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.1
 	github.com/openshift/dpu-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openshift/dpu-operator/dpu-api v0.0.0-20240301140229-ca0f19ca135b
-	github.com/opiproject/opi-api v0.0.0-20240304222410-5dba226aaa9e
+	github.com/openshift/dpu-operator/dpu-api v0.0.0-20241019152927-ea4f2eb159a2
+	github.com/opiproject/opi-api v0.0.0-20240808163627-6cd218088dda
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/zap v1.26.0
