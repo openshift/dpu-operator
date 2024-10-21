@@ -149,23 +149,15 @@ prow-ci-manifests-check: manifests
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-TMP_DIR := tmp
-.PHONY: generate
+TMP_DIR := $(shell mktemp -d)
+.PHONY: generate-check
 generate-check: controller-gen
-	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." +output:dir=$(TMP_DIR)
-
-	@echo "Comparing files in ./$(TMP_DIR)..."
-	@result=0; \
-	for file in ./$(TMP_DIR)/*; do \
-		filename=$$(basename $$file); \
-		found_file=$$(find . -type f -name $$filename -not -path "./$(TMP_DIR)/*" -not -path "./vendor/*" | head -n 1); \
-		if [ -n "$$found_file" ]; then \
-			echo "Generate will change $$found_file"; \
-			diff $$file $$found_file || result=1; \
-		fi \
-	done; \
-	rm -rf ./$(TMP_DIR); \
-	exit $$result
+	rm -rf $(TMP_DIR)
+	mkdir -p $(TMP_DIR)
+	cp -r . $(TMP_DIR)
+	cd $(TMP_DIR) && make generate
+	diff -r . $(TMP_DIR) || exit 1
+	rm -rf $(TMP_DIR)
 
 .PHONY: vendor-check
 vendor-check:
