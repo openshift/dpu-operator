@@ -149,7 +149,7 @@ prow-ci-manifests-check: manifests
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-TMP_DIR := tmp
+TMP_DIR := $(shell mktemp -d)
 .PHONY: generate
 generate-check: controller-gen
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..." +output:dir=$(TMP_DIR)
