@@ -17,7 +17,7 @@ require (
 	github.com/openshift/dpu-operator/dpu-api v0.0.0-20240301140229-ca0f19ca135b
 	github.com/opiproject/opi-api v0.0.0-20240304222410-5dba226aaa9e
 	github.com/urfave/cli/v2 v2.27.1
-	github.com/vishvananda/netlink v1.2.1-beta.2.0.20230905152006-63484bbf69f8
+	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/net v0.30.0
 	google.golang.org/grpc v1.65.0
@@ -27,7 +27,7 @@ require (
 	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.31.1
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kubelet v0.24.0
+	k8s.io/kubelet v0.31.1
 	sigs.k8s.io/controller-runtime v0.19.0
 	sigs.k8s.io/kind v0.22.0
 )
