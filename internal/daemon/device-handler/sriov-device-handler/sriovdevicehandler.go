@@ -1,107 +1,49 @@
 package sriovdevicehandler
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
+	"net"
 
 	"github.com/go-logr/logr"
-	"github.com/jaypipes/ghw"
-	devicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler"
+	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
-	"github.com/openshift/dpu-operator/internal/platform"
+	"github.com/openshift/dpu-operator/internal/utils"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // sriovDeviceHandler handles NF networking devices
 type sriovDeviceHandler struct {
-	log              logr.Logger
-	vfFilterFunc     FilterFunc
+	log logr.Logger
+	// Connection client to the API for the VSP DeviceService
+	client           pb.DeviceServiceClient
+	conn             *grpc.ClientConn
+	pathManager      utils.PathManager
 	setupDevicesDone chan struct{}
-}
-
-type FilterFunc func(*ghw.PCIDevice) (bool, error)
-
-func CreatePcieDevFilter(vendorID, deviceID, driverName string) FilterFunc {
-	return func(device *ghw.PCIDevice) (bool, error) {
-		if device.Vendor.ID == vendorID && device.Product.ID == deviceID {
-			name, err := devicehandler.GetDriverName(device.Address)
-			return name == driverName, err
-		}
-		return false, nil
-	}
-}
-
-func (s *sriovDeviceHandler) SetSriovNumVfs(pciAddr string, numVfs int) error {
-	s.log.Info("SetSriovNumVfs(): set sriov_numvfs", "device", pciAddr, "numVfs", numVfs)
-
-	numVfsFilePath := filepath.Join("/sys/bus/pci/devices", pciAddr, "sriov_numvfs")
-
-	bs := []byte(strconv.Itoa(numVfs))
-
-	// We must always write 0 to sriov_numvfs first before changing the number of VFs.
-	err := os.WriteFile(numVfsFilePath, []byte("0"), os.ModeAppend)
-	if err != nil {
-		return fmt.Errorf("SetSriovNumVfs(): fail to reset %s: %v", numVfsFilePath, err)
-	}
-
-	if numVfs != 0 {
-		err = os.WriteFile(numVfsFilePath, bs, os.ModeAppend)
-		if err != nil {
-			return fmt.Errorf("SetSriovNumVfs(): fail to set %s: %v", numVfsFilePath, err)
-		}
-		// NOTE: VF netdevs are not guaranteed to appear immediately after writing the file
-	}
-
-	return nil
-}
-
-func (s *sriovDeviceHandler) GetPcieDevices() ([]*ghw.PCIDevice, error) {
-	pci, err := ghw.PCI()
-	if err != nil {
-		return nil, fmt.Errorf("error getting PCI info: %v", err)
-	}
-
-	if len(pci.Devices) == 0 {
-		return nil, fmt.Errorf("no PCI network device found")
-	}
-
-	return pci.Devices, nil
+	dpuMode          bool
 }
 
 func (s *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
-	devices := make(dp.DeviceList)
-
 	// Wait for devices to be done initializing
 	<-s.setupDevicesDone
 
-	pciDevices, err := s.GetPcieDevices()
+	err := s.ensureConnected()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to ensure connection to plugin: %v", err)
 	}
-	for _, pciDevice := range pciDevices {
-		matchedDevice, err := s.vfFilterFunc(pciDevice)
-		if err != nil {
-			return nil, err
-		}
-		if matchedDevice {
-			var topology *pluginapi.TopologyInfo
-			numaNode := devicehandler.GetNumaNode(pciDevice.Address)
-			if numaNode >= 0 {
-				topology = &pluginapi.TopologyInfo{
-					Nodes: []*pluginapi.NUMANode{
-						{ID: int64(numaNode)},
-					},
-				}
-			}
-			devices[pciDevice.Address] = pluginapi.Device{
-				ID:       pciDevice.Address,
-				Health:   pluginapi.Healthy,
-				Topology: topology,
-			}
-		}
+
+	Devices, err := s.client.GetDevices(context.Background(), &pb.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to handle GetDevices request: %v", err)
+	}
+
+	devices := make(dp.DeviceList)
+
+	for _, device := range Devices.Devices {
+		devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
 	}
 
 	return &devices, nil
@@ -109,46 +51,69 @@ func (s *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 
 // ensureConnected makes sure we are connected to the VSP's gRPC
 func (s *sriovDeviceHandler) ensureConnected() error {
-	// TODO: FIXME, design proto API for VSP
+	if s.client != nil {
+		return nil
+	}
+	dialOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return net.Dial("unix", addr)
+		}),
+	}
+	conn, err := grpc.DialContext(context.Background(), s.pathManager.VendorPluginSocket(), dialOptions...)
+	if err != nil {
+		return fmt.Errorf("failed to connect to vendor plugin: %v", err)
+	}
+	s.conn = conn
+
+	s.client = pb.NewDeviceServiceClient(s.conn)
+	s.log.Info("Connected to DeviceServiceClient")
 	return nil
 }
 
 // SetupDevices
 func (s *sriovDeviceHandler) SetupDevices() error {
+	// Currently NF devices do not require any setup outside the VSP
+	if s.dpuMode {
+		s.log.Info(("Dpu mode detected, skipping devHandler devices setup"))
+		return nil
+	}
+
 	s.setupDevicesDone = make(chan struct{})
+
+	defer close(s.setupDevicesDone)
 
 	err := s.ensureConnected()
 	if err != nil {
 		return fmt.Errorf("failed to ensure connection to vsp: %v", err)
 	}
 
-	// TODO: The VSP should pass the hardcoded parameters to create a filter
-	pi := platform.NewPlatformInfo()
-	vendorName, _ := pi.Getvendorname()
-	var pfAddr string
-	if vendorName == "marvell" {
-		vendorID, deviceID, pfaddr, _ := pi.GetPcieDevFilter()
-		pfAddr = pfaddr
-		s.vfFilterFunc = CreatePcieDevFilter(vendorID, deviceID, "octeon_ep")
-	} else {
-		s.vfFilterFunc = CreatePcieDevFilter("8086", "145c", "idpf")
-		pfAddr = "0000:06:00.0"
+	vfCount := &pb.VfCount{
+		VfCnt: 8,
 	}
 
-	// TODO: The VSP should pass in the PF
-	err = s.SetSriovNumVfs(pfAddr, 8)
+	numVfs, err := s.client.SetNumVfs(context.Background(), vfCount)
 	if err != nil {
-		return fmt.Errorf("failed to set sriov numVfs: %v", err)
+		return fmt.Errorf("Failed to set sriov numVfs: %v", err)
 	}
 
-	close(s.setupDevicesDone)
+	if numVfs.VfCnt == 0 {
+		return fmt.Errorf("SetNumVfs ran, but numVfs == 0")
+	}
+
+	s.log.Info("Num vfs set to %d by vsp", numVfs)
 
 	return nil
 }
 
-func NewSriovDeviceHandler() *sriovDeviceHandler {
+func NewSriovDeviceHandler(opts ...func(*sriovDeviceHandler)) *sriovDeviceHandler {
 	devHandler := &sriovDeviceHandler{
-		log: ctrl.Log.WithName("SriovDeviceHandler"),
+		log:     ctrl.Log.WithName("SriovDeviceHandler"),
+		dpuMode: false,
+	}
+
+	for _, opt := range opts {
+		opt(devHandler)
 	}
 
 	// TODO: When changing the SRIOV numVfs, we should do the following:
