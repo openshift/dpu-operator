@@ -10,8 +10,7 @@ import (
 	"os"
 
 	daemon "github.com/openshift/dpu-operator/internal/daemon"
-	nfdevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/nf-device-handler"
-	sriovdevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/sriov-device-handler"
+	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/sriov-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
@@ -61,13 +60,12 @@ func createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string
 		return nil, err
 	}
 
+	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
+	dp := deviceplugin.NewDevicePlugin(deviceHandler)
+
 	if dpuMode {
-		deviceHandler := nfdevicehandler.NewNfDeviceHandler()
-		dp := deviceplugin.NewDevicePlugin(deviceHandler)
 		return daemon.NewDpuDaemon(plugin, dp, config), nil
 	} else {
-		deviceHandler := sriovdevicehandler.NewSriovDeviceHandler()
-		dp := deviceplugin.NewDevicePlugin(deviceHandler)
 		return daemon.NewHostDaemon(plugin, dp), nil
 	}
 }
