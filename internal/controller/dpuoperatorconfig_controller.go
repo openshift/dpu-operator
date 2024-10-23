@@ -36,19 +36,21 @@ var binData embed.FS
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
 type DpuOperatorConfigReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	dpuDaemonImage  string
-	vspImages       map[string]string
-	imagePullPolicy string
+	Scheme            *runtime.Scheme
+	dpuDaemonImage    string
+	vspImages         map[string]string
+	imagePullPolicy   string
+	injectorWebhookCA string
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string, injectorWebhookCA string) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
-		Client:          client,
-		Scheme:          scheme,
-		dpuDaemonImage:  dpuDaemonImage,
-		vspImages:       vspImages,
-		imagePullPolicy: "IfNotPresent",
+		Client:            client,
+		Scheme:            scheme,
+		dpuDaemonImage:    dpuDaemonImage,
+		vspImages:         vspImages,
+		imagePullPolicy:   "IfNotPresent",
+		injectorWebhookCA: injectorWebhookCA,
 	}
 }
 
@@ -100,6 +102,11 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
+	err = r.ensureWebhook(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to ensure Webhook is running")
+	}
+
 	if dpuOperatorConfig.Spec.Mode == "dpu" {
 		err = r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig)
 		if err != nil {
@@ -119,6 +126,7 @@ func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperator
 		"Mode":                   "auto",
 		"DpuOperatorDaemonImage": r.dpuDaemonImage,
 		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
+		"injectorWebhookCA":      r.injectorWebhookCA,
 	}
 
 	for key, value := range r.vspImages {
@@ -139,6 +147,11 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cf
 	return r.createAndApplyAllFromBinData(logger, "daemon", cfg)
 }
 
+func (r *DpuOperatorConfigReconciler) ensureWebhook(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Create Webhook")
+	return r.createAndApplyAllFromBinData(logger, "webhook", cfg)
+}
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Create the Network Function NAD")
