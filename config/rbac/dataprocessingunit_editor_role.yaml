@@ -1,0 +1,27 @@
+# permissions for end users to edit dataprocessingunits.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: dpu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dataprocessingunit-editor-role
+rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dataprocessingunits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dataprocessingunits/status
+  verbs:
+  - get

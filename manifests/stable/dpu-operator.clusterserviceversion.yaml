@@ -6,6 +6,18 @@ metadata:
       [
         {
           "apiVersion": "config.openshift.io/v1",
+          "kind": "DataProcessingUnit",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "dpu-operator"
+            },
+            "name": "dataprocessingunit-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "config.openshift.io/v1",
           "kind": "DpuOperatorConfig",
           "metadata": {
             "labels": {
@@ -58,6 +70,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: DataProcessingUnit is the Schema for the dataprocessingunits API
+      displayName: Data Processing Unit
+      kind: DataProcessingUnit
+      name: dataprocessingunits.config.openshift.io
+      version: v1
     - description: DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
       displayName: Dpu Operator Config
       kind: DpuOperatorConfig
@@ -164,6 +181,32 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits/status
+          verbs:
+          - get
+          - patch
+          - update
         - apiGroups:
           - config.openshift.io
           resources:
