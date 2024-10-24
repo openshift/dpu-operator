@@ -29,4 +29,13 @@ resources:
   kind: ServiceFunctionChain
   path: github.com/openshift/dpu-operator/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: config
+  kind: DataProcessingUnit
+  path: github.com/openshift/dpu-operator/api/v1
+  version: v1
 version: "3"
