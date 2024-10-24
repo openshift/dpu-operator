@@ -14,7 +14,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.1
 	github.com/openshift/dpu-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openshift/dpu-operator/dpu-api v0.0.0-20241019152927-ea4f2eb159a2
+	github.com/openshift/dpu-operator/dpu-api v0.0.0-20241023094403-a185e0f16e84
 	github.com/opiproject/opi-api v0.0.0-20240808163627-6cd218088dda
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.0
