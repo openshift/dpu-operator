@@ -1,4 +1,4 @@
-package sriovdevicehandler
+package dpudevicehandler
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// sriovDeviceHandler handles NF networking devices
-type sriovDeviceHandler struct {
+// dpuDeviceHandler handles NF networking devices
+type dpuDeviceHandler struct {
 	log logr.Logger
 	// Connection client to the API for the VSP DeviceService
 	client           pb.DeviceServiceClient
@@ -26,16 +26,16 @@ type sriovDeviceHandler struct {
 	dpuMode          bool
 }
 
-func (s *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
+func (d *dpuDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	// Wait for devices to be done initializing
-	<-s.setupDevicesDone
+	<-d.setupDevicesDone
 
-	err := s.ensureConnected()
+	err := d.ensureConnected()
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure connection to plugin: %v", err)
 	}
 
-	Devices, err := s.client.GetDevices(context.Background(), &pb.Empty{})
+	Devices, err := d.client.GetDevices(context.Background(), &pb.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to handle GetDevices request: %v", err)
 	}
@@ -50,8 +50,8 @@ func (s *sriovDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 }
 
 // ensureConnected makes sure we are connected to the VSP's gRPC
-func (s *sriovDeviceHandler) ensureConnected() error {
-	if s.client != nil {
+func (d *dpuDeviceHandler) ensureConnected() error {
+	if d.client != nil {
 		return nil
 	}
 	dialOptions := []grpc.DialOption{
@@ -60,30 +60,30 @@ func (s *sriovDeviceHandler) ensureConnected() error {
 			return net.Dial("unix", addr)
 		}),
 	}
-	conn, err := grpc.DialContext(context.Background(), s.pathManager.VendorPluginSocket(), dialOptions...)
+	conn, err := grpc.DialContext(context.Background(), d.pathManager.VendorPluginSocket(), dialOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to connect to vendor plugin: %v", err)
 	}
-	s.conn = conn
+	d.conn = conn
 
-	s.client = pb.NewDeviceServiceClient(s.conn)
-	s.log.Info("Connected to DeviceServiceClient")
+	d.client = pb.NewDeviceServiceClient(d.conn)
+	d.log.Info("Connected to DeviceServiceClient")
 	return nil
 }
 
 // SetupDevices
-func (s *sriovDeviceHandler) SetupDevices() error {
+func (d *dpuDeviceHandler) SetupDevices() error {
+	d.setupDevicesDone = make(chan struct{})
+
+	defer close(d.setupDevicesDone)
+
 	// Currently NF devices do not require any setup outside the VSP
-	if s.dpuMode {
-		s.log.Info(("Dpu mode detected, skipping devHandler devices setup"))
+	if d.dpuMode {
+		d.log.Info(("Dpu mode detected, skipping devHandler devices setup"))
 		return nil
 	}
 
-	s.setupDevicesDone = make(chan struct{})
-
-	defer close(s.setupDevicesDone)
-
-	err := s.ensureConnected()
+	err := d.ensureConnected()
 	if err != nil {
 		return fmt.Errorf("failed to ensure connection to vsp: %v", err)
 	}
@@ -92,7 +92,7 @@ func (s *sriovDeviceHandler) SetupDevices() error {
 		VfCnt: 8,
 	}
 
-	numVfs, err := s.client.SetNumVfs(context.Background(), vfCount)
+	numVfs, err := d.client.SetNumVfs(context.Background(), vfCount)
 	if err != nil {
 		return fmt.Errorf("Failed to set sriov numVfs: %v", err)
 	}
@@ -101,14 +101,26 @@ func (s *sriovDeviceHandler) SetupDevices() error {
 		return fmt.Errorf("SetNumVfs ran, but numVfs == 0")
 	}
 
-	s.log.Info("Num vfs set to %d by vsp", numVfs)
+	d.log.Info("Num vfs set to %d by vsp", numVfs)
 
 	return nil
 }
 
-func NewSriovDeviceHandler(opts ...func(*sriovDeviceHandler)) *sriovDeviceHandler {
-	devHandler := &sriovDeviceHandler{
-		log:     ctrl.Log.WithName("SriovDeviceHandler"),
+func WithDpuMode(dpuMode bool) func(*dpuDeviceHandler) {
+	return func(d *dpuDeviceHandler) {
+		d.dpuMode = dpuMode
+	}
+}
+
+func WithPathManager(pathManager utils.PathManager) func(*dpuDeviceHandler) {
+	return func(d *dpuDeviceHandler) {
+		d.pathManager = pathManager
+	}
+}
+
+func NewDpuDeviceHandler(opts ...func(*dpuDeviceHandler)) *dpuDeviceHandler {
+	devHandler := &dpuDeviceHandler{
+		log:     ctrl.Log.WithName("DpuDeviceHandler"),
 		dpuMode: false,
 	}
 
