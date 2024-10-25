@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
 
-type HostDaemon struct {
+type HostSideManager struct {
 	dev         bool
 	log         logr.Logger
 	conn        *grpc.ClientConn
@@ -45,7 +45,7 @@ type HostDaemon struct {
 	pathManager utils.PathManager
 }
 
-func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
+func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
 	err := d.connectWithRetry()
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (d *HostDaemon) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb
 	return d.client.CreateBridgePort(context.TODO(), createRequest)
 }
 
-func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) error {
+func (d *HostSideManager) DeleteBridgePort(pf int, vf int, vlan int, mac string) error {
 	d.connectWithRetry()
 	req := &pb.DeleteBridgePortRequest{Name: "host" + fmt.Sprintf("%d-%d", pf, vf)}
 
@@ -81,8 +81,8 @@ func (d *HostDaemon) DeleteBridgePort(pf int, vf int, vlan int, mac string) erro
 	return err
 }
 
-func NewHostDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *HostDaemon {
-	return &HostDaemon{
+func NewHostSideManager(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *HostSideManager {
+	return &HostSideManager{
 		vsp:         vsp,
 		dp:          dp,
 		log:         ctrl.Log.WithName("HostDaemon"),
@@ -91,22 +91,22 @@ func NewHostDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *HostD
 	}
 }
 
-func (d *HostDaemon) WithPathManager(pathManager *utils.PathManager) *HostDaemon {
+func (d *HostSideManager) WithPathManager(pathManager *utils.PathManager) *HostSideManager {
 	d.pathManager = *pathManager
 	return d
 }
 
-func (d *HostDaemon) WithSriovManager(manager sriov.Manager) *HostDaemon {
+func (d *HostSideManager) WithSriovManager(manager sriov.Manager) *HostSideManager {
 	d.sm = manager
 	return d
 }
 
-func (d *HostDaemon) WithManager(manager ctrl.Manager) *HostDaemon {
+func (d *HostSideManager) WithManager(manager ctrl.Manager) *HostSideManager {
 	d.manager = manager
 	return d
 }
 
-func (d *HostDaemon) connectWithRetry() error {
+func (d *HostSideManager) connectWithRetry() error {
 	if d.conn != nil {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (d *HostDaemon) connectWithRetry() error {
 	return nil
 }
 
-func (d *HostDaemon) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+func (d *HostSideManager) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
 	d.log.Info("addHandler")
 	res, err := d.sm.CmdAdd(req)
 	if err != nil {
@@ -161,7 +161,7 @@ func (d *HostDaemon) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Result,
 	return res, nil
 }
 
-func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
 	err := d.sm.CmdDel(req)
 	if err != nil {
 		return nil, errors.New("SRIOV manager failed in del handler")
@@ -176,7 +176,7 @@ func (d *HostDaemon) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result,
 	return nil, nil
 }
 
-func (d *HostDaemon) Listen() (net.Listener, error) {
+func (d *HostSideManager) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
@@ -200,7 +200,7 @@ func (d *HostDaemon) Listen() (net.Listener, error) {
 	return d.cniserver.Listen()
 }
 
-func (d *HostDaemon) ListenAndServe() error {
+func (d *HostSideManager) ListenAndServe() error {
 	var wg sync.WaitGroup
 	done := make(chan error, 3)
 	listener, err := d.Listen()
@@ -260,7 +260,7 @@ func (d *HostDaemon) ListenAndServe() error {
 	return err
 }
 
-func (d *HostDaemon) Serve(listener net.Listener) error {
+func (d *HostSideManager) Serve(listener net.Listener) error {
 	defer d.startedWg.Done()
 	err := d.cniserver.Serve(listener)
 	if err != nil {
@@ -270,7 +270,7 @@ func (d *HostDaemon) Serve(listener net.Listener) error {
 	return nil
 }
 
-func (d *HostDaemon) Stop() {
+func (d *HostSideManager) Stop() {
 	if d.cniserver != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
@@ -290,7 +290,7 @@ func init() {
 	utilruntime.Must(configv1.AddToScheme(scheme))
 }
 
-func (d *HostDaemon) setupReconcilers() {
+func (d *HostSideManager) setupReconcilers() {
 	if d.manager == nil {
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme: scheme,

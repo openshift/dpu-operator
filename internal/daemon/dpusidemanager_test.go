@@ -44,9 +44,9 @@ func waitAllNodesDpuAllocatable(client client.Client) {
 	}, testutils.TestInitialSetupTimeout, testutils.TestRetryInterval).Should(BeTrue())
 }
 
-var _ = g.Describe("DPU Daemon", Ordered, func() {
+var _ = g.Describe("DPU side maanger", Ordered, func() {
 	var (
-		dpuDaemon   *DpuDaemon
+		dpuDaemon   *DpuSideManager
 		config      *rest.Config
 		testCluster testutils.TestCluster
 		client      client.Client
@@ -73,7 +73,7 @@ var _ = g.Describe("DPU Daemon", Ordered, func() {
 			dpudevicehandler.WithDpuMode(true))
 		dp := deviceplugin.NewDevicePlugin(dpuDeviceHandler,
 			deviceplugin.WithPathManager(pathManager))
-		dpuDaemon = NewDpuDaemon(dpuPlugin, dp, config,
+		dpuDaemon = NewDpuSideManger(dpuPlugin, dp, config,
 			WithPathManager(pathManager))
 
 		dpuListen, err := dpuDaemon.Listen()
