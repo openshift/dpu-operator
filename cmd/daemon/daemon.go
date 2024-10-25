@@ -10,7 +10,7 @@ import (
 	"os"
 
 	daemon "github.com/openshift/dpu-operator/internal/daemon"
-	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/sriov-device-handler"
+	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
