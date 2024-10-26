@@ -8,14 +8,6 @@ nodes=$(oc get nodes)
 export worker=$(echo "$nodes" | grep -oP '^worker-[^\s]*')
 
 
-# wa for https://issues.redhat.com/browse/IIC-364
-pushd ../
-make undeploy
-make local-deploy
-oc create -f examples/host.yaml
-sleep 45 # Give times for Intel VSP to configure ip on <ipu-netdev>d3
-popd
-
 export KUBECONFIG=/root/kubeconfig.microshift
 nodes=$(oc get nodes)
 export acc=$(echo "$nodes" | grep -oP '^\d{3}-acc')
