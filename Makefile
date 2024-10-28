@@ -74,7 +74,6 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Define the scripts with their paths in the hack folder
-PREPARE_SCRIPT = hack/prepare.sh
 IPU_HOST_SCRIPT = hack/ipu_host_deploy.sh
 IPU_DEPLOY_SCRIPT = hack/ipu_deploy.sh
 DEPLOY_TFT_SCRIPT = hack/deploy_traffic_flow_tests.sh
@@ -83,9 +82,14 @@ MAKE_E2E_FAST = hack/deploy_fast.sh
 .PHONY: default
 default: build
 
+SUBMODULES ?= true
+
 .PHONY: prepare-e2e-test
 prepare-e2e-test:
-	bash $(PREPARE_SCRIPT)
+ifeq ($(SUBMODULES), true)
+	hack/prepare-submodules.sh
+endif
+	hack/prepare-venv.sh
 
 .PHONY: ipu_host
 ipu_host: prepare-e2e-test
