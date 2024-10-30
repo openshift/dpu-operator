@@ -49,6 +49,17 @@ func EnableArpAndNdiscNotify(ifName string) error {
 	return nil
 }
 
+// GetPciFromNetDev takes in a network device name and returns its PCI address
+func GetPciFromNetDev(ifName string) (string, error) {
+	netDevPath := filepath.Join(NetDirectory, ifName, "device")
+	pciAddr, err := filepath.EvalSymlinks(netDevPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to find PCI address for net device %s: %v", ifName, err)
+	}
+
+	return filepath.Base(pciAddr), nil
+}
+
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
 func GetSriovNumVfs(ifName string) (int, error) {
 	var vfTotal int
@@ -359,6 +370,11 @@ func SetVFHardwareMAC(netLinkManager NetlinkManager, pfDevice string, vfID int, 
 
 		return nil
 	})
+}
+
+// isValidPCIAddress checks if a provide string is a valid PCI address
+func IsValidPCIAddress(id string) bool {
+	return strings.Count(id, ":") == 2 && strings.Count(id, ".") == 1
 }
 
 // IsValidMACAddress checks if net.HardwareAddr is a valid MAC address.
