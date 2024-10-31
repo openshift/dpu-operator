@@ -182,14 +182,14 @@ var _ = Describe("Main Controller", Ordered, func() {
 	var ctx context.Context
 	var wg sync.WaitGroup
 	var mgr ctrl.Manager
-	var testCluster testutils.TestCluster
+	var testCluster testutils.KindCluster
 
 	BeforeAll(func() {
 		opts := zap.Options{
 			Development: true,
 		}
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-		testCluster = testutils.TestCluster{Name: testClusterName}
+		testCluster = testutils.KindCluster{Name: testClusterName}
 		client := testCluster.EnsureExists()
 		ctx, cancel = context.WithCancel(context.Background())
 		wg = sync.WaitGroup{}

@@ -181,11 +181,11 @@ var _ = g.Describe("Host Daemon", func() {
 		err           error
 		fakeDpuDaemon *DummyDpuDaemon
 		hostDaemon    *HostSideManager
-		testCluster   *testutils.TestCluster
+		testCluster   *testutils.KindCluster
 		pathManager   *utils.PathManager
 	)
 	g.BeforeEach(func() {
-		testCluster = &testutils.TestCluster{Name: "dpu-operator-test-cluster"}
+		testCluster = &testutils.KindCluster{Name: "dpu-operator-test-cluster"}
 		testCluster.EnsureExists()
 		pathManager = utils.NewPathManager(testCluster.TempDirPath())
 		Expect(err).NotTo(HaveOccurred())

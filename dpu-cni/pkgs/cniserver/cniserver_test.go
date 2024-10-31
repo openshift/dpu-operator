@@ -44,11 +44,11 @@ var _ = g.Describe("Cniserver", func() {
 		listener         net.Listener
 		addHandlerCalled bool
 		delHandlerCalled bool
-		testCluster      testutils.TestCluster
+		testCluster      testutils.KindCluster
 	)
 
 	g.BeforeEach(func() {
-		testCluster = testutils.TestCluster{Name: "dpu-operator-test-cluster"}
+		testCluster = testutils.KindCluster{Name: "dpu-operator-test-cluster"}
 		testCluster.EnsureExists()
 	})
 
