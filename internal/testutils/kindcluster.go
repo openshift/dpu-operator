@@ -63,15 +63,15 @@ func bootstrapTestEnv(restConfig *rest.Config) {
 	Expect(cfg).NotTo(BeNil())
 }
 
-type TestCluster struct {
+type KindCluster struct {
 	Name string
 }
 
-func (t *TestCluster) TempDirPath() string {
+func (t *KindCluster) TempDirPath() string {
 	return filepath.Join("/tmp", t.Name)
 }
 
-func (t *TestCluster) ensureTempDir() error {
+func (t *KindCluster) ensureTempDir() error {
 	dirPath := t.TempDirPath()
 	_, err := os.Stat(dirPath)
 	if err == nil {
@@ -86,7 +86,7 @@ func (t *TestCluster) ensureTempDir() error {
 	return err
 }
 
-func (t *TestCluster) ensureTempDirDeleted() error {
+func (t *KindCluster) ensureTempDirDeleted() error {
 	dirPath := t.TempDirPath()
 	err := os.RemoveAll(dirPath)
 	if err != nil {
@@ -95,19 +95,19 @@ func (t *TestCluster) ensureTempDirDeleted() error {
 	return nil
 }
 
-func (t *TestCluster) EnsureExists() *rest.Config {
-	client := t.prepareTestCluster()
+func (t *KindCluster) EnsureExists() *rest.Config {
+	client := t.prepareKindCluster()
 	bootstrapTestEnv(client)
 	return client
 }
 
-func (t *TestCluster) EnsureDeleted() {
-	deleteKindTestCluster(t.Name)
+func (t *KindCluster) EnsureDeleted() {
+	deleteKindCluster(t.Name)
 	err := t.ensureTempDirDeleted()
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func deleteKindTestCluster(name string) {
+func deleteKindCluster(name string) {
 	provider := cluster.NewProvider()
 	provider.Delete(name, "")
 }
@@ -148,7 +148,7 @@ func clusterExists(p *cluster.Provider, name string) bool {
 	return false
 }
 
-func (t *TestCluster) prepareTestCluster() *rest.Config {
+func (t *KindCluster) prepareKindCluster() *rest.Config {
 	var cfg []byte
 	var err error
 
