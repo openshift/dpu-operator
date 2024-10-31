@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-git submodule init
-git submodule update
-
 cd cluster-deployment-automation
 rm -rf /tmp/cda-venv
 python3.11 -m venv /tmp/cda-venv
