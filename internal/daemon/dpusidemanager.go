@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
-type DpuDaemon struct {
+type DpuSideManager struct {
 	pb.UnimplementedBridgePortServiceServer
 	pb2.UnimplementedDeviceServiceServer
 
@@ -46,19 +46,19 @@ type DpuDaemon struct {
 	pathManager   utils.PathManager
 }
 
-func (s *DpuDaemon) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
+func (s *DpuSideManager) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
 	s.log.Info("Passing CreateBridgePort", "name", bpr.BridgePort.Name)
 	return s.vsp.CreateBridgePort(bpr)
 }
 
-func (s *DpuDaemon) DeleteBridgePort(context context.Context, bpr *pb.DeleteBridgePortRequest) (*emptypb.Empty, error) {
+func (s *DpuSideManager) DeleteBridgePort(context context.Context, bpr *pb.DeleteBridgePortRequest) (*emptypb.Empty, error) {
 	s.log.Info("Passing DeleteBridgePort", "name", bpr.Name)
 	err := s.vsp.DeleteBridgePort(bpr)
 	return &emptypb.Empty{}, err
 }
 
-func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, config *rest.Config, opts ...func(*DpuDaemon)) *DpuDaemon {
-	d := &DpuDaemon{
+func NewDpuSideManger(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, config *rest.Config, opts ...func(*DpuSideManager)) *DpuSideManager {
+	d := &DpuSideManager{
 		vsp:         vsp,
 		dp:          dp,
 		pathManager: *utils.NewPathManager("/"),
@@ -75,13 +75,13 @@ func NewDpuDaemon(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, config 
 	return d
 }
 
-func WithPathManager(pathManager utils.PathManager) func(*DpuDaemon) {
-	return func(d *DpuDaemon) {
+func WithPathManager(pathManager utils.PathManager) func(*DpuSideManager) {
+	return func(d *DpuSideManager) {
 		d.pathManager = pathManager
 	}
 }
 
-func (d *DpuDaemon) cniCmdNfAddHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+func (d *DpuSideManager) cniCmdNfAddHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
 	d.log.Info("cniCmdNfAddHandler")
 	res, err := networkfn.CmdAdd(req)
 	if err != nil {
@@ -98,7 +98,7 @@ func (d *DpuDaemon) cniCmdNfAddHandler(req *cnitypes.PodRequest) (*cni100.Result
 	return res, nil
 }
 
-func (d *DpuDaemon) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
+func (d *DpuSideManager) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
 	d.log.Info("cniCmdNfDelHandler")
 	err := networkfn.CmdDel(req)
 	if err != nil {
@@ -118,7 +118,7 @@ func (d *DpuDaemon) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.Result
 	return nil, nil
 }
 
-func (d *DpuDaemon) Listen() (net.Listener, error) {
+func (d *DpuSideManager) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
 	d.log.Info("Starting DpuDaemon")
 	d.setupReconcilers()
@@ -151,7 +151,7 @@ func (d *DpuDaemon) Listen() (net.Listener, error) {
 	return lis, err
 }
 
-func (d *DpuDaemon) ListenAndServe() error {
+func (d *DpuSideManager) ListenAndServe() error {
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -162,7 +162,7 @@ func (d *DpuDaemon) ListenAndServe() error {
 	return d.Serve(listener)
 }
 
-func (d *DpuDaemon) Serve(listener net.Listener) error {
+func (d *DpuSideManager) Serve(listener net.Listener) error {
 
 	d.wg.Add(1)
 	go func() {
@@ -232,12 +232,12 @@ func (d *DpuDaemon) Serve(listener net.Listener) error {
 	return err
 }
 
-func (d *DpuDaemon) Stop() {
+func (d *DpuSideManager) Stop() {
 	d.done <- nil
 	d.startedWg.Wait()
 }
 
-func (d *DpuDaemon) setupReconcilers() {
+func (d *DpuSideManager) setupReconcilers() {
 	if d.manager == nil {
 		t := time.Duration(0)
 

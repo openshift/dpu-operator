@@ -180,7 +180,7 @@ var _ = g.Describe("Host Daemon", func() {
 	var (
 		err           error
 		fakeDpuDaemon *DummyDpuDaemon
-		hostDaemon    *HostDaemon
+		hostDaemon    *HostSideManager
 		testCluster   *testutils.TestCluster
 		pathManager   *utils.PathManager
 	)
@@ -192,7 +192,7 @@ var _ = g.Describe("Host Daemon", func() {
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon = NewHostDaemon(dummyPluginHost, &DummyDevicePlugin{}).
+		hostDaemon = NewHostSideManager(dummyPluginHost, &DummyDevicePlugin{}).
 			WithPathManager(pathManager).
 			WithSriovManager(m)
 	})
