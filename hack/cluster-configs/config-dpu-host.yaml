@@ -7,7 +7,7 @@ clusters:
     network_api_port: "eno12399"
     postconfig:
     - name: "dpu_operator_host"
-      dpu_operator_path: "../"
+      dpu_operator_path: "../../"
       ipu_plugin_sha: "d33b76a71b79fee1bc02fa46549c0427c829ae85"
     masters:
     - name: "nicmodecluster-master-1"
