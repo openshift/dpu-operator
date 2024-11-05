@@ -1,10 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -e
 
 check_ocp() {
     local KUBECONFIG_PATH=$1
 
     export KUBECONFIG=$KUBECONFIG_PATH
-    
+
     if oc get nodes; then
         return 0
     else
@@ -24,11 +26,11 @@ deploy_local_dpu_operator() {
    bash hack/deploy_traffic_flow_tests.sh
 }
 
-check_ocp "/root/kubeconfig.ocpcluster"
-result_ocp=$?
+result_ocp=0
+check_ocp "/root/kubeconfig.ocpcluster" || result_ocp=$?
 
-check_ocp "/root/kubeconfig.microshift"
-result_microshift=$?
+result_microshift=0
+check_ocp "/root/kubeconfig.microshift" || result_microshift=$?
 
 # Check if both OCP and MicroShift checks succeeded
 if [ $result_ocp -eq 0 ] && [ $result_microshift -eq 0 ]; then
@@ -38,4 +40,3 @@ else
     echo "Cluster config is not proper... deploying cluster and dpu operator"
     deploy_cluster_and_dpu_operator
 fi
-

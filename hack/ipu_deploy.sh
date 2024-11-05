@@ -1,4 +1,6 @@
-#!/bin/bin/env bash
+#!/usr/bin/env bash
+
+set -e
 
 cd cluster-deployment-automation
 python3.11 -m venv /tmp/cda-venv
@@ -13,4 +15,3 @@ else
     echo "cluster-deployment-automation deployment failed with error code $ret"
     exit $ret
 fi
-

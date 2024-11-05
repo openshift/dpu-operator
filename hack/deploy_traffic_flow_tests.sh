@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd ocp-traffic-flow-tests
 source /tmp/tft-venv/bin/activate
 
@@ -20,5 +22,3 @@ envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > tft_config.yaml
 sleep 100
 
 python3.11 main.py tft_config.yaml
-
- 
