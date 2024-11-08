@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovutils"
 	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
@@ -27,20 +26,6 @@ type dpuDeviceHandler struct {
 	dpuMode          bool
 }
 
-func normalizeDeviceToPci(device string) (string, error) {
-
-	if sriovutils.IsValidPCIAddress(device) {
-		return device, nil
-	}
-
-	pciAddr, err := sriovutils.GetPciFromNetDev(device)
-	if err != nil {
-		return device, fmt.Errorf("failed to get PCI address for netdev %s: %v", device, err)
-	}
-
-	return pciAddr, nil
-}
-
 func (d *dpuDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	// Wait for devices to be done initializing
 	<-d.setupDevicesDone
@@ -58,11 +43,7 @@ func (d *dpuDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 	devices := make(dp.DeviceList)
 
 	for _, device := range Devices.Devices {
-		devPciId, err := normalizeDeviceToPci(device.ID)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to normalize device %s from GetDevice request: %v", device.ID, err)
-		}
-		devices[devPciId] = pluginapi.Device{ID: devPciId, Health: pluginapi.Healthy}
+		devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
 	}
 
 	return &devices, nil
