@@ -17,11 +17,13 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 )
 
 // log is for logging in this package.
@@ -43,20 +45,24 @@ func (r *DpuOperatorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.Validator = &DpuOperatorConfig{}
 
+func (r *DpuOperatorConfig) validateDpuOperatorConfig() (admission.Warnings, error) {
+	if r.Name != vars.DpuOperatorConfigName {
+		return nil, fmt.Errorf("DpuOperatorConfig must have standard name \"" + vars.DpuOperatorConfigName + "\"")
+	}
+
+	return nil, nil
+}
+
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *DpuOperatorConfig) ValidateCreate() (admission.Warnings, error) {
 	dpuoperatorconfiglog.Info("validate create", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object creation.
-	return nil, nil
+	return r.validateDpuOperatorConfig()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *DpuOperatorConfig) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	dpuoperatorconfiglog.Info("validate update", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object update.
-	return nil, nil
+	return r.validateDpuOperatorConfig()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
