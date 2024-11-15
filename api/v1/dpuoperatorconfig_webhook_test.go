@@ -22,14 +22,6 @@ import (
 
 var _ = Describe("DpuOperatorConfig Webhook", func() {
 
-	Context("When creating DpuOperatorConfig under Defaulting Webhook", func() {
-		It("Should fill in the default value if a required field is empty", func() {
-
-			// TODO(user): Add your logic here
-
-		})
-	})
-
 	Context("When creating DpuOperatorConfig under Validating Webhook", func() {
 		It("Should deny if a required field is empty", func() {
 

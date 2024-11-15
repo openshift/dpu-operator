@@ -21,7 +21,6 @@ resources:
   path: github.com/openshift/dpu-operator/api/v1
   version: v1
   webhooks:
-    defaulting: true
     validation: true
     webhookVersion: v1
 - api:

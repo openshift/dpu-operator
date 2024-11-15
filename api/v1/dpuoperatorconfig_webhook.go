@@ -36,17 +36,6 @@ func (r *DpuOperatorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-config-openshift-io-v1-dpuoperatorconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=config.openshift.io,resources=dpuoperatorconfigs,verbs=create;update,versions=v1,name=mdpuoperatorconfig.kb.io,admissionReviewVersions=v1
-
-//var _ webhook.Defaulter = &DpuOperatorConfig{}
-
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *DpuOperatorConfig) Default() {
-	dpuoperatorconfiglog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
-}
-
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.

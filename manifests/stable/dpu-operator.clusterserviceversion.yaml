@@ -38,7 +38,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-02-25T12:19:48Z"
+    createdAt: "2025-02-25T12:29:34Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -417,26 +417,6 @@ spec:
     url: www.redhat.com
   version: 4.19.0
   webhookdefinitions:
-  - admissionReviewVersions:
-    - v1
-    containerPort: 443
-    deploymentName: dpu-operator-controller-manager
-    failurePolicy: Fail
-    generateName: mdpuoperatorconfig.kb.io
-    rules:
-    - apiGroups:
-      - config.openshift.io
-      apiVersions:
-      - v1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - dpuoperatorconfigs
-    sideEffects: None
-    targetPort: 9443
-    type: MutatingAdmissionWebhook
-    webhookPath: /mutate-config-openshift-io-v1-dpuoperatorconfig
   - admissionReviewVersions:
     - v1
     containerPort: 443
