@@ -4,7 +4,7 @@ clusters:
     ingress_vip: "192.168.122.101"
     network_api_port: "eno12409"
     kind: "iso"
-    install_iso: "{{iso_server()}}/RHEL-9.4.0-20240514.71-aarch64-dvd1-w-kickstart.iso"
+    install_iso: "{{iso_server()}}/RHEL-9.6.0-20241114.6-aarch64-dvd1-w-kickstart.iso"
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
@@ -21,5 +21,5 @@ clusters:
     - name: "microshift"
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
-      ipu_plugin_sha: "d33b76a71b79fee1bc02fa46549c0427c829ae85"
+      ipu_plugin_sha: "0c23d7ef37bf7c5bfdb89958df080644fd5aea3b"
       rebuild_dpu_operators_images: false

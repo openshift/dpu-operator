@@ -25,19 +25,28 @@ spec:
         command: {{.Command}}
         args: {{.Args}}
         volumeMounts:
-        - name: vendor-plugin-sock
-          mountPath: /var/run/dpu-daemon/
-        - name: host-opt
-          mountPath: /opt/p4
+        - mountPath: /var/run/
+          name: vendor-plugin-sock
+        - mountPath: /opt/p4/p4-cp-nws/var
           mountPropagation: Bidirectional
+          name: host-opt
+        - mountPath: /proc
+          mountPropagation: Bidirectional
+          name: host-proc
       volumes:
-      - name: host-opt
-        hostPath:
-          path: /var/lib/containers/storage/volumes/data1/_data/
-      - name: host-libmodules
-        hostPath:
+      - hostPath:
+          path: /proc
+          type: ""
+        name: host-proc
+      - hostPath:
+          path: /opt/p4/p4-cp-nws/var
+          type: ""
+        name: host-opt
+      - hostPath:
           path: /lib/modules
           type: DirectoryOrCreate
-      - name: vendor-plugin-sock
-        hostPath:
-          path: /var/run/dpu-daemon/
+        name: host-libmodules
+      - hostPath:
+          path: /var/run/
+          type: ""
+        name: vendor-plugin-sock

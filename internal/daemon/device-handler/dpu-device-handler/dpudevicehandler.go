@@ -57,7 +57,13 @@ func (d *dpuDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 
 	devices := make(dp.DeviceList)
 
+	// TODO: We need to properly enforce API boundaries at the VSP level. The host side requires pci-addresses when handling devices, however the dpu side requires a higher level of abstraction. For now, just enforce PCI addresses for device ID on the host only.
 	for _, device := range Devices.Devices {
+		if d.dpuMode {
+			devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
+			continue
+		}
+
 		devPciId, err := normalizeDeviceToPci(device.ID)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to normalize device %s from GetDevice request: %v", device.ID, err)
