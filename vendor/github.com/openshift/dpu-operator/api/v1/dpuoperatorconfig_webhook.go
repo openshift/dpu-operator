@@ -50,6 +50,11 @@ func (r *DpuOperatorConfig) validateDpuOperatorConfig() (admission.Warnings, err
 		return nil, fmt.Errorf("DpuOperatorConfig must have standard name \"dpu-operator-config\"")
 	}
 
+	mode := r.Spec.Mode
+	if mode != "host" && mode != "dpu" && mode != "auto" {
+		return nil, fmt.Errorf("Invalid mode in \"openshift-dpu-operator/dpu-operator-config\"")
+	}
+
 	return nil, nil
 }
 
