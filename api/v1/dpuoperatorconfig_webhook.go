@@ -52,6 +52,11 @@ func (r *DpuOperatorConfig) validateDpuOperatorConfig() (admission.Warnings, err
 		return nil, fmt.Errorf("DpuOperatorConfig must have standard name \"" + vars.DpuOperatorConfigName + "\"")
 	}
 
+	mode := r.Spec.Mode
+	if mode != "host" && mode != "dpu" && mode != "auto" {
+		return nil, fmt.Errorf("Invalid mode")
+	}
+
 	return nil, nil
 }
 
