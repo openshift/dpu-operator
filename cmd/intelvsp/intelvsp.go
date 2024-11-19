@@ -1,7 +1,7 @@
 package intelvsp
 
 import (
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd"
 )
 
 func main() {
