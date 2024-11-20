@@ -15,15 +15,12 @@ check_ocp() {
 }
 
 deploy_cluster_and_dpu_operator() {
-   bash hack/ipu_host_deploy.sh
-   bash hack/ipu_deploy.sh 
-   bash hack/deploy_traffic_flow_tests.sh
+    bash hack/both.sh
 }
 
 deploy_local_dpu_operator() {
-   bash hack/ipu_host_deploy_post.sh
-   bash hack/ipu_deploy_post.sh
-   bash hack/deploy_traffic_flow_tests.sh
+    bash hack/ipu_host_deploy_post.sh
+    bash hack/ipu_deploy_post.sh
 }
 
 result_ocp=0
@@ -40,3 +37,5 @@ else
     echo "Cluster config is not proper... deploying cluster and dpu operator"
     deploy_cluster_and_dpu_operator
 fi
+
+bash hack/deploy_traffic_flow_tests.sh
