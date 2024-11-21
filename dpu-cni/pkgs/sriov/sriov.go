@@ -491,7 +491,7 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 
 	// Mark the pci address as in use.
 	klog.Infof("Mark the PCI address as in use %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
+	allocator := sriovutils.NewPCIAllocator(*sriovutils.NewKeyValueStore(sriovconfig.DefaultCNIDir))
 	if err = allocator.SaveAllocatedPCI(netConf.DeviceID, req.Netns); err != nil {
 		return nil, fmt.Errorf("error saving the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
@@ -571,7 +571,7 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 
 	// Mark the pci address as released
 	klog.Infof("Mark the PCI address as released %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
+	allocator := sriovutils.NewPCIAllocator(*sriovutils.NewKeyValueStore(sriovconfig.DefaultCNIDir))
 	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
 		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
