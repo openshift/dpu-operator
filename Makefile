@@ -139,28 +139,26 @@ prow-ci-manifests-check: manifests
 		exit 1; \
 	fi
 
+.PHONY: vendor
+vendor:
+	for d in . dpu-api api tools ; do \
+		if [ "$$d" = . ] ; then \
+			(cd $$d && go mod vendor) || exit $$? ; \
+		fi ; \
+		(cd $$d && go mod tidy) || exit $$? ; \
+	done
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-TMP_DIR := $(shell mktemp -d)
 .PHONY: generate-check
 generate-check: controller-gen
-	rm -rf $(TMP_DIR)
-	mkdir -p $(TMP_DIR)
-	cp -r . $(TMP_DIR)
-	cd $(TMP_DIR) && make generate
-	diff -r . $(TMP_DIR) || exit 1
-	rm -rf $(TMP_DIR)
+	./scripts/check-gittree-for-diff.sh make generate
 
 .PHONY: vendor-check
 vendor-check:
-	rm -rf $(TMP_DIR)
-	mkdir -p $(TMP_DIR)
-	cp -r . $(TMP_DIR)
-	cd $(TMP_DIR) && go mod vendor && go mod tidy
-	diff -r . $(TMP_DIR) || exit 1
-	rm -rf $(TMP_DIR)
+	./scripts/check-gittree-for-diff.sh make vendor
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
