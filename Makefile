@@ -139,6 +139,15 @@ prow-ci-manifests-check: manifests
 		exit 1; \
 	fi
 
+.PHONY: vendor
+vendor:
+	for d in . dpu-api api tools ; do \
+		if [ "$$d" = . ] ; then \
+			(cd $$d && go mod vendor) || exit $$? ; \
+		fi ; \
+		(cd $$d && go mod tidy) || exit $$? ; \
+	done
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	GOFLAGS='' $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
