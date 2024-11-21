@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovutils"
 )
@@ -14,6 +15,13 @@ var (
 	// DefaultCNIDir used for caching NetConf
 	DefaultCNIDir = "/var/lib/cni/dpusriov"
 )
+
+func namespaceExists(namespace string) bool {
+	networkNamespace, err := ns.GetNS(namespace)
+	ret := err != nil
+	networkNamespace.Close()
+	return ret
+}
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
 func LoadConf(n *cnitypes.NetConf) (*cnitypes.NetConf, error) {
@@ -30,23 +38,19 @@ func LoadConf(n *cnitypes.NetConf) (*cnitypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): VF pci addr is required")
 	}
 
-	// Check if the device is already allocated.
-	// This is to prevent issues where kubelet request to delete a pod and in the same time a new pod using the same
-	// vf is started. we can have an issue where the cmdDel of the old pod is called AFTER the cmdAdd of the new one
-	// This will block the new pod creation until the cmdDel is done.
-	// FIXME: Fix Logging
-	//logging.Debug("Check if the device is already allocated",
-	//	"func", "LoadConf",
-	//	"DefaultCNIDir", DefaultCNIDir,
-	//	"n.DeviceID", n.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(DefaultCNIDir)
-	isAllocated, err := allocator.IsAllocated(n.DeviceID)
+	allocator := sriovutils.NewPCIAllocator(*sriovutils.NewKeyValueStore(DefaultCNIDir))
+	_, err := allocator.Sync(n.DeviceID)
 	if err != nil {
-		return n, err
+		return nil, fmt.Errorf("LoadConf(): Sync with net ns failed: %v", err)
 	}
 
-	if isAllocated {
-		return n, fmt.Errorf("pci address %s is already allocated", n.DeviceID)
+	namespace, err := allocator.LoadAllocatedPCI(n.DeviceID)
+	if err != nil {
+		return nil, fmt.Errorf("LoadConf(): Failed to check pci device: %v", err)
+	}
+
+	if namespace != "" {
+		return nil, fmt.Errorf("LoadConf(): Device %v already allocated in ns %v", n.DeviceID, namespace)
 	}
 
 	// Assuming VF is netdev interface; Get interface name(s)
