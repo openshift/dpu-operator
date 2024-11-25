@@ -37,6 +37,8 @@ var (
 	setupLog                  = ctrl.Log.WithName("setup")
 )
 
+var TestEnv *envtest.Environment
+
 func relativeToAbs(path string) string {
 	_, file, _, _ := runtime.Caller(0)
 	file, err := filepath.Abs(file)
@@ -48,7 +50,7 @@ func bootstrapTestEnv(restConfig *rest.Config) {
 	var err error
 	trueVal := true
 	By("bootstrapping test environment")
-	testEnv := &envtest.Environment{
+	TestEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			relativeToAbs("../../config/crd/bases"),
 			relativeToAbs("../../test/crd"),
@@ -58,7 +60,7 @@ func bootstrapTestEnv(restConfig *rest.Config) {
 		Config:                restConfig,
 	}
 	By("starting the test env")
-	cfg, err := testEnv.Start()
+	cfg, err := TestEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 }

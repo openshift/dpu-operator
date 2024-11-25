@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
@@ -33,7 +32,6 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var cfg *rest.Config
-var testEnv *envtest.Environment
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
