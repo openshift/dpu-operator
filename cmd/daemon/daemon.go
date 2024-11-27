@@ -41,5 +41,8 @@ func main() {
 	vspImages := plugin.CreateVspImagesMap(true, log)
 
 	d := daemon.NewDaemon(mode, client, scheme.Scheme, vspImages, config)
-	d.Run()
+	if err := d.Run(); err != nil {
+		log.Error(err, "Failed to run daemon")
+		panic(err)
+	}
 }

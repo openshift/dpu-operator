@@ -65,29 +65,27 @@ func NewDaemon(mode string, client client.Client, scheme *runtime.Scheme, vspIma
 	}
 }
 
-func (d *Daemon) Run() {
+func (d *Daemon) Run() error {
 	ce := utils.NewClusterEnvironment(d.client)
 	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
-		d.log.Error(err, "Failed to get cluster flavour")
-		return
+		return err
 	}
 	d.log.Info("Detected OpenShift", "flavour", flavour)
 	err = d.prepareCni(flavour)
 	if err != nil {
-		return
+		return err
 	}
 	dpuMode, err := d.isDpuMode()
 	if err != nil {
-		d.log.Error(err, "Failed to parse mode")
-		return
+		return err
 	}
 	daemon, err := createDaemon(dpuMode, d.config, d.vspImages, d.client)
 	if err != nil {
 		d.log.Error(err, "Failed to start daemon")
-		return
+		return err
 	}
-	daemon.ListenAndServe()
+	return daemon.ListenAndServe()
 }
 
 func (d *Daemon) prepareCni(flavour utils.Flavour) error {
