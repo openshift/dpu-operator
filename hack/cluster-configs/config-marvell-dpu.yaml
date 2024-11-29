@@ -1,0 +1,23 @@
+# This deploys the Marvell DPU itself, installs microshift and the dpu-operator.
+# Run on hosts:
+# - wsfd-advnetlab44.anl.eng.bos2.dc.redhat.com (Cluster 15: Marvell dev cluster)
+# - wsfd-advnetlab41.anl.eng.bos2.dc.redhat.com (Cluster 16: Marvell dev cluster)
+clusters:
+  - name : "iso_cluster"
+    api_vip: "192.168.122.99"
+    ingress_vip: "192.168.122.101"
+    network_api_port: "eno2"
+    kind: "iso"
+    install_iso: "rhel:9.6"
+    masters:
+    - name: "marvell-dpu-{{worker_number(0)}}"
+      node: "{{worker_name(0)}}"
+      kind: "marvell-dpu"
+      ip: "192.168.123.7"
+    postconfig:
+    - name: "rh_subscription"
+      organization_id: "{{organization_id()}}"
+      activation_key: "{{activation_key()}}"
+    - name: "microshift"
+    - name: "dpu_operator_dpu"
+      dpu_operator_path: "../../"
