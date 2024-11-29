@@ -14,14 +14,17 @@ clusters:
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.2"
+      disk_size: 32
     - name: "nicmodecluster-master-2"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.3"
+      disk_size: 32
     - name: "nicmodecluster-master-3"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.4"
+      disk_size: 32
     workers:
     - name: "worker-{{worker_number(0)}}"
       kind: "physical"
