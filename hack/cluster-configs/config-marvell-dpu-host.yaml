@@ -1,0 +1,34 @@
+# This deploys the OCP cluster for a host with a Marvell DPU.
+# Run on hosts:
+# - wsfd-advnetlab44.anl.eng.bos2.dc.redhat.com (Cluster 15: Marvell dev cluster)
+# - wsfd-advnetlab41.anl.eng.bos2.dc.redhat.com (Cluster 16: Marvell dev cluster)
+clusters:
+  - name : "ocpcluster"
+    api_vip: "192.168.122.99"
+    ingress_vip: "192.168.122.101"
+    kubeconfig: "/root/kubeconfig.ocpcluster"
+    version: "4.16.0-nightly"
+    network_api_port: "eno1"
+    masters:
+    - name: "nicmodecluster-master-1"
+      kind: "vm"
+      node: "localhost"
+      ip: "192.168.122.2"
+    - name: "nicmodecluster-master-2"
+      kind: "vm"
+      node: "localhost"
+      ip: "192.168.122.3"
+    - name: "nicmodecluster-master-3"
+      kind: "vm"
+      node: "localhost"
+      ip: "192.168.122.4"
+    workers:
+    - name: "worker-{{worker_number(0)}}"
+      kind: "physical"
+      node: "{{worker_name(0)}}"
+      bmc_user: "root"
+      bmc_password: "calvin"
+      bmc: "{{bmc(0)}}"
+    postconfig:
+    - name: "dpu_operator_host"
+      dpu_operator_path: "../../"
