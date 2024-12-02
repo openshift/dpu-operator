@@ -18,21 +18,95 @@ package v1
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
+
+func check_validateDpuOperatorConfig() {
+	var err error
+
+	config := &DpuOperatorConfig{}
+	config.SetName("dpu-operator-config")
+	config.Spec = DpuOperatorConfigSpec{
+		Mode:     "host",
+		LogLevel: 2,
+	}
+
+	_, err = config.validateDpuOperatorConfig()
+	Expect(err).NotTo(HaveOccurred())
+
+	config.SetName("dpu-operator-config2")
+	_, err = config.validateDpuOperatorConfig()
+	Expect(err).To(HaveOccurred())
+}
 
 var _ = Describe("DpuOperatorConfig Webhook", func() {
 
 	Context("When creating DpuOperatorConfig under Validating Webhook", func() {
-		It("Should deny if a required field is empty", func() {
+		It("Validation should happen", func() {
+			var err error
 
-			// TODO(user): Add your logic here
+			check_validateDpuOperatorConfig()
 
-		})
+			config := &DpuOperatorConfig{}
 
-		It("Should admit if all required fields are provided", func() {
+			key := types.NamespacedName{
+				Name:      "dpu-operator-config",
+				Namespace: "openshift-dpu-operator",
+			}
 
-			// TODO(user): Add your logic here
+			err = k8sClient.Get(ctx, key, config)
+			Expect(err).To(HaveOccurred())
 
+			create := &DpuOperatorConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      key.Name,
+					Namespace: key.Namespace,
+				},
+				Spec: DpuOperatorConfigSpec{
+					Mode: "host",
+				},
+			}
+			err = k8sClient.Create(ctx, create)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, key, config)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Delete(ctx, config)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, key, config)
+			Expect(err).To(HaveOccurred())
+
+			create2 := &DpuOperatorConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      key.Name,
+					Namespace: key.Namespace,
+				},
+				Spec: DpuOperatorConfigSpec{
+					Mode: "invalid",
+				},
+			}
+			err = k8sClient.Create(ctx, create2)
+			Expect(err).To(HaveOccurred())
+
+			create3 := &DpuOperatorConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "invalid",
+					Namespace: key.Namespace,
+				},
+				Spec: DpuOperatorConfigSpec{
+					Mode: "host",
+				},
+			}
+			err = k8sClient.Create(ctx, create3)
+			Expect(err).To(HaveOccurred())
+
+			err = k8sClient.Get(ctx, key, config)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
