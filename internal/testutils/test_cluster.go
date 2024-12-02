@@ -26,7 +26,7 @@ import (
 
 var (
 	testNamespace             = "openshift-dpu-operator"
-	testDpuOperatorConfigName = "default"
+	testDpuOperatorConfigName = "dpu-operator-config"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
 	testNetworkFunctionNAD    = "dpunfcni-conf"
