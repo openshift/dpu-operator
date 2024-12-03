@@ -22,5 +22,4 @@ clusters:
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
       ipu_plugin_sha: "0c23d7ef37bf7c5bfdb89958df080644fd5aea3b"
-      rebuild_dpu_operators_images: false
       host_side_bmc: "{{bmc(0)}}"
