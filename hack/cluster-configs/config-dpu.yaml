@@ -12,6 +12,7 @@ clusters:
       bmc: "{{IMC_hostname(0)}}"
       bmc_user: "root"
       bmc_password: "redhat"
+      host_side_bmc: "{{bmc(0)}}"
       ip: "172.16.3.16"
       mac: "{{IPU_mac_address(0)}}"
     postconfig:
@@ -22,4 +23,3 @@ clusters:
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
       ipu_plugin_sha: "0c23d7ef37bf7c5bfdb89958df080644fd5aea3b"
-      host_side_bmc: "{{bmc(0)}}"
