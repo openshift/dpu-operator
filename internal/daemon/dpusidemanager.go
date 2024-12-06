@@ -125,8 +125,7 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 
 	addr, port, err := d.vsp.Start()
 	if err != nil {
-		d.log.Error(err, "Failed to get addr:port from VendorPlugin")
-		return nil, err
+		return nil, fmt.Errorf("Failed to get addr:port from VendorPlugin: %v", err)
 	}
 
 	d.server = grpc.NewServer()
@@ -134,8 +133,7 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
-		d.log.Error(err, "Failed to start listening on", "addr", addr, "port", port)
-		return lis, err
+		return lis, fmt.Errorf("Failed to start listening on %v:%v: %v", addr, port, err)
 	}
 	d.log.Info("server listening", "address", lis.Addr())
 
@@ -155,8 +153,7 @@ func (d *DpuSideManager) ListenAndServe() error {
 	listener, err := d.Listen()
 
 	if err != nil {
-		d.log.Error(err, "Failed to listen")
-		return err
+		return fmt.Errorf("ListenAndServe failed with error: %v", err)
 	}
 
 	return d.Serve(listener)
