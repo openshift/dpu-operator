@@ -8,20 +8,23 @@ clusters:
     postconfig:
     - name: "dpu_operator_host"
       dpu_operator_path: "../../"
-      ipu_plugin_sha: "0c23d7ef37bf7c5bfdb89958df080644fd5aea3b"
+      ipu_plugin_sha: "540b6b8cb00fcde8ada0f9ed76dce530744a3cab"
     masters:
     - name: "nicmodecluster-master-1"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.2"
+      disk_size: 32
     - name: "nicmodecluster-master-2"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.3"
+      disk_size: 32
     - name: "nicmodecluster-master-3"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.4"
+      disk_size: 32
     workers:
     - name: "worker-{{worker_number(0)}}"
       kind: "physical"
