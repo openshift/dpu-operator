@@ -9,3 +9,9 @@ rules:
   - customresourcedefinitions
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
