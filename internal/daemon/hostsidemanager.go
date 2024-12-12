@@ -48,12 +48,12 @@ type HostSideManager struct {
 func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
 	err := d.connectWithRetry()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to connect with retry: %v", err)
 	}
 
 	m, err := net.ParseMAC(mac)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to parse Mac: %v", err)
 	}
 
 	createRequest := &pb.CreateBridgePortRequest{
@@ -129,8 +129,7 @@ func (d *HostSideManager) connectWithRetry() error {
 
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", d.addr, d.port), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
-		d.log.Error(err, "did not connect")
-		return err
+		return fmt.Errorf("connectWithRetry dial failed: %v", err)
 	}
 	d.log.Info("Dial succeeded", "addr", d.addr, "port", d.port)
 	d.conn = conn
