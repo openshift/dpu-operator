@@ -23,6 +23,6 @@ clusters:
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
       rebuild_dpu_operators_images: "true"
-      ipu_plugin_sha: "cc8d96a43e746993880c077d4741788ed1734487"
+      ipu_plugin_sha: "e3c84b731874b10c9acf6c1b84703d4fda34901f"
       builder_image: "wsfd-advnetlab-amp04.anl.eng.bos2.dc.redhat.com:5000/ocp/builder:rhel-9-golang-1.22-openshift-4.18"
       base_image: "wsfd-advnetlab-amp04.anl.eng.bos2.dc.redhat.com:5000/ocp/4.18:base-rhel9"
