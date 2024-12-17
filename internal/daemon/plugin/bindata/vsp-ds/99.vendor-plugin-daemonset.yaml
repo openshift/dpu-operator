@@ -16,6 +16,7 @@ spec:
         dpu: "true"
       hostNetwork: true
       serviceAccountName: vsp-sa
+      terminationGracePeriodSeconds: 180
       containers:
       - name: appcntr1
         image: {{.VendorSpecificPluginImage}}
