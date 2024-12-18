@@ -39,7 +39,7 @@ import (
 
 var (
 	testNamespace             = "openshift-dpu-operator"
-	testDpuOperatorConfigName = "default"
+	testDpuOperatorConfigName = "dpu-operator-config"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
 	testNetworkFunctionNAD    = "dpunfcni-conf"
@@ -217,7 +217,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 		Context("When DpuOperatorConfig CR exists with host mode", func() {
 			BeforeAll(func() {
 				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR("operator-config", "host", ns)
+				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
 				createNameSpace(mgr.GetClient(), ns)
 				createDpuOperatorCR(mgr.GetClient(), cr)
 			})
@@ -231,9 +231,25 @@ var _ = Describe("Main Controller", Ordered, func() {
 				err := mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, &nad)
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			})
+			It("only DpuOperatorConfig \"openshift-dpu-operator/dpu-operator-config\" is allowed", func() {
+				ns := dpuOperatorNameSpace()
+				client := mgr.GetClient()
+
+				/* The CR already exists. Adding it again will fail. */
+				cr := dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				err := client.Create(context.Background(), cr)
+				Expect(err).To(HaveOccurred())
+
+				cr2 := dpuOperatorCR("foo", "host", ns)
+				err2 := client.Create(context.Background(), cr2)
+				/* The validating webhook does not run in this setup. Otherwise we would
+				 * expect creating this CR to fail. */
+				Expect(err2).NotTo(HaveOccurred())
+				deleteDpuOperatorCR(mgr.GetClient(), cr2)
+			})
 			AfterAll(func() {
 				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR("operator-config", "host", ns)
+				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
 				deleteDpuOperatorCR(mgr.GetClient(), cr)
 			})
 		})
