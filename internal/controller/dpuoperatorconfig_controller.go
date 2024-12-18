@@ -36,19 +36,21 @@ var binData embed.FS
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
 type DpuOperatorConfigReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	dpuDaemonImage  string
-	vspImages       map[string]string
-	imagePullPolicy string
+	Scheme            *runtime.Scheme
+	dpuDaemonImage    string
+	vspImages         map[string]string
+	imagePullPolicy   string
+	injectorWebhookCA string
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string, injectorWebhookCA string) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
-		Client:          client,
-		Scheme:          scheme,
-		dpuDaemonImage:  dpuDaemonImage,
-		vspImages:       vspImages,
-		imagePullPolicy: "IfNotPresent",
+		Client:            client,
+		Scheme:            scheme,
+		dpuDaemonImage:    dpuDaemonImage,
+		vspImages:         vspImages,
+		imagePullPolicy:   "IfNotPresent",
+		injectorWebhookCA: injectorWebhookCA,
 	}
 }
 
@@ -67,10 +69,13 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=anyuid;hostnetwork;privileged,verbs=use
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create;get
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=mutatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -100,6 +105,11 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
+	err = r.ensureWebhook(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to ensure Webhook is running")
+	}
+
 	if dpuOperatorConfig.Spec.Mode == "dpu" {
 		err = r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig)
 		if err != nil {
@@ -119,6 +129,7 @@ func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperator
 		"Mode":                   "auto",
 		"DpuOperatorDaemonImage": r.dpuDaemonImage,
 		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
+		"injectorWebhookCA":      r.injectorWebhookCA,
 	}
 
 	for key, value := range r.vspImages {
@@ -139,6 +150,11 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cf
 	return r.createAndApplyAllFromBinData(logger, "daemon", cfg)
 }
 
+func (r *DpuOperatorConfigReconciler) ensureWebhook(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Create Webhook")
+	return r.createAndApplyAllFromBinData(logger, "webhook", cfg)
+}
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Create the Network Function NAD")
