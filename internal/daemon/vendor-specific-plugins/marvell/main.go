@@ -3,25 +3,29 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
-	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
-	ghw "github.com/jaypipes/ghw"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	debugdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/debug-dp"
+	mrvlutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/mrvl-utils"
+	ovsdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/ovs-dp"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"github.com/vishvananda/netlink"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -33,8 +37,20 @@ const (
 	Version       string = "0.0.1"
 	PortType      string = "veth"
 	NoOfPortPairs int    = 2
+	DataPlaneType string = "debug"
+	NumPFs        int    = 1
+	PFID          int    = 0
+	isDPDK        bool   = false
 )
 
+// multiple dataplane can be added using mrvldp interface functions
+type mrvldp interface {
+	AddPortToDataPlane(bridgeName string, portName string, vfPCIAddres string, isDPDK bool) error
+	DeletePortFromDataPlane(bridgeName string, portName string) error
+	InitDataPlane(bridgeName string) error
+	ReadAllPortFromDataPlane(bridgeName string) (string, error)
+	DeleteDataplane(bridgeName string) error
+}
 type mrvlDeviceInfo struct {
 	nfInterfaceName string
 	dpInterfaceName string
@@ -57,6 +73,8 @@ type mrvlVspServer struct {
 	deviceStore   map[string]mrvlDeviceInfo
 	portType      string
 	noOfPortPairs int
+	bridgeName    string
+	mrvlDP        mrvldp
 }
 
 // createVethPair function to create a veth pair with the given index and InterfaceInfo
@@ -70,6 +88,9 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 		PeerName:  dpInterfaceName,
 	}
 	if err := netlink.LinkAdd(vethLink); err != nil {
+		return err
+	}
+	if err := netlink.LinkSetUp(vethLink); err != nil {
 		return err
 	}
 
@@ -100,7 +121,7 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 
 func (vsp *mrvlVspServer) createHwLBK() error {
 	//TODO: Implement HW Loopback
-	klog.Infof("currently only veth pairs are supported")
+	vsp.log.Info("Currently only veth pairs are supported")
 	return errors.New("currently only veth pairs are supported")
 }
 
@@ -113,16 +134,16 @@ func (vsp *mrvlVspServer) CleanVethPairs() error {
 		for _, mrvlDeviceInfo := range deviceStore {
 			nfLink, err := netlink.LinkByName(mrvlDeviceInfo.nfInterfaceName)
 			if err != nil {
-				klog.Errorf("Error occurred in getting Link By Name: %v", err)
+				vsp.log.Error(err, "Error occurred in getting Link By Name")
 				errResult = errors.Join(errResult, err)
 				continue
 			}
 			if err := netlink.LinkDel(nfLink); err != nil {
-				klog.Errorf("Error occurred in deleting Link: %v", err)
+				vsp.log.Error(err, "Error occurred in deleting Link")
 				errResult = errors.Join(errResult, err)
 				continue
 			}
-			klog.Infof("Deleted Veth Pair: %s", mrvlDeviceInfo.nfInterfaceName)
+			vsp.log.Info("Deleted Veth Pair", "nfInterfaceName", mrvlDeviceInfo.nfInterfaceName)
 		}
 	}
 	return errResult
@@ -136,11 +157,11 @@ func (vsp *mrvlVspServer) ConfigureNetworkInterface() error {
 
 	switch vsp.portType {
 	case "veth":
-		klog.Infof("Creating %d veth pairs", vsp.noOfPortPairs)
+		vsp.log.Info("Creating Veth Pairs", "NoOfPortPairs", vsp.noOfPortPairs)
 		for i := 0; i < vsp.noOfPortPairs; i++ {
 			err := vsp.createVethPair(i)
 			if err != nil {
-				klog.Errorf("Error occurred in creating Veth Pair: %v", err)
+				vsp.log.Error(err, "Error occurred in creating Veth Pair")
 				_ = vsp.CleanVethPairs()
 				return err
 			}
@@ -148,14 +169,14 @@ func (vsp *mrvlVspServer) ConfigureNetworkInterface() error {
 	case "hwlbk":
 		err := vsp.createHwLBK()
 		if err != nil {
-			klog.Errorf("Error occurred in creating HW Loopback: %v", err)
+			vsp.log.Error(err, "Error occurred in creating HW Loopback")
 			return err
 		}
 	default:
 		return errors.New("invalid Port Type")
 	}
 	for nfMacAddress, mrvlDeviceInfo := range vsp.deviceStore {
-		klog.Infof("nfMacAddress: %s, nfInterfaceName: %s, dpInterfaceName: %s, dpMacAddress: %s, health: %s", nfMacAddress, mrvlDeviceInfo.nfInterfaceName, mrvlDeviceInfo.dpInterfaceName, mrvlDeviceInfo.dpMAC, mrvlDeviceInfo.health)
+		vsp.log.Info("Device Info", "nfMacAddress", nfMacAddress, "nfInterfaceName", mrvlDeviceInfo.nfInterfaceName, "dpInterfaceName", mrvlDeviceInfo.dpInterfaceName, "dpMacAddress", mrvlDeviceInfo.dpMAC, "health", mrvlDeviceInfo.health)
 	}
 	return nil
 }
@@ -174,7 +195,7 @@ func (vsp *mrvlVspServer) GetDeviceHealth(nfInterfaceName string) string {
 		}
 		return "Healthy"
 	case "hwlbk":
-		return "Healthy" //TODO: Implement HW Loopback
+		return "Unhealthy" //TODO: Implement HW Loopback
 	default:
 		return "Unhealthy"
 	}
@@ -183,7 +204,7 @@ func (vsp *mrvlVspServer) GetDeviceHealth(nfInterfaceName string) string {
 // Init function to initialize the Marvell VSP Server with the given context and InitRequest
 // It will return the IpPort and error
 func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
-	klog.Infof("Received Init() request  DpuMode: %v", in.DpuMode)
+	vsp.log.Info("Received Init() request", "DpuMode", in.DpuMode)
 	vsp.isDPUMode = in.DpuMode
 	ipPort, err := vsp.fetchIP(in.DpuMode)
 	if vsp.isDPUMode {
@@ -192,10 +213,18 @@ func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpP
 		}
 		err := vsp.ConfigureNetworkInterface()
 		if err != nil {
-			klog.Errorf("Error occurred in configuring Network Interface: %v", err)
+			vsp.log.Error(err, "Error occurred in configuring Network Interface")
 			vsp.Stop()
 			return &pb.IpPort{}, err
 		}
+		// Initialize Marvell Data Path
+		vsp.bridgeName = "br0" // TODO: example name discuss on it
+		if err := vsp.mrvlDP.InitDataPlane(vsp.bridgeName); err != nil {
+			vsp.log.Error(err, "Error occurred in initializing Data Path")
+			vsp.Stop()
+			return &pb.IpPort{}, err
+		}
+
 	}
 	return &pb.IpPort{
 		Ip:   ipPort.Ip,
@@ -203,18 +232,94 @@ func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpP
 	}, err
 }
 
+// getVFName function to get the VF Name of the given BridgePortName on DPU
+func (vsp *mrvlVspServer) getVFDetails(BridgePortName string) (string, string, error) {
+	// regexp to get VFId from BridgePortName ex: host1-0 , vfId=0
+	re := regexp.MustCompile(`host(\d+)-(\d+)`)
+	matches := re.FindStringSubmatch(BridgePortName)
+	if matches == nil {
+		return "", "", errors.New("no VFId Match Found")
+	}
+	pfid, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return "", "", err
+	}
+	vfId, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return "", "", err
+	}
+	vsp.log.Info("mrvlUtils: Mapped VF for ", "PFID", pfid, "VFID", vfId, "NumPFs", NumPFs)
+	vfPciAddress, err := mrvlutils.Mapped_VF(NumPFs, PFID, vfId) // TODO: Get PF Count=1 and PF ID=0
+	if err != nil {
+		return "", "", err
+	}
+	vsp.log.Info("mrvlUtils", "VF PCI Address", vfPciAddress)
+	if vfPciAddress == "" {
+		return "", "", errors.New("mapped VF not found")
+	}
+	vfName := ""
+	if isDPDK {
+		vfName = fmt.Sprintf("vf%d-%d", pfid, vfId)
+	} else {
+		vfName, err = mrvlutils.GetNameByPCI(vfPciAddress)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	return vfName, vfPciAddress, err
+}
+
 // CreateBridgePort function to create a bridge port with the given context and CreateBridgePortRequest
 // It will return the BridgePort and error
 func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
-	klog.Infof("Received CreateBridgePort() request  BridgePortId: %v", in.BridgePortId)
-	out := new(opi.BridgePort)
+	vsp.log.Info("Received CreateBridgePort() request", "BridgePortId", in.BridgePortId, "BridgePortId", in.BridgePortId)
+	portName := in.BridgePort.Name
+	vfName, vfPCIAddress, err := vsp.getVFDetails(portName)
+	if err != nil {
+		vsp.log.Error(err, "Error occurred in getting VF Name", "BridgePortName", portName)
+		return nil, err
+	}
+	if err := vsp.mrvlDP.AddPortToDataPlane(vsp.bridgeName, vfName, vfPCIAddress, isDPDK); err != nil {
+		vsp.log.Error(err, "Error occurred in adding Port to Bridge")
+		return nil, err
+	}
+	vsp.log.Info("Port Added to Bridge Successfully")
+	if isDPDK {
+		if err = mrvlutils.PrintDPDKPortInfo(vfPCIAddress); err != nil {
+			vsp.log.Error(err, "Error occurred in printing DPDK Port Info")
+		}
+	} else {
+		if err = mrvlutils.PrintPortInfo(vfName); err != nil {
+			vsp.log.Error(err, "Error occurred in printing Port Info")
+		}
+	}
+	out := &opi.BridgePort{
+		Name:   fmt.Sprintf("bridge_port/%s", portName),
+		Spec:   in.BridgePort.Spec,
+		Status: &opi.BridgePortStatus{},
+	}
 	return out, nil
 }
 
 // DeleteBridgePort function to delete a bridge port with the given context and DeleteBridgePortRequest
 // It will return the Empty and error
 func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBridgePortRequest) (*emptypb.Empty, error) {
-	klog.Infof("Received DeleteBridgePort() request  Name: %v , AllowMissing: %v", in.Name, in.AllowMissing)
+	vsp.log.Info("Received DeleteBridgePort() request", "Name", in.Name, "AllowMissing", in.AllowMissing)
+	portName := in.Name
+	vfName, _, err := vsp.getVFDetails(portName)
+	vsp.log.Info("VF Name", "VFName", vfName)
+	if err != nil {
+		vsp.log.Error(err, "Error occurred in getting VF Name")
+		return nil, err
+	}
+	if err := vsp.mrvlDP.DeletePortFromDataPlane(vsp.bridgeName, vfName); err != nil {
+		vsp.log.Error(err, "Error occurred in deleting Port from Bridge")
+		return nil, err
+	}
+	vsp.log.Info("Port Deleted from Bridge Successfully")
+	if err = mrvlutils.PrintPortInfo(vfName); err != nil {
+		vsp.log.Error(err, "Error occurred in printing Port Info")
+	}
 	out := new(emptypb.Empty)
 	return out, nil
 }
@@ -222,7 +327,7 @@ func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBr
 // CreateNetworkFunction function to create a network function with the given context and NFRequest
 // It will return the Empty and error
 func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
-	klog.Infof("Received CreateNetworkFunction() request  Input: %v , Output: %v", in.Input, in.Output)
+	vsp.log.Info("Received CreateNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 	out := new(pb.Empty)
 	return out, nil
 }
@@ -230,7 +335,7 @@ func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRe
 // DeleteNetworkFunction function to delete a network function with the given context and NFRequest
 // It will return the Empty and error
 func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
-	klog.Infof("Received DeleteNetworkFunction() request  Input: %v , Output: %v", in.Input, in.Output)
+	vsp.log.Info("Received DeleteNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 	out := new(pb.Empty)
 	return out, nil
 }
@@ -238,7 +343,7 @@ func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRe
 // GetDevices function to get all the devices with the given context and Empty
 // It will return the DeviceListResponse and error
 func (vsp *mrvlVspServer) GetDevices(ctx context.Context, in *pb.Empty) (*pb.DeviceListResponse, error) {
-	klog.Info("Received GetDevices() request")
+	vsp.log.Info("Received GetDevices() request")
 	devices := make(map[string]*pb.Device)
 	if vsp.deviceStore == nil {
 		return nil, errors.New("device Store is empty")
@@ -255,29 +360,54 @@ func (vsp *mrvlVspServer) GetDevices(ctx context.Context, in *pb.Empty) (*pb.Dev
 	}, nil
 }
 
+// SetNumVfs function to set the number of VFs with the given context and VfCount
+func (vsp *mrvlVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) (*pb.VfCount, error) {
+	vsp.log.Info("Received SetNumVfs() request", "VfCnt", in.VfCnt)
+	if vsp.isDPUMode {
+		return nil, errors.New("SetNumVfs is not supported in DPU Mode")
+	}
+	pciAddress, err := mrvlutils.GetPCIByDeviceID(HostDeviceID)
+	if pciAddress == "" || err != nil {
+		return nil, errors.New("PCI Address not found")
+	}
+	vfcnt := in.VfCnt
+	if vfcnt < 0 {
+		return nil, errors.New("invalid VF Count")
+	}
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("echo %d > /sys/bus/pci/devices/0000:17:00.0/sriov_numvfs", vfcnt))
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	out := &pb.VfCount{
+		VfCnt: vfcnt,
+	}
+	return out, nil
+}
+
 // dpuIpPort function to get the IPv6 Address of DPU being used for Comm Channel
 // It will return the IpPort and error
 func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
-	klog.Infof("GetInterface Name  DPUdeviceID: %v", DPUdeviceID)
-	IfName, err := getInterfaceName(DPUdeviceID)
+	vsp.log.Info("GetInterface Name", "DPUdeviceID:", DPUdeviceID)
+	IfName, err := mrvlutils.GetNameByDeviceID(DPUdeviceID)
 	if err != nil {
-		klog.Errorf("Error occurred in getting Interface Name: %v", err)
+		vsp.log.Error(err, "Error occurred in getting Interface Name")
 		return pb.IpPort{}, err
 	}
 	err = enableIPV6LinkLocal(IfName)
 	if err != nil {
-		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
+		vsp.log.Error(err, "Error occurred in enabling IPv6 Link local Address: %v")
 		return pb.IpPort{}, err
 	}
-	klog.Infof("IPv6 Link Local Address Enabled  IfName: %v", IfName)
+	vsp.log.Info("IPv6 Link Local Address Enabled", "IfName:", IfName)
 	IfDetails, err := net.InterfaceByName(IfName)
 	if err != nil {
-		klog.Errorf("Error occurred in getting InterfaceDetails By Name: %v", err)
+		vsp.log.Error(err, "Error occurred in getting InterfaceDetails By Name: %v")
 		return pb.IpPort{}, err
 	}
 	addrs, err := IfDetails.Addrs()
 	if err != nil {
-		klog.Errorf("Error occurred in getting IP Address: %v", err)
+		vsp.log.Error(err, "Error occurred in getting IP Address: %v")
 		return pb.IpPort{}, err
 	}
 	var IPv6Addres string
@@ -287,12 +417,12 @@ func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
 		}
 	}
 	if IPv6Addres == "" {
-		klog.Info("IPv6 Address is not found")
+		vsp.log.Error(err, "IPv6 Address is not found")
 		return pb.IpPort{}, errors.New("there is no IPv6 Address")
 	}
-	klog.Infof("IPv6 Address: %s", IPv6Addres)
+	vsp.log.Info("IPv6 Address", "IPv6Addres:", IPv6Addres)
 	ConnStr := "[" + IPv6Addres + "%" + IfName + "]"
-	klog.Infof("Connection String: %s", ConnStr)
+	vsp.log.Info("Connection String", "ConnStr:", ConnStr)
 	return pb.IpPort{
 		Ip:   ConnStr,
 		Port: DefaultPort,
@@ -302,29 +432,29 @@ func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
 // hostIpPort function to get the IPv6 Address of Host being used for Comm Channel
 // It will return the IpPort and error
 func (vsp *mrvlVspServer) hostIpPort() (pb.IpPort, error) {
-	klog.Infof("GetInterface Name  HostDeviceID: %v", HostDeviceID)
+	vsp.log.Info("GetInterface Name", "HostDeviceID:", HostDeviceID)
 	// Get the Interface Name on Host for the given Device ID
-	ifName, err := getInterfaceName(HostDeviceID)
+	ifName, err := mrvlutils.GetNameByDeviceID(HostDeviceID)
 	if err != nil {
-		klog.Errorf("Error occurred in getting Interface Name: %v", err)
+		vsp.log.Error(err, "Error occurred in getting Interface Name")
 		return pb.IpPort{}, err
 	}
-	klog.Infof("Interface Name  InterfaceName: %v", ifName)
+	vsp.log.Info("Interface Name", "InterfaceName:", ifName)
 	err = enableIPV6LinkLocal(ifName)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in enabling IPv6 Link local Address: %v")
 		return pb.IpPort{}, err
 	}
-	klog.Infof("IPv6 Link Local Address Enabled  IfName: %v", ifName)
-	klog.Infof("Get Neighbour IP  InterfaceName: %v", ifName)
+	vsp.log.Info("IPv6 Link Local Address Enabled", "IfName:", ifName)
+	vsp.log.Info("Get Neighbour IP", "InterfaceName:", ifName)
 	LinkLocalIpv6, err := getNeighbourIPs(ifName)
 	if err != nil {
-		klog.Errorf("Error occurred in getting Neighbour IP: %v", err)
+		vsp.log.Error(err, "Error occurred in getting Neighbour IP")
 		return pb.IpPort{}, err
 	}
 	ConnStr := "[" + LinkLocalIpv6 + "%25" + ifName + "]"
-	klog.Infof("IPv6 Address: %s", LinkLocalIpv6)
-	klog.Infof("Connection String: %s", ConnStr)
+	vsp.log.Info("IPv6 Address", "LinkLocalIpv6:", LinkLocalIpv6)
+	vsp.log.Info("Connection String", "ConnStr:", ConnStr)
 	return pb.IpPort{
 		Ip:   ConnStr,
 		Port: DefaultPort,
@@ -340,55 +470,6 @@ func (vsp *mrvlVspServer) fetchIP(dpuMode bool) (pb.IpPort, error) {
 		vsp.log.Info("Host Mode")
 		return vsp.hostIpPort()
 	}
-}
-
-// GetPfName function to get the PF Name of the given  PCI Address
-// It will return the PF Name and error
-func GetPfName(pciAddress string) (string, error) {
-	pfSymLink := filepath.Join(SysBusPci, pciAddress, "net")
-	_, err := os.Lstat(pfSymLink)
-	if err != nil {
-		return "", err
-	}
-
-	files, err := os.ReadDir(pfSymLink)
-	if err != nil {
-		return "", err
-	}
-
-	if len(files) < 1 {
-		return "", errors.New("PF network device not found")
-	}
-
-	return strings.TrimSpace(files[0].Name()), nil
-}
-
-// getInterfaceName function to get the Interface Name of the given Device ID and vendor ID
-// It will return the Interface Name and error
-func getInterfaceName(deviceID string) (string, error) {
-	targetVendorID := VendorID
-	targetDeviceID := deviceID
-	pci, err := ghw.PCI()
-	if err != nil {
-		return "", err
-	}
-	var pciAddress string
-	for _, device := range pci.Devices {
-		if device.Vendor != nil && device.Product != nil {
-			if device.Vendor.ID == targetVendorID && device.Product.ID == targetDeviceID {
-				pciAddress = device.Address
-				break
-			}
-		}
-	}
-	if pciAddress == "" {
-		return "", fmt.Errorf("device not found with Vendor ID: %s and Device ID: %s", targetVendorID, targetDeviceID)
-	}
-	ifname, err := GetPfName(pciAddress)
-	if err != nil {
-		return "", err
-	}
-	return ifname, nil
 }
 
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
@@ -415,7 +496,6 @@ func enableIPV6LinkLocal(interfaceName string) error {
 	}
 
 	if len(address) == 0 {
-		klog.Error("IPv6 address not found on interface", interfaceName)
 		return errors.New("IPv6 address not found on interface")
 	}
 
@@ -472,7 +552,7 @@ func (vsp *mrvlVspServer) Listen() (net.Listener, error) {
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)
-	klog.Infof("gRPC server is listening on : %v", listener.Addr())
+	vsp.log.Info("gRPC server is listening on ", "listener.Addr()", listener.Addr())
 
 	return listener, nil
 }
@@ -483,13 +563,13 @@ func (vsp *mrvlVspServer) Serve(listener net.Listener) error {
 	vsp.wg.Add(1)
 	go func() {
 		vsp.version = Version
-		klog.Infof("Starting Marvell VSP Server, Version: %s", vsp.version)
+		vsp.log.Info("Starting Marvell VSP Server", "Version", vsp.version)
 		if err := vsp.grpcServer.Serve(listener); err != nil {
 			vsp.done <- err
 		} else {
 			vsp.done <- nil
 		}
-		klog.Info("Stopping Marvell VSP Server")
+		vsp.log.Info("Stopping Marvell VSP Server")
 		vsp.wg.Done()
 	}()
 
@@ -504,9 +584,16 @@ func (vsp *mrvlVspServer) Serve(listener net.Listener) error {
 }
 
 func (vsp *mrvlVspServer) Stop() {
+	if err := vsp.mrvlDP.DeleteDataplane(vsp.bridgeName); err != nil {
+		vsp.log.Error(err, "Error occurred during DeleteDataPlane")
+	}
+	if err := vsp.CleanVethPairs(); err != nil {
+		vsp.log.Error(err, "Error occurred during clearning Veth-Peers")
+	}
 	vsp.grpcServer.Stop()
 	vsp.done <- nil
 	vsp.startedWg.Wait()
+
 }
 func WithPathManager(pathManager utils.PathManager) func(*mrvlVspServer) {
 	return func(vsp *mrvlVspServer) {
@@ -515,11 +602,24 @@ func WithPathManager(pathManager utils.PathManager) func(*mrvlVspServer) {
 }
 
 func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
+	var mode string
+	flag.StringVar(&mode, "mode", "", "Mode for the daemon, can be either host or dpu")
+	options := zap.Options{
+		Development: true,
+		Level:       zapcore.DebugLevel,
+	}
+	options.BindFlags(flag.CommandLine)
+	flag.Parse()
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&options)))
 	vsp := &mrvlVspServer{
 		log:         ctrl.Log.WithName("MarvellVsp"),
 		pathManager: *utils.NewPathManager("/"),
 		deviceStore: make(map[string]mrvlDeviceInfo),
 		done:        make(chan error),
+		mrvlDP:      ovsdp.NewOvsDP(),
+	}
+	if DataPlaneType == "debug" {
+		vsp.mrvlDP = debugdp.NewDebugDP()
 	}
 
 	for _, opt := range opts {
@@ -532,13 +632,14 @@ func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
 func main() {
 	mrvlVspServer := NewMarvellVspServer()
 	listener, err := mrvlVspServer.Listen()
+
 	if err != nil {
-		klog.Fatalf("Failed to Listen Marvell VSP server: %v", err)
+		mrvlVspServer.log.Error(err, "Failed to Listen Marvell VSP server")
 		return
 	}
 	err = mrvlVspServer.Serve(listener)
 	if err != nil {
-		klog.Fatalf("Failed to serve Marvell VSP server: %v", err)
+		mrvlVspServer.log.Error(err, "Failed to serve Marvell VSP server")
 		return
 	}
 }
