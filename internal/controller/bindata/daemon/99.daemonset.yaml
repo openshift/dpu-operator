@@ -49,11 +49,14 @@ spec:
           mountPath: /var/lib/cni
         - name: opt-cni-dir
           mountPath: /opt/cni
-        - name: host-run
+        - name: host-run-netns
           mountPath: /var/run/netns
           mountPropagation: Bidirectional
         - name: proc
           mountPath: /proc
+        - name: host-run
+          mountPath: /var/run
+          readOnly: true
         args:
         - --mode
         - {{.Mode}}
@@ -70,9 +73,12 @@ spec:
         - name: opt-cni-dir
           hostPath:
             path: /opt/cni
-        - name: host-run
+        - name: host-run-netns
           hostPath:
             path: /var/run/netns
         - name: proc
           hostPath:
             path: /proc/
+        - name: host-run
+          hostPath:
+            path: /var/run
