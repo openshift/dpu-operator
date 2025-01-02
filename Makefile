@@ -242,8 +242,13 @@ local-build: ## Build all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
 
+.PHONE: prepare-multi-arch
+prepare-multi-arch:
+	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
+	setenforce 0
+
 .PHONY: local-buildx
-local-buildx: ## Build all container images necessary to run the whole operator
+local-buildx: prepare-multi-arch ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
 	buildah manifest rm $(DPU_OPERATOR_IMAGE)-manifest || true
 	buildah manifest create $(DPU_OPERATOR_IMAGE)-manifest
