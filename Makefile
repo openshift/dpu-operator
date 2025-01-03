@@ -219,7 +219,6 @@ REGISTRY ?= $(shell hostname)
 DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
 DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
 MARVELL_VSP_IMAGE := $(REGISTRY):5000/mrvl-vsp:dev
-INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
 
 .PHONY: local-deploy-prep
 prep-local-deploy: tools
@@ -240,42 +239,31 @@ local-build: ## Build all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
-
-.PHONE: prepare-multi-arch
-prepare-multi-arch:
-	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
-	setenforce 0
 
 .PHONY: local-buildx
-local-buildx: prepare-multi-arch ## Build all container images necessary to run the whole operator
+local-buildx: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
 	buildah manifest rm $(DPU_OPERATOR_IMAGE)-manifest || true
 	buildah manifest create $(DPU_OPERATOR_IMAGE)-manifest
-	buildah build --layers --manifest $(DPU_OPERATOR_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	buildah build --authfile /root/config.json --manifest $(DPU_OPERATOR_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
 	buildah manifest rm $(DPU_DAEMON_IMAGE)-manifest || true
 	buildah manifest create $(DPU_DAEMON_IMAGE)-manifest
-	buildah build --layers --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	buildah build --authfile /root/config.json --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
 	buildah manifest rm $(MARVELL_VSP_IMAGE)-manifest || true
 	buildah manifest create $(MARVELL_VSP_IMAGE)-manifest
-	buildah build --layers --manifest $(MARVELL_VSP_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	buildah manifest rm $(INTEL_VSP_IMAGE)-manifest || true
-	buildah manifest create $(INTEL_VSP_IMAGE)-manifest
-	buildah build --layers --manifest $(INTEL_VSP_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
+	buildah build --authfile /root/config.json --manifest $(MARVELL_VSP_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
 
 .PHONY: local-pushx
 local-pushx: ## Push all container images necessary to run the whole operator
 	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
-	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
 
 .PHONY: local-push
 local-push: ## Push all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) push $(DPU_OPERATOR_IMAGE)
 	$(CONTAINER_TOOL) push $(DPU_DAEMON_IMAGE)
 	$(CONTAINER_TOOL) push $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) push $(INTEL_VSP_IMAGE)
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
