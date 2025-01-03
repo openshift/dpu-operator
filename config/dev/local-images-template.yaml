@@ -21,7 +21,7 @@ spec:
         - name: DPU_DAEMON_IMAGE
           value: {{ .RegistryURL }}:5000/dpu-daemon:dev
         - name: IntelVspImage
-          value: {{ .RegistryURL }}:5000/intel_vsp:dev
+          value: {{ .RegistryURL }}:5000/intel-vsp:dev
         - name: MarvellVspImage
           value: {{ .RegistryURL }}:5000/mrvl-vsp:dev
         - name: IMAGE_PULL_POLICIES
