@@ -29,9 +29,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types"
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/utils"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"

@@ -17,7 +17,7 @@ package ipuplugin
 import (
 	"fmt"
 
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 )
