@@ -101,6 +101,21 @@ fast_e2e_test: prepare-e2e-test
 e2e-test: deploy_clusters deploy_tft_tests
 	@echo "E2E Test Completed"
 
+.PHONY: redeploy
+redeploy:
+	 -$(MAKE) undeploy
+	 $(MAKE) local-buildx
+	 $(MAKE) local-pushx
+	 $(MAKE) local-deploy
+	 @echo "redeployed"
+
+.PHONY: redeploy-both
+redeploy-both:
+	KUBECONFIG=/root/kubeconfig.microshift make redeploy
+	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
+	KUBECONFIG=/root/kubeconfig.ocpcluster make redeploy
+	KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
+
 .PHONY: all
 all: build
 
