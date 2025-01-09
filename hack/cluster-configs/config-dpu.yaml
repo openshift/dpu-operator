@@ -4,7 +4,7 @@ clusters:
     ingress_vip: "192.168.122.101"
     network_api_port: "eno12409"
     kind: "iso"
-    install_iso: "{{iso_server()}}/RHEL-9.6.0-20241114.6-aarch64-dvd1-w-kickstart.iso.v2"
+    install_iso: "{{iso_server()}}/RHEL-9.6.0-20250107.2-aarch64-dvd1-w-kickstart.iso"
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
