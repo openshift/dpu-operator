@@ -24,9 +24,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types"
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/utils"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
 	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"

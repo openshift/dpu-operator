@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types"
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/utils"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -128,8 +128,6 @@ func ImcQueryfindVsiGivenMacAddr(mode string, mac string) (string, error) {
 
 	runCommand := fmt.Sprintf(`ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@"%s" "/usr/bin/cli_client -cq" \
 		| awk '{if(($17 == "%s")) {print $8}}'`, ipAddr, mac)
-
-	log.WithField("params", "").Debugf("runnig comamnd %v", runCommand)
 
 	output, err := ExecuteScript(runCommand)
 	output = strings.TrimSpace(string(output))

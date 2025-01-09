@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
-	"github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	log "github.com/sirupsen/logrus"

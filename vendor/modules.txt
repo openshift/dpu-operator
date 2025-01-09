@@ -11,13 +11,6 @@ github.com/alessio/shellescape
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bn222/ipu-opi-plugins/ipu-plugin v0.0.0-20241231111112-dc59c1f148ab
-## explicit; go 1.22.4
-github.com/bn222/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd
-github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/ipuplugin
-github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient
-github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/types
-github.com/bn222/ipu-opi-plugins/ipu-plugin/pkg/utils
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -161,6 +154,13 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
+# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250107182722-a48903537e77
+## explicit; go 1.22.4
+github.com/intel/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd
+github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/ipuplugin
+github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient
+github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types
+github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils
 # github.com/jaypipes/ghw v0.13.0
 ## explicit; go 1.21
 github.com/jaypipes/ghw
