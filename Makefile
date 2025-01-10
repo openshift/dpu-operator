@@ -98,7 +98,11 @@ fast_e2e_test: prepare-e2e-test
 	hack/deploy_fast.sh
 
 .PHONY: e2e_test
-e2e-test: deploy_clusters deploy_tft_tests
+e2e-test:
+	 $(MAKE) deploy_clusters
+	 $(MAKE) deploy_tft_tests
+	 $(MAKE) deploy_clusters
+	 $(MAKE) deploy_tft_tests
 	@echo "E2E Test Completed"
 
 .PHONY: redeploy
