@@ -8,7 +8,6 @@ clusters:
     postconfig:
     - name: "dpu_operator_host"
       dpu_operator_path: "../../"
-      rebuild_dpu_operators_images: "false"
     masters:
     - name: "nicmodecluster-master-1"
       kind: "vm"
