@@ -49,6 +49,11 @@ The DPU operator also integrates with CDA (https://github.com/bn222/cluster-depl
 make e2e-test
 ```
 
+### End-to-end testing on any cluster
+It is possible to run the e2e test suite separately by using the 'e2e-test-suite' target. This will execute the tests on two clusters, which are referenced by the configuration files located at `/root/kubeconfig.ocpcluster` and `/root/kubeconfig.microshift`.
+```sh
+make e2e-test-suite
+```
 ### Integration testing
 
 Using the following makefile target, a Kind cluster will be set up against which some tests are ran. This is mainly used during development.
