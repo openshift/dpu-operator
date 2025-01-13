@@ -29,7 +29,6 @@ var (
 	testDpuOperatorConfigName = "default"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
-	testNetworkFunctionNAD    = "dpunfcni-conf"
 	testClusterName           = "dpu-operator-test-cluster"
 	TestAPITimeout            = time.Second * 2
 	TestRetryInterval         = time.Millisecond * 10
