@@ -4,7 +4,7 @@ metadata:
   name: my-pod
   namespace: default
   annotations:
-    k8s.v1.cni.cncf.io/networks: sriov-net1
+    k8s.v1.cni.cncf.io/networks: default-sriov-net
 spec:
   nodeSelector:
     kubernetes.io/hostname: worker-237
