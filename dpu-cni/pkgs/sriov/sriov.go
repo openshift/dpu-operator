@@ -421,6 +421,7 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 
 	// run the IPAM plugin
 	if netConf.IPAM.Type != "" {
+		klog.Infof("Executing Ipam plugin. IPAM type: %s", netConf.IPAM.Type)
 		var r types.Result
 		r, err = ipam.ExecAdd(netConf.IPAM.Type, req.CNIReq.Config)
 		if err != nil {
@@ -481,6 +482,8 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 			}
 		}
 		result = newResult
+	} else {
+		klog.Infof("IPAM type not set in NetConf, skipping IPAM plugin")
 	}
 
 	// Cache NetConf for CmdDel
