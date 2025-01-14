@@ -19,7 +19,7 @@ tft:
             sriov: "true"
         plugins:
           - name: validate_offload
-        secondary_network_nad: "sriov-net1"
+        secondary_network_nad: "default-sriov-net"
         resource_name: "openshift.io/dpu"
 kubeconfig: "/root/kubeconfig.ocpcluster"
 kubeconfig_infra: "/var/lib/microshift/resources/kubeadmin/$acc/kubeconfig"

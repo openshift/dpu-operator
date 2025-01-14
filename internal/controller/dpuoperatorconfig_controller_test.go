@@ -38,13 +38,14 @@ import (
 )
 
 var (
-	testNamespace             = "openshift-dpu-operator"
-	testDpuOperatorConfigName = "default"
-	testDpuOperatorConfigKind = "DpuOperatorConfig"
-	testDpuDaemonName         = "dpu-daemon"
-	testNetworkFunctionNAD    = "dpunfcni-conf"
-	testClusterName           = "dpu-operator-test-cluster"
-	setupLog                  = ctrl.Log.WithName("setup")
+	testNamespace              = "openshift-dpu-operator"
+	testDpuOperatorConfigName  = "default"
+	testDpuOperatorConfigKind  = "DpuOperatorConfig"
+	testDpuDaemonName          = "dpu-daemon"
+	testNetworkFunctionNADDpu  = "dpunfcni-conf"
+	testNetworkFunctionNADHost = "default-sriov-net"
+	testClusterName            = "dpu-operator-test-cluster"
+	setupLog                   = ctrl.Log.WithName("setup")
 )
 
 func dpuOperatorNameSpace() *corev1.Namespace {
@@ -226,10 +227,11 @@ var _ = Describe("Main Controller", Ordered, func() {
 				testutils.WaitForDaemonSetReady(&daemonSet, mgr.GetClient(), testNamespace, testDpuDaemonName)
 				Expect(daemonSet.Spec.Template.Spec.Containers[0].Args[1]).To(Equal("auto"))
 			})
-			It("should not have the network function NAD created by controller manager", func() {
-				nad := netattdefv1.NetworkAttachmentDefinition{}
-				err := mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, &nad)
-				Expect(errors.IsNotFound(err)).To(BeTrue())
+			It("should have the network function NAD created by controller manager", func() {
+				nad := &netattdefv1.NetworkAttachmentDefinition{}
+				Eventually(func() error {
+					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: "default", Name: testNetworkFunctionNADHost}, nad)
+				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {
 				ns := dpuOperatorNameSpace()
@@ -255,7 +257,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			It("should have the network function NAD created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}
 				Eventually(func() error {
-					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNAD}, nad)
+					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNADDpu}, nad)
 				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {

@@ -1,0 +1,18 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: default-sriov-net
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: {{.ResourceName}}
+spec:
+  #TODO: We need to customize the config based on the user's DpuNetwork CR
+  config: '{
+    "type": "dpu-cni",
+    "cniVersion": "0.4.0",
+    "name": "dpu-cni",
+    "ipam": {
+      "type": "host-local",
+      "subnet": "10.56.217.0/24"
+    }
+    }'
