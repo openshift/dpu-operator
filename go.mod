@@ -129,6 +129,7 @@ require (
 )
 
 replace (
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250108230236-f8c46d8b657b => github.com/bn222/ipu-opi-plugins/ipu-plugin v0.0.0-20250115115137-1441a42904e9
 	github.com/openshift/dpu-operator/api => ./api
 	github.com/openshift/dpu-operator/dpu-api => ./dpu-api
 )
