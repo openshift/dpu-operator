@@ -38,6 +38,7 @@ require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bn222/ipu-opi-plugins/ipu-plugin v0.0.0-20250115115137-1441a42904e9 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-iptables v0.7.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
@@ -129,6 +130,7 @@ require (
 )
 
 replace (
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250108230236-f8c46d8b657b => github.com/bn222/ipu-opi-plugins/ipu-plugin v0.0.0-20250115115137-1441a42904e9
 	github.com/openshift/dpu-operator/api => ./api
 	github.com/openshift/dpu-operator/dpu-api => ./dpu-api
 )
