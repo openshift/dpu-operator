@@ -11,6 +11,8 @@ spec:
     kind: ServiceFunctionChain
     listKind: ServiceFunctionChainList
     plural: servicefunctionchains
+    shortNames:
+    - sfc
     singular: servicefunctionchain
   scope: Namespaced
   versions:
