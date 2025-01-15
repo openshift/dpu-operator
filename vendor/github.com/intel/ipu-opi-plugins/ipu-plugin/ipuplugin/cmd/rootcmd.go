@@ -109,7 +109,13 @@ var (
 			log.Info("Initializing IPU plugin")
 			if mode == types.IpuMode {
 				vsi, err := findVsiForPfInterface(mode, intf)
-				if err != nil {
+				/*In case, where default P4 package is loaded with 4 APFs, this check,
+				will fail. Note::For linux-P4 package, portMuxVsi(not used).
+				For redhat P4 we would need this check.
+				As a quick fix, restricting check to redhat P4 package only.
+				TODO: If we revert to redhat P4 package(unlikely), this check can be moved else-where.
+				*/
+				if (err != nil) && (p4pkg == "redhat") {
 					log.Errorf("Not able to find VSI->%d, for bridge interface->%v\n", vsi, intf)
 					exitWithError(err, 5)
 				} else {
