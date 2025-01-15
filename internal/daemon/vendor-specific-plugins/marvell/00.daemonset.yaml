@@ -43,6 +43,10 @@ spec:
               mountPropagation: Bidirectional
             - name: proc
               mountPath: /proc
+            - name: ovs-bin
+              mountPath: /usr/local/bin/
+            - name: ovs-db
+              mountPath: /usr/local/var/run/openvswitch/
       volumes:
         - name: mrvl-vsp-mount
           hostPath:
@@ -53,3 +57,9 @@ spec:
         - name: proc
           hostPath:
             path: /proc/
+        - name: ovs-bin
+          hostPath:
+            path: /usr/local/bin/
+        - name: ovs-db
+          hostPath:
+            path: /usr/local/var/run/openvswitch/
