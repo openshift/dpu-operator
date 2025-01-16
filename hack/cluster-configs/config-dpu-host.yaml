@@ -9,17 +9,17 @@ clusters:
     - name: "dpu_operator_host"
       dpu_operator_path: "../../"
     masters:
-    - name: "nicmodecluster-master-1"
+    - name: "{{cluster_name}}-master-1"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.2"
       disk_size: 32
-    - name: "nicmodecluster-master-2"
+    - name: "{{cluster_name}}-master-2"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.3"
       disk_size: 32
-    - name: "nicmodecluster-master-3"
+    - name: "{{cluster_name}}-master-3"
       kind: "vm"
       node: "localhost"
       ip: "192.168.122.4"
