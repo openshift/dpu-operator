@@ -3,7 +3,7 @@ clusters:
     api_vip: "192.168.122.99"
     ingress_vip: "192.168.122.101"
     kubeconfig: "/root/kubeconfig.ocpcluster"
-    version: "4.16.0-nightly"
+    version: "4.19.0-nightly"
     network_api_port: "eno12399"
     postconfig:
     - name: "dpu_operator_host"
