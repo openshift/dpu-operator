@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-logr/logr"
 	ghw "github.com/jaypipes/ghw"
@@ -397,39 +396,19 @@ func getInterfaceName(deviceID string) (string, error) {
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
 func enableIPV6LinkLocal(interfaceName string) error {
-	baseNsenterCmd := "nsenter -t 1 -m -u -n -i -- "
-	nmcliCmdStr := baseNsenterCmd + "nmcli con add type ethernet ifname " + interfaceName + " ipv6.method link-local"
-	nmcliCmd := exec.Command("/bin/sh", "-c", nmcliCmdStr)
-	if err := nmcliCmd.Run(); err != nil {
-		return err
-	}
+	// Ensure to set addrgenmode and toggle link state (which can result in creating
+	// the IPv6 link local address. Ignore errors here.
+	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
+	exec.Command("ip", "link", "set", interfaceName, "down").Run()
 
-	// wait for interface to get IPv6 Link local address
-	time.Sleep(3 * time.Second)
-	link, err := netlink.LinkByName(interfaceName)
+	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error setting link %s up: %v", interfaceName, err)
 	}
 
-	//returns the list of IPv6 addresses on the given interface
-	address, err := netlink.AddrList(link, netlink.FAMILY_V6)
-	if err != nil {
-		return err
-	}
+	// Ping IPv6 Multicast group to get the IPv6 Neighbour Entry in Arp Table
+	exec.Command("ping6", "-c", "2", "-I", interfaceName, "ff02::1").Run()
 
-	if len(address) == 0 {
-		klog.Error("IPv6 address not found on interface", interfaceName)
-		return errors.New("IPv6 address not found on interface")
-	}
-
-	//ping to get the IPv6 Neighbour Entry in Arp Table
-	cmdS := baseNsenterCmd + "/usr/bin/ping6 -c 2 -I " + interfaceName + " ff02::1 &> /dev/null"
-	cmd := exec.Command("/bin/sh", "-c", cmdS)
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-	time.Sleep(2 * time.Second)
 	return nil
 }
 
