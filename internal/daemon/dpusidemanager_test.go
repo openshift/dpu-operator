@@ -48,11 +48,11 @@ var _ = g.Describe("DPU side maanger", Ordered, func() {
 	var (
 		dpuDaemon   *DpuSideManager
 		config      *rest.Config
-		testCluster testutils.TestCluster
+		testCluster testutils.KindCluster
 		client      client.Client
 	)
 	g.BeforeEach(func() {
-		testCluster = testutils.TestCluster{Name: "dpu-operator-test-cluster"}
+		testCluster = testutils.KindCluster{Name: "dpu-operator-test-cluster"}
 		config = testCluster.EnsureExists()
 
 		pathManager := *utils.NewPathManager(testCluster.TempDirPath())
