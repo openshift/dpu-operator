@@ -4,7 +4,7 @@ clusters:
     ingress_vip: "192.168.122.101"
     kubeconfig: "/root/kubeconfig.ocpcluster"
     version: "4.19.0-nightly"
-    network_api_port: "eno12399"
+    network_api_port: "{{api_network()}}"
     postconfig:
     - name: "dpu_operator_host"
       dpu_operator_path: "../../"
