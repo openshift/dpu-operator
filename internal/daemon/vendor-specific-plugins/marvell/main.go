@@ -396,6 +396,14 @@ func getInterfaceName(deviceID string) (string, error) {
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
 func enableIPV6LinkLocal(interfaceName string) error {
+	// Tell NetworkManager to not manage our interface.
+	err1 := exec.Command("nsenter", "-t", "1", "-m", "-u", "-n", "-i", "--", "nmcli", "device", "set", interfaceName, "managed", "no").Run()
+	if err1 != nil {
+		// This error may be fine. Maybe our host doesn't even run
+		// NetworkManager. Ignore.
+		klog.Infof("nmcli device set %s managed no failed with error %v", interfaceName, err1)
+	}
+
 	// Ensure to set addrgenmode and toggle link state (which can result in creating
 	// the IPv6 link local address. Ignore errors here.
 	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
