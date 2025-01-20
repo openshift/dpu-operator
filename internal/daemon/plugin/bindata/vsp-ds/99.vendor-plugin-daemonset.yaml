@@ -23,6 +23,7 @@ spec:
         imagePullPolicy: {{.ImagePullPolicy}}
         securityContext:
           privileged: true
+          runAsUser: 0
         command: {{.Command}}
         args: {{.Args}}
         volumeMounts:
