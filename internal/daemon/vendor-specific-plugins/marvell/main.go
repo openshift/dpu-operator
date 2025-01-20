@@ -264,6 +264,8 @@ func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
 		klog.Errorf("Error occurred in getting Interface Name: %v", err)
 		return pb.IpPort{}, err
 	}
+	klog.Infof("Interface Name: %s", IfName)
+
 	err = enableIPV6LinkLocal(IfName)
 	if err != nil {
 		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
@@ -309,7 +311,8 @@ func (vsp *mrvlVspServer) hostIpPort() (pb.IpPort, error) {
 		klog.Errorf("Error occurred in getting Interface Name: %v", err)
 		return pb.IpPort{}, err
 	}
-	klog.Infof("Interface Name  InterfaceName: %v", ifName)
+	klog.Infof("Interface Name: %s", ifName)
+
 	err = enableIPV6LinkLocal(ifName)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in enabling IPv6 Link local Address: %v")
