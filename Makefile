@@ -212,13 +212,31 @@ e2e-test-suite: envtest ginkgo
 	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./e2e_test/... -coverprofile cover.out
 ##@ Build
 
-.PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+MANAGER_BIN     = bin/manager
+DAEMON_BIN      = bin/daemon
+DPU_CNI_BIN     = bin/dpu-cni
+IPU_PLUGIN_BIN  = bin/ipuplugin
+VSP_BIN         = bin/vsp-mrvl
 
-.PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+GOARCH ?= amd64
+GOOS ?= linux
+
+.PHONY: build-manager
+build-manager:
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(MANAGER_BIN).${GOARCH} cmd/main.go
+
+.PHONY: build-daemon
+build-daemon:
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(DAEMON_BIN).${GOARCH} cmd/daemon/daemon.go
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(DPU_CNI_BIN).${GOARCH} dpu-cni/dpu-cni.go
+
+.PHONY: build-intel-vsp
+build-intel-vsp:
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(IPU_PLUGIN_BIN).${GOARCH} cmd/intelvsp/intelvsp.go
+
+.PHONY: build-marvell-vsp
+build-marvell-vsp:
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(VSP_BIN).${GOARCH} internal/daemon/vendor-specific-plugins/marvell/main.go
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
@@ -245,6 +263,11 @@ prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
+.PHONY: incremental-local-deploy-prep
+incremental-prep-local-deploy: tools
+	./bin/config -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
+	cp config/dev/kustomization.yaml bin
+
 .PHONY: local-deploy
 local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
@@ -266,21 +289,75 @@ prepare-multi-arch:
 	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
 	setenforce 0
 
-.PHONY: local-buildx
-local-buildx: prepare-multi-arch ## Build all container images necessary to run the whole operator
+.PHONY: go-cache
+go-cache: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
-	buildah manifest rm $(DPU_OPERATOR_IMAGE)-manifest || true
-	buildah manifest create $(DPU_OPERATOR_IMAGE)-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $(DPU_OPERATOR_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	buildah manifest rm $(DPU_DAEMON_IMAGE)-manifest || true
-	buildah manifest create $(DPU_DAEMON_IMAGE)-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $(DPU_DAEMON_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	buildah manifest rm $(MARVELL_VSP_IMAGE)-manifest || true
-	buildah manifest create $(MARVELL_VSP_IMAGE)-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $(MARVELL_VSP_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	buildah manifest rm $(INTEL_VSP_IMAGE)-manifest || true
-	buildah manifest create $(INTEL_VSP_IMAGE)-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $(INTEL_VSP_IMAGE)-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
+
+## Build all container images necessary to run the whole operator
+.PHONY: local-buildx
+local-buildx: prepare-multi-arch go-cache local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp
+	@echo "local-buildx completed"
+
+define build_image
+	buildah manifest rm $($(1))-manifest || true
+	buildah manifest create $($(1))-manifest
+	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f $(2) -t $($(1))
+endef
+
+.PHONY: local-buildx-manager
+local-buildx-manager: prepare-multi-arch go-cache
+	$(call build_image,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+
+.PHONY: local-buildx-daemon
+local-buildx-daemon: prepare-multi-arch go-cache
+	$(call build_image,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+
+.PHONY: local-buildx-marvell-vsp
+local-buildx-marvell-vsp: prepare-multi-arch go-cache
+	$(call build_image,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+
+.PHONY: local-buildx-intel-vsp
+local-buildx-intel-vsp: prepare-multi-arch go-cache
+	$(call build_image,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+
+TMP_FILE=/tmp/dpu-operator-incremental-build
+define build_image_incremental
+    bin/incremental -dockerfile $(2) -base-uri $($(1)) -output-file $(TMP_FILE)
+    # Pass the newly generated Dockerfile to build_image
+    $(call build_image,$(1),$(TMP_FILE))
+endef
+
+## Build all container images necessary to run the whole operator incrementally.
+## It only makes sense to use this target after you've called local-buildx at
+## least once.
+.PHONY: local-buildx-incremental-manager
+local-buildx-incremental-manager: prepare-multi-arch go-cache
+	GOARCH=arm64 $(MAKE) build-manager
+	GOARCH=amd64 $(MAKE) build-manager
+	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+
+.PHONY: local-buildx-incremental-daemon
+local-buildx-incremental-daemon: prepare-multi-arch go-cache
+	GOARCH=amd64 $(MAKE) build-daemon
+	GOARCH=arm64 $(MAKE) build-daemon
+	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+
+.PHONY: local-buildx-incremental-marvell-vsp
+local-buildx-incremental-marvell-vsp: prepare-multi-arch go-cache
+	GOARCH=arm64 $(MAKE) build-marvell-vsp
+	GOARCH=amd64 $(MAKE) build-marvell-vsp
+	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+
+.PHONY: local-buildx-incremental-intel-vsp
+	GOARCH=arm64 $(MAKE) build-intel-vsp
+	GOARCH=amd64 $(MAKE) build-intel-vsp
+local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
+	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+
+
+.PHONY: incremental-local-buildx
+incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy build-both
+	@echo "local-buildx-incremental completed"
 
 .PHONY: local-pushx
 local-pushx: ## Push all container images necessary to run the whole operator
@@ -333,7 +410,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 
 .PHONY: tools
 tools:
-	cd tools && go build -o ../bin/config config.go
+	cd tools/config && go build -o ../../bin/config config.go
+	cd tools/incremental && go build -o ../../bin/incremental incremental.go
 
 ##@ Build Dependencies
 
