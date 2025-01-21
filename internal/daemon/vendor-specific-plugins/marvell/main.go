@@ -32,6 +32,8 @@ const (
 	Version       string = "0.0.1"
 	PortType      string = "veth"
 	NoOfPortPairs int    = 2
+	IPv6AddrDpu   string = "fe80::1"
+	IPv6AddrHost  string = "fe80::2"
 )
 
 type mrvlDeviceInfo struct {
@@ -265,7 +267,7 @@ func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
 	}
 	klog.Infof("Interface Name: %s", IfName)
 
-	err = enableIPV6LinkLocal(IfName)
+	err = enableIPV6LinkLocal(IfName, IPv6AddrDpu)
 	if err != nil {
 		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
 		return pb.IpPort{}, err
@@ -312,7 +314,7 @@ func (vsp *mrvlVspServer) hostIpPort() (pb.IpPort, error) {
 	}
 	klog.Infof("Interface Name: %s", ifName)
 
-	err = enableIPV6LinkLocal(ifName)
+	err = enableIPV6LinkLocal(ifName, IPv6AddrHost)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in enabling IPv6 Link local Address: %v")
 		return pb.IpPort{}, err
@@ -395,7 +397,7 @@ func getInterfaceName(deviceID string) (string, error) {
 
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
-func enableIPV6LinkLocal(interfaceName string) error {
+func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 	// Tell NetworkManager to not manage our interface.
 	err1 := exec.Command("nsenter", "-t", "1", "-m", "-u", "-n", "-i", "--", "nmcli", "device", "set", interfaceName, "managed", "no").Run()
 	if err1 != nil {
@@ -412,6 +414,11 @@ func enableIPV6LinkLocal(interfaceName string) error {
 	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
 	if err != nil {
 		return fmt.Errorf("Error setting link %s up: %v", interfaceName, err)
+	}
+
+	err = exec.Command("ip", "addr", "replace", ipv6Addr+"/64", "dev", interfaceName).Run()
+	if err != nil {
+		return fmt.Errorf("Error configuring IPv6 address %s/64 on link %s: %v", ipv6Addr, interfaceName, err)
 	}
 
 	// Ping IPv6 Multicast group to get the IPv6 Neighbour Entry in Arp Table
