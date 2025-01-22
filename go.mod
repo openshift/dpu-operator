@@ -7,7 +7,7 @@ require (
 	github.com/containernetworking/plugins v1.5.0
 	github.com/go-logr/logr v1.4.2
 	github.com/gorilla/mux v1.8.1
-	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250108230236-f8c46d8b657b
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250121192445-0f9803536f34
 	github.com/jaypipes/ghw v0.13.0
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.5.0
