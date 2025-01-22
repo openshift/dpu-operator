@@ -12,7 +12,6 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,7 +52,7 @@ type Daemon struct {
 	config    *rest.Config
 }
 
-func NewDaemon(mode string, client client.Client, scheme *runtime.Scheme, vspImages map[string]string, config *rest.Config) Daemon {
+func NewDaemon(mode string, client client.Client, vspImages map[string]string, config *rest.Config) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		client:    client,
