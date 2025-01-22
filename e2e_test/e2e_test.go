@@ -16,12 +16,10 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -64,11 +62,7 @@ var _ = g.Describe("Dpu side", g.Ordered, func() {
 		_, dpuConfig, err := cluster.EnsureExists()
 		Expect(err).NotTo(HaveOccurred())
 
-		scheme := runtime.NewScheme()
-		utilruntime.Must(configv1.AddToScheme(scheme))
-		utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-		dpuSideClient, err = client.New(dpuConfig, client.Options{Scheme: scheme})
+		dpuSideClient, err = client.New(dpuConfig, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
