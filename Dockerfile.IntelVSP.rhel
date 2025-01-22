@@ -2,11 +2,12 @@ FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.19 AS 
 ARG TARGETOS
 ARG TARGETARCH
 
-COPY . /usr/src/ipu-opi-plugin
-WORKDIR /usr/src/ipu-opi-plugin
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ipuplugin cmd/intelvsp/intelvsp.go
+WORKDIR /workspace
+COPY . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
 
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+ARG TARGETARCH
 ENV PYTHONUNBUFFERED=1
 RUN dnf install -y NetworkManager openvswitch3.4 iproute python3 python3-pip openssh-clients
 #By setting workdir, the directory is created automatically
@@ -18,6 +19,6 @@ COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
 COPY ./cmd/intelvsp/p4runtime-2023.11.0-py3-none-any.whl /opt/p4/p4-cp-nws/bin/
 RUN python3 -m pip install --no-cache-dir /opt/p4/p4-cp-nws/bin/p4runtime-2023.11.0-py3-none-any.whl grpcio'=='1.59.3 protobuf'=='4.25.0 netaddr'=='0.9.0
 
-COPY --chmod=755 --from=builder /usr/src/ipu-opi-plugin/bin/ipuplugin /usr/bin/
+COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /usr/bin/ipuplugin
 WORKDIR /
 LABEL io.k8s.display-name="IPU OPI Plugin"
