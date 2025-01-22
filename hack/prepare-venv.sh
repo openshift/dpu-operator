@@ -28,4 +28,4 @@ setup_venv() {
 }
 
 setup_venv cluster-deployment-automation /tmp/cda-venv "sh ./dependencies.sh"
-setup_venv ocp-traffic-flow-tests /tmp/tft-venv "pip install -r requirements.txt"
+setup_venv kubernetes-traffic-flow-tests /tmp/tft-venv "pip install -r requirements.txt"

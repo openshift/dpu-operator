@@ -1,6 +1,6 @@
 [submodule "cluster-deployment-automation"]
 	path = cluster-deployment-automation
 	url = https://github.com/bn222/cluster-deployment-automation
-[submodule "ocp-traffic-flow-tests"]
-	path = ocp-traffic-flow-tests
-	url = https://github.com/wizhaoredhat/ocp-traffic-flow-tests.git
+[submodule "kubernetes-traffic-flow-tests"]
+	path = kubernetes-traffic-flow-tests
+	url = https://github.com/ovn-kubernetes/kubernetes-traffic-flow-tests
