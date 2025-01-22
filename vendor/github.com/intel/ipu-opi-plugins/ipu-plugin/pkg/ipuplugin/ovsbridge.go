@@ -100,6 +100,11 @@ func (b *ovsBridge) EnsureBridgeExists() error {
 		log.Errorf("EnsureBridgeExists: error->%v from getInfrapodNamespace", err)
 		return err
 	}
+	// Flush any existing IP addresses from the bridge interface from any previous runs
+	flushIPCmd := []string{"net", "exec", netNs, "ip", "addr", "flush", "dev", b.bridgeName}
+	if err := utils.ExecOsCommand("ip", flushIPCmd...); err != nil {
+		return fmt.Errorf("error flushing IP addresses for bridge %s: %v", b.bridgeName, err)
+	}
 	//assigning IP for bridge interface.
 	ipAddr := ACC_VM_PR_IP
 	cmdParams := []string{"net", "exec", netNs, "ip", "addr", "add", "dev", b.bridgeName, ipAddr}

@@ -49,6 +49,7 @@ type LifeCycleServiceServer struct {
 	mode         string
 	p4rtbin      string
 	bridgeCtlr   types.BridgeController
+	initialized  bool // Currently, can only call initiliaze once
 }
 
 const (
@@ -85,6 +86,7 @@ func NewLifeCycleService(daemonHostIp, daemonIpuIp string, daemonPort int, mode 
 		mode:         mode,
 		p4rtbin:      p4rtbin,
 		bridgeCtlr:   brCtlr,
+		initialized:  false,
 	}
 }
 
@@ -893,6 +895,11 @@ func (s *FXPHandlerImpl) configureFXP(p4rtbin string, brCtlr types.BridgeControl
 }
 
 func (s *LifeCycleServiceServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
+	if s.initialized {
+		return nil, fmt.Errorf("Error during init call, already initialized")
+	}
+	s.initialized = true
+
 	InitHandlers()
 
 	if in.DpuMode && s.mode != types.IpuMode || !in.DpuMode && s.mode != types.HostMode {
