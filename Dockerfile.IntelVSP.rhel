@@ -16,8 +16,14 @@ WORKDIR /opt/p4/p4-cp-nws/bin/
 COPY ./cmd/intelvsp/fxp-net_linux-networking.pkg /
 COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
 #TODO: Update to newer package, according to release.
-COPY ./cmd/intelvsp/p4runtime-2023.11.0-py3-none-any.whl /opt/p4/p4-cp-nws/bin/
-RUN python3 -m pip install --no-cache-dir /opt/p4/p4-cp-nws/bin/p4runtime-2023.11.0-py3-none-any.whl grpcio'=='1.59.3 protobuf'=='4.25.0 netaddr'=='0.9.0
+COPY ./cmd/intelvsp/pip-packages/* /opt/p4/p4-cp-nws/bin/
+RUN ARCH=$(uname -m) && \
+	python3 -m pip install --no-cache-dir --no-index \
+	/opt/p4/p4-cp-nws/bin/p4runtime-2023.11.0-py3-none-any.whl \
+	/opt/p4/p4-cp-nws/bin/googleapis_common_protos-1.66.0-py2.py3-none-any.whl \
+	/opt/p4/p4-cp-nws/bin/grpcio-1.59.3-cp39-cp39-manylinux_2_17_${ARCH}.whl \
+	/opt/p4/p4-cp-nws/bin/netaddr-0.9.0-py3-none-any.whl \
+	/opt/p4/p4-cp-nws/bin/protobuf-4.25.0-cp37-abi3-manylinux2014_${ARCH}.whl
 
 COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /usr/bin/ipuplugin
 WORKDIR /
