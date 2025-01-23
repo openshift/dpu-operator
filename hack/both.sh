@@ -3,7 +3,6 @@
 set -e
 
 cd cluster-deployment-automation
-python3.11 -m venv /tmp/cda-venv
 source /tmp/cda-venv/bin/activate
 
 # Tear down any previous cluster fully
