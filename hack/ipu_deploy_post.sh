@@ -5,7 +5,7 @@ set -e
 cd cluster-deployment-automation
 source /tmp/cda-venv/bin/activate
 
-python3.11 cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy -s post
+./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy -s post
 
 ret=$?
 if [ $ret == 0 ]; then
