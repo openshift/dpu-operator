@@ -497,6 +497,13 @@ func setBaseMacAddr() (string, error) {
 	return macAddress, nil
 }
 
+/*
+Updates files below on IMC, and does IMC reboot.
+1. Copy P4 package from container to IMC
+2. Update load_custom_pkg.sh
+3. Create post_init_app.sh
+4. Create uuid file.
+*/
 func (s *SSHHandlerImpl) sshFunc() error {
 	config := &ssh.ClientConfig{
 		User: "root",
@@ -587,6 +594,38 @@ func (s *SSHHandlerImpl) sshFunc() error {
 		return fmt.Errorf("failed to sync load_custom_pkg.sh: %s", err)
 	}
 
+	err = sftpClient.Chmod(loadCustomPkgFilePath, 0755)
+	if err != nil {
+		log.Errorf("failed to chmod load_custom_pkg.sh file: %s", err)
+		return fmt.Errorf("failed to chmod load_custom_pkg.sh file: %s", err)
+	}
+
+	//Create post_init_app.sh
+	postInitAppFileStr := postInitAppScript()
+	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
+	postInitFile, err := sftpClient.Create(postInitRemoteFilePath)
+	if err != nil {
+		log.Errorf("failed to create post_init_app.sh file: %s", err)
+		return fmt.Errorf("failed to create post_init_app.sh file: %s", err)
+	}
+	defer postInitFile.Close()
+
+	_, err = postInitFile.Write([]byte(postInitAppFileStr))
+	if err != nil {
+		return fmt.Errorf("failed to write to post_init_app.sh file: %s", err)
+	}
+
+	err = postInitFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync post_init_app.sh file: %s", err)
+	}
+
+	err = sftpClient.Chmod(postInitRemoteFilePath, 0755)
+	if err != nil {
+		log.Errorf("failed to chmod post_init_app.sh file: %s", err)
+		return fmt.Errorf("failed to chmod post_init_app.sh file: %s", err)
+	}
+
 	uuidFilePath := "/work/uuid"
 	uuidFile, err := sftpClient.Create(uuidFilePath)
 	if err != nil {
@@ -644,6 +683,135 @@ func countAPFDevices() int {
 	return len(pfList)
 }
 
+/*
+Updates post_init_app.sh script, which installs
+port-setup.sh script. port-setup.sh script,
+will run devmem command for D5 interface, as soon as
+D5 comes up on ACC, to enable connectivity. 
+There is an intermittent race condition, when port-setup.log file, is
+accessed(for file removal or any other case) by post_init_app.sh,
+then later when nohup tries to stdout to that log file(port-setup.log),
+there are file sync issues, either log file is not updated or not present.
+In order to circumvent this, just allowing nohup to over-write port-setup.log.
+Also, to make this more robust, added polling in post-init-app.sh, to check for
+log(and if not present within 10 secs), we start second instance of port-setup.sh.
+So, at the most, we would run port-setup.sh twice.
+Running devmem commands thro locking mechanism, so the devmem commands are 
+run in critical section, so that devmem commands are run sequentially,
+when port-setup.sh gets run concurrently.
+*/
+func postInitAppScript() string {
+
+	postInitAppScriptStr := `#!/bin/bash
+set -x
+
+trap 'echo "Line $LINENO: $BASH_COMMAND"' DEBUG
+
+PORT_SETUP_SCRIPT=/work/scripts/port-setup.sh
+PORT_SETUP_LOG=/work/port-setup.log
+POST_INIT_LOG=/work/post-init.log
+PORT_SETUP_LOG2=/work/port-setup2.log
+
+/usr/bin/rm -f ${PORT_SETUP_SCRIPT} ${POST_INIT_LOG}
+
+exec 2>&1 1>${POST_INIT_LOG}
+
+pkill -9 $(basename ${PORT_SETUP_SCRIPT})
+
+cat<<PORT_CONFIG_EOF > ${PORT_SETUP_SCRIPT}
+#!/bin/bash
+set -x
+IDPF_VPORT_NAME="enp0s1f0d5"
+ACC_VPORT_ID=0x5
+retry=0
+
+echo "random_num(for unique port-setup.log):"$(od -An -N8 -i /dev/urandom)
+
+LOCKFILE=/tmp/mylockfile
+
+# Function to release the lock
+release_lock() {
+  rm -f \${LOCKFILE}
+}
+
+# Set up the trap to release the lock on exit
+trap release_lock EXIT
+
+while true ; do
+sleep 2
+cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
+if [ \${#cli_entry[@]} -gt 1 ] ; then
+
+        for (( id=0 ; id<\${#cli_entry[@]} ; id+=2 )) ;  do
+                declare "\${cli_entry[id]}"="\${cli_entry[\$((id+1))]}"
+                #echo "\${cli_entry[id]}"="\${cli_entry[\$((id+1))]}"
+        done
+
+        if [ X\${is_created} == X"yes" ] && [ X\${is_enabled} == X"yes" ] ; then
+                IDPF_VPORT_VSI_HEX=\${vsi_id}
+                VSI_GROUP_INIT=\$(printf  "0x%x" \$((0x8000050000000000 + IDPF_VPORT_VSI_HEX)))
+                VSI_GROUP_WRITE=\$(printf "0x%x" \$((0xA000050000000000 + IDPF_VPORT_VSI_HEX)))
+                echo "#Add to VSI Group 1 :  \${IDPF_VPORT_NAME} [vsi: \${IDPF_VPORT_VSI_HEX}]"
+                # Try to acquire the lock
+                while true ; do
+                if ( set -o noclobber; echo $$ > \${LOCKFILE} ) 2>/dev/null; then
+                  echo "RunDevMemCmds_Start: LogFile->"
+                  # Critical section - only one script can be here at a time
+                  devmem 0x20292002a0 64 \${VSI_GROUP_INIT}
+                  devmem 0x2029200388 64 0x1
+                  devmem 0x20292002a0 64 \${VSI_GROUP_WRITE}
+                  sync
+                  echo "RunDevMemCmds_End: LogFile->"
+                  # Release the lock
+                  rm \${LOCKFILE}
+                  exit 0
+                else
+                  echo "RunDevMemCmds: Needs to wait,sleep"
+                  sleep 1
+                fi
+                done
+        fi
+else
+        retry=\$((retry+1))
+        echo "RETRY: \${retry} : #Add to VSI Group 1 :  \${IDPF_VPORT_NAME} .. "
+fi
+done
+PORT_CONFIG_EOF
+
+/usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
+/usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"'' 0<&- &> ${PORT_SETUP_LOG} &
+
+log_retry=0
+while true ; do
+   sync
+if [[ $log_retry -gt 10 ]]; then
+   echo "waited for log more than 10 secs, 2nd attempt for port_setup.sh below"
+   /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
+   /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"'' 0<&- &> ${PORT_SETUP_LOG2} &
+   echo "2nd attempt for port_setup.sh done"
+   sleep 1
+   sync
+   break
+fi
+if [[ -s ${PORT_SETUP_LOG}  ]]; then
+   log_retry=$((log_retry+1))
+   echo "log file empty. sleep and check"
+   sleep 1
+elif [ ! -f ${PORT_SETUP_LOG} ]; then
+   log_retry=$((log_retry+1))
+   echo "log file doesnt exist. sleep and check"
+   sleep 1
+else
+   if [ -f ${PORT_SETUP_LOG} ]; then
+      echo "log file exists. break"
+      break
+   fi
+fi
+done`
+
+	return postInitAppScriptStr
+}
+
 func genLoadCustomPkgFile(macAddress string) string {
 
 	p4PkgName := os.Getenv("P4_NAME") + ".pkg"
@@ -678,9 +846,12 @@ fi
 /*
 	IMC reboot needed for following cases:
 
+Note: Changes to load_custom_pkg.sh or post_init_app.sh is managed
+thro ipu-plugin->using genLoadCustomPkgFile and postInitAppScript.
 1. First time provisioning of IPU system(where MAC gets set in node policy)
 2. Upgrade-for any update to P4 package.
 3. Upgrade-for node policy. Other changes in node policy thro load_custom_pkg.sh.
+4. Check if file-> post_init_app.sh exists.
 Returns-> bool(returns false, if IMC reboot is required), string->for any error or success string.
 */
 func skipIMCReboot() (bool, string) {
@@ -717,7 +888,7 @@ func skipIMCReboot() (bool, string) {
 	p4pkgMatch := false
 	uuidFileExists := false
 	lcpkgFileMatch := false
-
+	piaFileMatch := false
 	outputStr := strings.TrimSuffix(string(outputBytes), "\n")
 
 	if outputStr == "File does not exist" {
@@ -807,7 +978,41 @@ func skipIMCReboot() (bool, string) {
 		return false, "lcpkgFileMatch mismatch"
 	}
 
-	log.Infof("uuidFileExists->%v, p4pkgMatch->%v, lcpkgFileMatch->%v", uuidFileExists, p4pkgMatch, lcpkgFileMatch)
+	postInitAppFile := postInitAppScript()
+	postInitAppFileHash := md5.Sum([]byte(postInitAppFile))
+	postInitAppFileHashStr := hex.EncodeToString(postInitAppFileHash[:])
+
+	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
+	imcPostInitFile, err := sftpClient.Open(postInitRemoteFilePath)
+	if err != nil {
+		log.Errorf("failed to open post_init_app.sh file: %s", err)
+		return false, fmt.Sprintf("failed to open post_init_app.sh file: %s", err)
+	}
+	log.Infof("post_init_app.sh file exists")
+	defer imcPostInitFile.Close()
+
+	imcPostInitFileBytes, err := io.ReadAll(imcPostInitFile)
+	if err != nil {
+		log.Errorf("failed to read post_init_app.sh: %s", err)
+		return false, fmt.Sprintf("failed to read post_init_app.sh: %s", err)
+	}
+
+	imcPostInitFileHash := md5.Sum(imcPostInitFileBytes)
+	imcPostInitFileHashStr := hex.EncodeToString(imcPostInitFileHash[:])
+
+	if postInitAppFileHashStr != imcPostInitFileHashStr {
+		log.Infof("post_init_app.sh md5 mismatch, generated->%v, on IMC->%v", postInitAppFileHashStr, imcPostInitFileHashStr)
+	} else {
+		log.Infof("post_init_app.sh md5 match, generated->%v, on IMC->%v", postInitAppFileHashStr, imcPostInitFileHashStr)
+		piaFileMatch = true
+	}
+
+	if !piaFileMatch {
+		return false, "piaFileMatch mismatch"
+	}
+
+	log.Infof("uuidFileExists->%v, p4pkgMatch->%v, lcpkgFileMatch->%v, piaFileMatch->%v",
+		uuidFileExists, p4pkgMatch, lcpkgFileMatch, piaFileMatch)
 	return true, fmt.Sprintf("checks pass, imc reboot not required")
 
 }
