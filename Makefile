@@ -101,19 +101,13 @@ fast_e2e_test: prepare-e2e-test
 e2e-test: deploy_clusters e2e-test-suite deploy_tft_tests
 	@echo "E2E Test Completed"
 
-.PHONY: redeploy
-redeploy:
-	 -$(MAKE) undeploy
-	 $(MAKE) local-buildx
-	 $(MAKE) local-pushx
-	 $(MAKE) local-deploy
-	 @echo "redeployed"
-
 .PHONY: redeploy-both
 redeploy-both:
-	KUBECONFIG=/root/kubeconfig.microshift make redeploy
+	# $(MAKE) local-buildx-incremental-manager
+	$(MAKE) local-pushx
+	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
 	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
-	KUBECONFIG=/root/kubeconfig.ocpcluster make redeploy
+	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
 	KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
 
 .PHONY: all
@@ -274,6 +268,7 @@ incremental-prep-local-deploy: tools
 
 .PHONY: local-deploy
 local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
+	-$(MAKE) undeploy
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
