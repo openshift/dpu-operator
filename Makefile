@@ -221,6 +221,10 @@ VSP_BIN         = bin/vsp-mrvl
 GOARCH ?= amd64
 GOOS ?= linux
 
+.PHONY: build
+build: manifests generate fmt vet build-manager build-daemon build-intel-vsp build-marvell-vsp
+	@echo "Built all components"
+
 .PHONY: build-manager
 build-manager:
 	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(MANAGER_BIN).${GOARCH} cmd/main.go
