@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-logr/logr"
 	ghw "github.com/jaypipes/ghw"
@@ -33,6 +32,8 @@ const (
 	Version       string = "0.0.1"
 	PortType      string = "veth"
 	NoOfPortPairs int    = 2
+	IPv6AddrDpu   string = "fe80::1"
+	IPv6AddrHost  string = "fe80::2"
 )
 
 type mrvlDeviceInfo struct {
@@ -264,7 +265,9 @@ func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
 		klog.Errorf("Error occurred in getting Interface Name: %v", err)
 		return pb.IpPort{}, err
 	}
-	err = enableIPV6LinkLocal(IfName)
+	klog.Infof("Interface Name: %s", IfName)
+
+	err = enableIPV6LinkLocal(IfName, IPv6AddrDpu)
 	if err != nil {
 		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
 		return pb.IpPort{}, err
@@ -309,8 +312,9 @@ func (vsp *mrvlVspServer) hostIpPort() (pb.IpPort, error) {
 		klog.Errorf("Error occurred in getting Interface Name: %v", err)
 		return pb.IpPort{}, err
 	}
-	klog.Infof("Interface Name  InterfaceName: %v", ifName)
-	err = enableIPV6LinkLocal(ifName)
+	klog.Infof("Interface Name: %s", ifName)
+
+	err = enableIPV6LinkLocal(ifName, IPv6AddrHost)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in enabling IPv6 Link local Address: %v")
 		return pb.IpPort{}, err
@@ -393,40 +397,33 @@ func getInterfaceName(deviceID string) (string, error) {
 
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
-func enableIPV6LinkLocal(interfaceName string) error {
-	baseNsenterCmd := "nsenter -t 1 -m -u -n -i -- "
-	nmcliCmdStr := baseNsenterCmd + "nmcli con add type ethernet ifname " + interfaceName + " ipv6.method link-local"
-	nmcliCmd := exec.Command("/bin/sh", "-c", nmcliCmdStr)
-	if err := nmcliCmd.Run(); err != nil {
-		return err
+func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
+	// Tell NetworkManager to not manage our interface.
+	err1 := exec.Command("nsenter", "-t", "1", "-m", "-u", "-n", "-i", "--", "nmcli", "device", "set", interfaceName, "managed", "no").Run()
+	if err1 != nil {
+		// This error may be fine. Maybe our host doesn't even run
+		// NetworkManager. Ignore.
+		klog.Infof("nmcli device set %s managed no failed with error %v", interfaceName, err1)
 	}
 
-	// wait for interface to get IPv6 Link local address
-	time.Sleep(3 * time.Second)
-	link, err := netlink.LinkByName(interfaceName)
+	// Ensure to set addrgenmode and toggle link state (which can result in creating
+	// the IPv6 link local address. Ignore errors here.
+	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
+	exec.Command("ip", "link", "set", interfaceName, "down").Run()
+
+	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error setting link %s up: %v", interfaceName, err)
 	}
 
-	//returns the list of IPv6 addresses on the given interface
-	address, err := netlink.AddrList(link, netlink.FAMILY_V6)
+	err = exec.Command("ip", "addr", "replace", ipv6Addr+"/64", "dev", interfaceName).Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error configuring IPv6 address %s/64 on link %s: %v", ipv6Addr, interfaceName, err)
 	}
 
-	if len(address) == 0 {
-		klog.Error("IPv6 address not found on interface", interfaceName)
-		return errors.New("IPv6 address not found on interface")
-	}
+	// Ping IPv6 Multicast group to get the IPv6 Neighbour Entry in Arp Table
+	exec.Command("ping6", "-c", "2", "-I", interfaceName, "ff02::1").Run()
 
-	//ping to get the IPv6 Neighbour Entry in Arp Table
-	cmdS := baseNsenterCmd + "/usr/bin/ping6 -c 2 -I " + interfaceName + " ff02::1 &> /dev/null"
-	cmd := exec.Command("/bin/sh", "-c", cmdS)
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-	time.Sleep(2 * time.Second)
 	return nil
 }
 
