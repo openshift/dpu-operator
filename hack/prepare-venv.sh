@@ -14,6 +14,6 @@ cd ocp-traffic-flow-tests
 rm -rf /tmp/tft-venv
 python3.11 -m venv /tmp/tft-venv
 source /tmp/tft-venv/bin/activate
-pip3.11 install -r requirements.txt
+pip install -r requirements.txt
 deactivate
 cd -

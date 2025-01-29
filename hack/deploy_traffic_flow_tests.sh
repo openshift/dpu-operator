@@ -28,4 +28,4 @@ envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > tft_config.yaml
 # Give dpu operator pods time to settle to ensure pods will successfully create
 sleep 100
 
-python3.11 main.py tft_config.yaml
+python main.py tft_config.yaml
