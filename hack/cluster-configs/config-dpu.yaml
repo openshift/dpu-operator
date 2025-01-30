@@ -8,13 +8,13 @@ clusters:
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
-      kind: "ipu"
-      bmc: "{{IMC_hostname(0)}}"
-      bmc_user: "root"
-      bmc_password: "redhat"
+      kind: "dpu"
+      bmc:
+        url: "{{bmc_hostname(0)}}"
+        user: "root"
       host_side_bmc: "{{bmc(0)}}"
       ip: "172.16.3.16"
-      mac: "{{IPU_mac_address(0)}}"
+      mac: "{{DPU_mac_address(0)}}"
     postconfig:
     - name: "rh_subscription"
       organization_id: "{{organization_id()}}"
