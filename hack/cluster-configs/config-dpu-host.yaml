@@ -28,6 +28,7 @@ clusters:
     - name: "worker-{{worker_number(0)}}"
       kind: "physical"
       node: "{{worker_name(0)}}" 
-      bmc_user: "root"
-      bmc_password: "calvin"
-      bmc: "{{bmc(0)}}"
+      bmc:
+        user: "root"
+        password: "calvin"
+        url: "{{bmc(0)}}"
