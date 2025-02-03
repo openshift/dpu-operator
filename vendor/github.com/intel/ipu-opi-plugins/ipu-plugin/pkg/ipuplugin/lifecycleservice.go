@@ -699,7 +699,11 @@ So, at the most, we would run port-setup.sh twice.
 Running devmem commands thro locking mechanism, so the devmem commands are 
 run in critical section, so that devmem commands are run sequentially,
 when port-setup.sh gets run concurrently.
-*/
+Note: In order to handle RHEL ISO install use-case, where ACC reboots(post install),
+independant of IMC, port-setup script will be running
+as daemon, so anytime ACC goes down(it will get detected), so that devmem commands
+will get re-run, when ACC comes up. Based on design, atleast 1 or utmost 2 instances
+of port-setup can be running as daemon. */
 func postInitAppScript() string {
 
 	postInitAppScriptStr := `#!/bin/bash
@@ -720,12 +724,21 @@ pkill -9 $(basename ${PORT_SETUP_SCRIPT})
 
 cat<<PORT_CONFIG_EOF > ${PORT_SETUP_SCRIPT}
 #!/bin/bash
-set -x
 IDPF_VPORT_NAME="enp0s1f0d5"
 ACC_VPORT_ID=0x5
 retry=0
+ran_cmds=0
+ran_cmds_cnt=0
+ran_cmds_cnt_max=2147483647 # Max value for 32-bit signed integer
 
-echo "random_num(for unique port-setup.log):"$(od -An -N8 -i /dev/urandom)
+# Set max size of log file (bytes)
+MAX_LOG_SIZE=1048576
+# Log file to check
+LOG_FILE=\${1}
+
+echo "LOG_FILE->:"\${LOG_FILE}
+
+echo "random_num(for unique port-setup.log):"\$(od -An -N8 -i /dev/urandom)
 
 LOCKFILE=/tmp/mylockfile
 
@@ -737,7 +750,10 @@ release_lock() {
 # Set up the trap to release the lock on exit
 trap release_lock EXIT
 
-while true ; do
+# Function to invoke devmem commands
+run_devmem_cmds() {
+retry=0
+while [[ \${ran_cmds} -eq 0 ]] ; do
 sleep 2
 cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
 if [ \${#cli_entry[@]} -gt 1 ] ; then
@@ -754,17 +770,25 @@ if [ \${#cli_entry[@]} -gt 1 ] ; then
                 echo "#Add to VSI Group 1 :  \${IDPF_VPORT_NAME} [vsi: \${IDPF_VPORT_VSI_HEX}]"
                 # Try to acquire the lock
                 while true ; do
-                if ( set -o noclobber; echo $$ > \${LOCKFILE} ) 2>/dev/null; then
+                if ( set -o noclobber; echo \$$ > \${LOCKFILE} ) 2>/dev/null; then
                   echo "RunDevMemCmds_Start: LogFile->"
                   # Critical section - only one script can be here at a time
+                  set -x
                   devmem 0x20292002a0 64 \${VSI_GROUP_INIT}
                   devmem 0x2029200388 64 0x1
                   devmem 0x20292002a0 64 \${VSI_GROUP_WRITE}
+                  set +x
                   sync
-                  echo "RunDevMemCmds_End: LogFile->"
+                  if [ \${ran_cmds_cnt} -eq  \${ran_cmds_cnt_max} ]; then
+                     echo "ran_cmds_cnt has reached maximum value, reset"
+                     ran_cmds_cnt=0
+                  fi
+                  ran_cmds_cnt=\$((ran_cmds_cnt+1))
+                  echo "RunDevMemCmds_End: LogFile, ran_cmds_cnt->"\${ran_cmds_cnt}
                   # Release the lock
-                  rm \${LOCKFILE}
-                  exit 0
+                  release_lock
+                  ran_cmds=1
+                  break
                 else
                   echo "RunDevMemCmds: Needs to wait,sleep"
                   sleep 1
@@ -776,10 +800,50 @@ else
         echo "RETRY: \${retry} : #Add to VSI Group 1 :  \${IDPF_VPORT_NAME} .. "
 fi
 done
+}
+
+# Function to check if D5 interface is up on ACC
+d5_interface_up() {
+  cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
+  if [ \${#cli_entry[@]} -gt 1 ] ; then
+   return 1  # Success
+  fi
+  return 0
+}
+
+# Invokes run_devmem_cmds, upon startup, and periodically checks if D5 is alive, if not re-run.
+while [[ \${ran_cmds} -eq 0 ]]; do
+   echo "invoke run_devmem_cmds"
+   run_devmem_cmds
+   echo "ran_cmds->"\${ran_cmds}
+
+   #Truncate log, if needed
+   LOG_FILE_SIZE=\$(stat -c %s \${LOG_FILE})
+   # Check if file size exceeds max
+   if [ \${LOG_FILE_SIZE} -gt \${MAX_LOG_SIZE} ]; then
+      echo "File exceeds maximum size. Truncating->"\${LOG_FILE}
+      # Truncate the file, by saving the last 1000 lines
+      X=\$(tail -1000 \${LOG_FILE})
+      echo \${X}>\${LOG_FILE}
+   fi
+
+   #inner while
+   while true ; do
+   d5_interface_up
+   if [[ \$? -eq 1 ]]; then
+      #echo "D5 interface up, sleep"
+      sleep 5
+   else
+      echo "D5 not found. ACC may have gone down, retry."
+      ran_cmds=0
+      break
+   fi
+   done
+done
 PORT_CONFIG_EOF
 
 /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
-/usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"'' 0<&- &> ${PORT_SETUP_LOG} &
+/usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"' '"${PORT_SETUP_LOG}"'' 0>&- &> ${PORT_SETUP_LOG} &
 
 log_retry=0
 while true ; do
@@ -787,7 +851,7 @@ while true ; do
 if [[ $log_retry -gt 10 ]]; then
    echo "waited for log more than 10 secs, 2nd attempt for port_setup.sh below"
    /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
-   /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"'' 0<&- &> ${PORT_SETUP_LOG2} &
+   /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"' '"${PORT_SETUP_LOG2}"'' 0>&- &> ${PORT_SETUP_LOG2} &
    echo "2nd attempt for port_setup.sh done"
    sleep 1
    sync
