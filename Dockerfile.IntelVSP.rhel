@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.19 AS builder
+FROM quay.io/sdaniele/builder-4-19 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -6,10 +6,14 @@ WORKDIR /workspace
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
 
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM quay.io/centos/centos:stream9
 ARG TARGETARCH
 ENV PYTHONUNBUFFERED=1
-RUN dnf install -y NetworkManager openvswitch3.4 iproute python3 python3-pip openssh-clients
+
+COPY redhat.aarch64.repo /etc/yum.repos.d/
+COPY redhat.amd64.repo /etc/yum.repos.d/
+
+RUN ART_DNF_WRAPPER_POLICY="skip" dnf install -y NetworkManager openvswitch3.4 iproute python3 python3-pip openssh-clients
 #By setting workdir, the directory is created automatically
 WORKDIR /opt/p4/p4-cp-nws/bin/
 
