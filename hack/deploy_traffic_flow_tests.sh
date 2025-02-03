@@ -27,4 +27,4 @@ temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
-python main.py $temp_file
+./tft.py $temp_file
