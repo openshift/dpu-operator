@@ -353,9 +353,9 @@ local-buildx-incremental-marvell-vsp: prepare-multi-arch go-cache
 	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
 
 .PHONY: local-buildx-incremental-intel-vsp
+local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-intel-vsp
 	GOARCH=amd64 $(MAKE) build-intel-vsp
-local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
 
 
