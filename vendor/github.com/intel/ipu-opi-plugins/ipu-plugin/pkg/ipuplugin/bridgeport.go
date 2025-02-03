@@ -125,7 +125,7 @@ func (s *server) CreateBridgePort(_ context.Context, in *pb.CreateBridgePortRequ
 		return s.Ports[in.BridgePort.Name].PbBrPort, nil
 	}
 
-	CheckAndAddPeerToPeerP4Rules(s.p4rtbin)
+	CheckAndAddPeerToPeerP4Rules(s.p4rtClient)
 
 	err, intfName := allocateAccInterface()
 	if err != nil {
@@ -147,8 +147,8 @@ func (s *server) CreateBridgePort(_ context.Context, in *pb.CreateBridgePortRequ
 	}
 
 	// Add FXP rules
-	log.Infof("AddHostVfP4Rules, path->%s, 1->%v, 2->%v", s.p4rtbin, in.BridgePort.Spec.MacAddress, AccApfMacList[intIndex])
-	p4rtclient.AddHostVfP4Rules(s.p4rtbin, in.BridgePort.Spec.MacAddress, AccApfMacList[intIndex])
+	log.Infof("AddHostVfP4Rules, path->%s, 1->%v, 2->%v", s.p4rtClient.GetBin(), in.BridgePort.Spec.MacAddress, AccApfMacList[intIndex])
+	p4rtclient.AddHostVfP4Rules(s.p4rtClient, in.BridgePort.Spec.MacAddress, AccApfMacList[intIndex])
 
 	resp := proto.Clone(in.BridgePort).(*pb.BridgePort)
 	resp.Status = &pb.BridgePortStatus{OperStatus: pb.BPOperStatus_BP_OPER_STATUS_UP}
@@ -194,8 +194,8 @@ func (s *server) DeleteBridgePort(_ context.Context, in *pb.DeleteBridgePortRequ
 	}
 	freeAccInterface(brPortInfo.PortInterface)
 	// Delete FXP rules
-	log.Infof("DeleteHostVfP4Rules, path->%s, 1->%v, 2->%v", s.p4rtbin, portInfo.Spec.MacAddress, AccApfMacList[intIndex])
-	p4rtclient.DeleteHostVfP4Rules(s.p4rtbin, portInfo.Spec.MacAddress, AccApfMacList[intIndex])
+	log.Infof("DeleteHostVfP4Rules, path->%s, 1->%v, 2->%v", s.p4rtClient.GetBin(), portInfo.Spec.MacAddress, AccApfMacList[intIndex])
+	p4rtclient.DeleteHostVfP4Rules(s.p4rtClient, portInfo.Spec.MacAddress, AccApfMacList[intIndex])
 
 	delete(s.Ports, in.Name)
 	return &emptypb.Empty{}, nil
