@@ -267,7 +267,7 @@ prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
-.PHONY: incremental-local-deploy-prep
+.PHONY: incremental-prep-local-deploy
 incremental-prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
@@ -360,7 +360,7 @@ local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 
 
 .PHONY: incremental-local-buildx
-incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy build-both
+incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp
 	@echo "local-buildx-incremental completed"
 
 .PHONY: local-pushx
