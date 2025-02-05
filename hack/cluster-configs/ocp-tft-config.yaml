@@ -22,4 +22,4 @@ tft:
         secondary_network_nad: "default-sriov-net"
         resource_name: "openshift.io/dpu"
 kubeconfig: "/root/kubeconfig.ocpcluster"
-kubeconfig_infra: "/var/lib/microshift/resources/kubeadmin/$acc/kubeconfig"
+kubeconfig_infra: "/root/kubeconfig.microshift"
