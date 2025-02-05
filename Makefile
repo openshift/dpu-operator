@@ -330,19 +330,19 @@ endef
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: prepare-multi-arch go-cache
+local-buildx-incremental-manager: tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
 	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
 
 .PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: prepare-multi-arch go-cache
+local-buildx-incremental-daemon: tools prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
 	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
 
 .PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: prepare-multi-arch go-cache
+local-buildx-incremental-marvell-vsp: tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
 	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
