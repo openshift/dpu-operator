@@ -27,7 +27,4 @@ temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
-# Give dpu operator pods time to settle to ensure pods will successfully create
-sleep 100
-
 python main.py $temp_file
