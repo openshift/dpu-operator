@@ -2,10 +2,10 @@
 
 set -e
 
+bash hack/prepare-venv.sh
+
 cd ocp-traffic-flow-tests
 source /tmp/tft-venv/bin/activate
-
-pip install -r requirements.txt
 
 export KUBECONFIG=/root/kubeconfig.ocpcluster
 nodes=$(oc get nodes)
