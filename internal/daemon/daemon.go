@@ -26,23 +26,6 @@ type SideManager interface {
 	Stop()
 }
 
-func createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
-	platform := platform.NewPlatformInfo()
-	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
-	if err != nil {
-		return nil, err
-	}
-
-	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
-	dp := deviceplugin.NewDevicePlugin(deviceHandler)
-
-	if dpuMode {
-		return NewDpuSideManger(plugin, dp, config), nil
-	} else {
-		return NewHostSideManager(plugin, dp), nil
-	}
-}
-
 type Daemon struct {
 	client    client.Client
 	mode      string
@@ -79,12 +62,29 @@ func (d *Daemon) Run() error {
 	if err != nil {
 		return err
 	}
-	daemon, err := createDaemon(dpuMode, d.config, d.vspImages, d.client)
+	daemon, err := d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
 	if err != nil {
 		d.log.Error(err, "Failed to start daemon")
 		return err
 	}
 	return daemon.ListenAndServe()
+}
+
+func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
+	platform := platform.NewPlatformInfo()
+	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
+	dp := deviceplugin.NewDevicePlugin(deviceHandler)
+
+	if dpuMode {
+		return NewDpuSideManger(plugin, dp, config), nil
+	} else {
+		return NewHostSideManager(plugin, dp), nil
+	}
 }
 
 func (d *Daemon) prepareCni(flavour utils.Flavour) error {
