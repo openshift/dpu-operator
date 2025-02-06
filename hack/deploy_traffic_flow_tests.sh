@@ -2,10 +2,10 @@
 
 set -e
 
+bash hack/prepare-venv.sh
+
 cd ocp-traffic-flow-tests
 source /tmp/tft-venv/bin/activate
-
-pip install -r requirements.txt
 
 export KUBECONFIG=/root/kubeconfig.ocpcluster
 nodes=$(oc get nodes)
@@ -23,9 +23,8 @@ if [ -z "$acc" ]; then
   exit 1
 fi
 
-envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > tft_config.yaml
+temp_file=$(mktemp)
 
-# Give dpu operator pods time to settle to ensure pods will successfully create
-sleep 100
+envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
-python main.py tft_config.yaml
+python main.py $temp_file

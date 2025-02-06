@@ -12,7 +12,6 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,23 +26,6 @@ type SideManager interface {
 	Stop()
 }
 
-func createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
-	platform := platform.NewPlatformInfo()
-	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
-	if err != nil {
-		return nil, err
-	}
-
-	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
-	dp := deviceplugin.NewDevicePlugin(deviceHandler)
-
-	if dpuMode {
-		return NewDpuSideManger(plugin, dp, config), nil
-	} else {
-		return NewHostSideManager(plugin, dp), nil
-	}
-}
-
 type Daemon struct {
 	client    client.Client
 	mode      string
@@ -53,7 +35,7 @@ type Daemon struct {
 	config    *rest.Config
 }
 
-func NewDaemon(mode string, client client.Client, scheme *runtime.Scheme, vspImages map[string]string, config *rest.Config) Daemon {
+func NewDaemon(mode string, client client.Client, vspImages map[string]string, config *rest.Config) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		client:    client,
@@ -80,12 +62,29 @@ func (d *Daemon) Run() error {
 	if err != nil {
 		return err
 	}
-	daemon, err := createDaemon(dpuMode, d.config, d.vspImages, d.client)
+	daemon, err := d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
 	if err != nil {
 		d.log.Error(err, "Failed to start daemon")
 		return err
 	}
 	return daemon.ListenAndServe()
+}
+
+func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
+	platform := platform.NewPlatformInfo()
+	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
+	dp := deviceplugin.NewDevicePlugin(deviceHandler)
+
+	if dpuMode {
+		return NewDpuSideManger(plugin, dp, config), nil
+	} else {
+		return NewHostSideManager(plugin, dp), nil
+	}
 }
 
 func (d *Daemon) prepareCni(flavour utils.Flavour) error {

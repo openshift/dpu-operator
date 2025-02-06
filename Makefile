@@ -101,19 +101,13 @@ fast_e2e_test: prepare-e2e-test
 e2e-test: deploy_clusters e2e-test-suite deploy_tft_tests
 	@echo "E2E Test Completed"
 
-.PHONY: redeploy
-redeploy:
-	 -$(MAKE) undeploy
-	 $(MAKE) local-buildx
-	 $(MAKE) local-pushx
-	 $(MAKE) local-deploy
-	 @echo "redeployed"
-
 .PHONY: redeploy-both
 redeploy-both:
-	KUBECONFIG=/root/kubeconfig.microshift make redeploy
+	# $(MAKE) local-buildx-incremental-manager
+	$(MAKE) local-pushx
+	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
 	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
-	KUBECONFIG=/root/kubeconfig.ocpcluster make redeploy
+	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
 	KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
 
 .PHONY: all
@@ -267,13 +261,14 @@ prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
-.PHONY: incremental-local-deploy-prep
+.PHONY: incremental-prep-local-deploy
 incremental-prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: local-deploy
 local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
+	-$(MAKE) undeploy
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
@@ -335,32 +330,32 @@ endef
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: prepare-multi-arch go-cache
+local-buildx-incremental-manager: tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
 	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
 
 .PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: prepare-multi-arch go-cache
+local-buildx-incremental-daemon: tools prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
 	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
 
 .PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: prepare-multi-arch go-cache
+local-buildx-incremental-marvell-vsp: tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
 	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
 
 .PHONY: local-buildx-incremental-intel-vsp
+local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-intel-vsp
 	GOARCH=amd64 $(MAKE) build-intel-vsp
-local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
 
 
 .PHONY: incremental-local-buildx
-incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy build-both
+incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp
 	@echo "local-buildx-incremental completed"
 
 .PHONY: local-pushx

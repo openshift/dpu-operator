@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/openshift/dpu-operator/internal/scheme"
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,8 +24,6 @@ import (
 
 	"k8s.io/client-go/rest"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -116,13 +114,8 @@ func deleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *sync.WaitGroup) ctrl.Manager {
 	var err error
 
-	scheme := runtime.NewScheme()
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(configv1.AddToScheme(scheme))
-	utilruntime.Must(netattdefv1.AddToScheme(scheme))
-
 	mgr, err := ctrl.NewManager(client, ctrl.Options{
-		Scheme: scheme,
+		Scheme: scheme.Scheme,
 		Metrics: server.Options{
 			BindAddress: ":18001",
 		},
