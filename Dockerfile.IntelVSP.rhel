@@ -9,15 +9,32 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETARCH
 ENV PYTHONUNBUFFERED=1
-RUN dnf install -y NetworkManager openvswitch3.4 iproute python3 python3-pip openssh-clients
+
+# https://github.com/grpc/grpc/issues/24556
+# dependencies needed to compile python packages
+# python3-dev gcc gcc-c++
+RUN dnf install -y \
+	NetworkManager openvswitch3.4 iproute python3 python3-devel openssh-clients gcc gcc-c++ \
+    && python3 -m ensurepip --upgrade
+
 #By setting workdir, the directory is created automatically
 WORKDIR /opt/p4/p4-cp-nws/bin/
 
 COPY ./cmd/intelvsp/fxp-net_linux-networking.pkg /
 COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
-#TODO: Update to newer package, according to release.
-COPY ./cmd/intelvsp/p4runtime-2023.11.0-py3-none-any.whl /opt/p4/p4-cp-nws/bin/
-RUN python3 -m pip install --no-cache-dir /opt/p4/p4-cp-nws/bin/p4runtime-2023.11.0-py3-none-any.whl grpcio'=='1.59.3 protobuf'=='4.25.0 netaddr'=='0.9.0
+
+# Add steps for cachito
+ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
+ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
+COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+COPY openshift/install-dpu.sh .
+RUN chmod +x install-dpu.sh \
+    && ./install-dpu.sh
+
+# Remove packages which are only needed for cachito
+RUN dnf remove -y gcc gcc-c++ \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
 
 COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /usr/bin/ipuplugin
 WORKDIR /
