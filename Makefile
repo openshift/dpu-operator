@@ -281,6 +281,13 @@ local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller w
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	@echo "Waiting for namespace 'openshift-dpu-operator' to be removed..."
+	@while $(KUBECTL) get ns openshift-dpu-operator >/dev/null 2>&1; do \
+		echo "Namespace still exists... waiting"; \
+		sleep 5; \
+	done
+	@echo "Namespace 'openshift-dpu-operator' has been removed."
+
 
 .PHONY: local-build
 local-build: ## Build all container images necessary to run the whole operator
