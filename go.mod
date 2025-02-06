@@ -7,7 +7,7 @@ require (
 	github.com/containernetworking/plugins v1.5.0
 	github.com/go-logr/logr v1.4.2
 	github.com/gorilla/mux v1.8.1
-	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250206004742-b96859d2ebd0
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250206232827-56622a78dbc5
 	github.com/jaypipes/ghw v0.13.0
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.5.0
@@ -20,7 +20,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/net v0.30.0
+	golang.org/x/net v0.33.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	k8s.io/api v0.31.1
