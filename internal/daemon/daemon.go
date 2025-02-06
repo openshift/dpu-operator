@@ -47,7 +47,7 @@ func NewDaemon(mode string, client client.Client, vspImages map[string]string, c
 	}
 }
 
-func (d *Daemon) Run() error {
+func (d *Daemon) ListenAndServe() error {
 	ce := utils.NewClusterEnvironment(d.client)
 	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
