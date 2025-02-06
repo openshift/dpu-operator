@@ -33,6 +33,7 @@ type Daemon struct {
 	log       logr.Logger
 	vspImages map[string]string
 	config    *rest.Config
+	mgr       SideManager
 }
 
 func NewDaemon(mode string, client client.Client, vspImages map[string]string, config *rest.Config) Daemon {
@@ -62,12 +63,12 @@ func (d *Daemon) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	daemon, err := d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
+	d.mgr, err = d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
 	if err != nil {
 		d.log.Error(err, "Failed to start daemon")
 		return err
 	}
-	return daemon.ListenAndServe()
+	return d.mgr.ListenAndServe()
 }
 
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
