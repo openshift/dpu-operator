@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 )
 
 const (
@@ -29,7 +30,7 @@ type dpServer struct {
 	pluginapi.DevicePluginServer
 	log           logr.Logger
 	pathManager   utils.PathManager
-	deviceHandler DeviceHandler
+	deviceHandler dh.DeviceHandler
 	startedWg     sync.WaitGroup
 }
 
@@ -38,7 +39,7 @@ type DevicePlugin interface {
 	Stop() error
 }
 
-func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *DeviceList) error {
+func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer, devices *dh.DeviceList) error {
 	resp := new(pluginapi.ListAndWatchResponse)
 	for _, dev := range *devices {
 		resp.Devices = append(resp.Devices, &dev)
@@ -53,7 +54,7 @@ func (dp *dpServer) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer
 	return nil
 }
 
-func (dp *dpServer) devicesEqual(d1, d2 *DeviceList) bool {
+func (dp *dpServer) devicesEqual(d1, d2 *dh.DeviceList) bool {
 	if len(*d1) != len(*d2) {
 		return false
 	}
@@ -67,7 +68,7 @@ func (dp *dpServer) devicesEqual(d1, d2 *DeviceList) bool {
 	return true
 }
 
-func (dp *dpServer) setDeviceCache(devices *DeviceList) {
+func (dp *dpServer) setDeviceCache(devices *dh.DeviceList) {
 	dp.devices = *devices
 	for id, dev := range dp.devices {
 		dp.log.Info("Cached device", "id", id, "dev.ID", dev.ID)
@@ -83,7 +84,7 @@ func (dp *dpServer) checkCachedDeviceHealth(id string) (bool, error) {
 }
 
 func (dp *dpServer) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
-	oldDevices := make(DeviceList)
+	oldDevices := make(dh.DeviceList)
 	for {
 		newDevices, err := dp.deviceHandler.GetDevices()
 		if err != nil {
@@ -320,7 +321,7 @@ func WithPathManager(pathManager utils.PathManager) func(*dpServer) {
 	}
 }
 
-func NewDevicePlugin(dh DeviceHandler, opts ...func(*dpServer)) *dpServer {
+func NewDevicePlugin(dh dh.DeviceHandler, opts ...func(*dpServer)) *dpServer {
 	dp := &dpServer{
 		devices:       make(map[string]pluginapi.Device),
 		grpcServer:    grpc.NewServer(),
