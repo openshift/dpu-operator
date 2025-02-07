@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
@@ -268,9 +267,7 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 
 func (d *HostSideManager) Stop() {
 	if d.cniserver != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-		d.cniserver.Shutdown(ctx)
+		d.cniserver.ShutdownAndWait()
 		d.startedWg.Wait()
 		d.cniserver = nil
 	}

@@ -66,6 +66,12 @@ func (s *Server) Listen() (net.Listener, error) {
 	return listener, nil
 }
 
+func (s *Server) ShutdownAndWait() {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	s.Shutdown(ctx)
+}
+
 func processRequest(request *cnitypes.Request) (*cni100.Result, error) {
 	// FIXME: Do actual work here.
 	klog.Infof("DEBUG: %v", request)
