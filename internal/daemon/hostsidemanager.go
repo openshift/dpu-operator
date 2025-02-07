@@ -280,6 +280,7 @@ var (
 )
 
 func (d *HostSideManager) setupReconcilers() {
+	d.log.Info("HostSideManager.setupReconcilers()")
 	if d.manager == nil {
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme: scheme.Scheme,

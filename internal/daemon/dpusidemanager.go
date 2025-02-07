@@ -236,6 +236,7 @@ func (d *DpuSideManager) Stop() {
 }
 
 func (d *DpuSideManager) setupReconcilers() {
+	d.log.Info("DpuSideManager.setupReconcilers()")
 	if d.manager == nil {
 		t := time.Duration(0)
 
