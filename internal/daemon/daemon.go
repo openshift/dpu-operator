@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 
-	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
@@ -78,8 +77,7 @@ func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[s
 		return nil, err
 	}
 
-	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
-	dp := deviceplugin.NewDevicePlugin(deviceHandler)
+	dp := deviceplugin.NewDevicePlugin(dpuMode, *utils.NewPathManager("/"))
 
 	if dpuMode {
 		return NewDpuSideManger(plugin, dp, config), nil

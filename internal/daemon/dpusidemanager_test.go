@@ -9,7 +9,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	mockvsp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/mock-vsp"
@@ -68,11 +67,7 @@ var _ = g.Describe("DPU side maanger", Ordered, func() {
 		dpuPlugin := plugin.NewGrpcPlugin(true,
 			client,
 			plugin.WithPathManager(pathManager))
-		dpuDeviceHandler := dpudevicehandler.NewDpuDeviceHandler(
-			dpudevicehandler.WithPathManager(pathManager),
-			dpudevicehandler.WithDpuMode(true))
-		dp := deviceplugin.NewDevicePlugin(dpuDeviceHandler,
-			deviceplugin.WithPathManager(pathManager))
+		dp := deviceplugin.NewDevicePlugin(true, pathManager)
 		dpuDaemon = NewDpuSideManger(dpuPlugin, dp, config,
 			WithPathManager(pathManager))
 

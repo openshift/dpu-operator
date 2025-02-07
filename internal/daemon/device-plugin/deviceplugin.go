@@ -17,6 +17,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
+	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
 )
 
 const (
@@ -321,12 +322,13 @@ func WithPathManager(pathManager utils.PathManager) func(*dpServer) {
 	}
 }
 
-func NewDevicePlugin(dh dh.DeviceHandler, opts ...func(*dpServer)) *dpServer {
+func NewDevicePlugin(dpuMode bool, pm utils.PathManager, opts ...func(*dpServer)) *dpServer {
+	dh := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode), dpudevicehandler.WithPathManager(pm))
 	dp := &dpServer{
 		devices:       make(map[string]pluginapi.Device),
 		grpcServer:    grpc.NewServer(),
 		log:           ctrl.Log.WithName("DevicePlugin"),
-		pathManager:   *utils.NewPathManager("/"),
+		pathManager:   pm,
 		deviceHandler: dh,
 	}
 
