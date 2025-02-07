@@ -58,10 +58,9 @@ func (s *DpuSideManager) DeleteBridgePort(context context.Context, bpr *pb.Delet
 	return &emptypb.Empty{}, err
 }
 
-func NewDpuSideManger(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, config *rest.Config, opts ...func(*DpuSideManager)) *DpuSideManager {
+func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func(*DpuSideManager)) *DpuSideManager {
 	d := &DpuSideManager{
 		vsp:         vsp,
-		dp:          dp,
 		pathManager: *utils.NewPathManager("/"),
 		log:         ctrl.Log.WithName("DpuDaemon"),
 		macStore:    make(map[string][]string),
@@ -72,6 +71,8 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin, con
 	for _, opt := range opts {
 		opt(d)
 	}
+
+	d.dp = deviceplugin.NewDevicePlugin(true, d.pathManager)
 
 	return d
 }

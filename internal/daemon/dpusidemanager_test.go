@@ -67,9 +67,7 @@ var _ = g.Describe("DPU side maanger", Ordered, func() {
 		dpuPlugin := plugin.NewGrpcPlugin(true,
 			client,
 			plugin.WithPathManager(pathManager))
-		dp := deviceplugin.NewDevicePlugin(true, pathManager)
-		dpuDaemon = NewDpuSideManger(dpuPlugin, dp, config,
-			WithPathManager(pathManager))
+		dpuDaemon = NewDpuSideManger(dpuPlugin, config, WithPathManager(pathManager))
 
 		dpuListen, err := dpuDaemon.Listen()
 		Expect(err).NotTo(HaveOccurred())

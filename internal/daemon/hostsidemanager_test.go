@@ -192,9 +192,7 @@ var _ = g.Describe("Host Daemon", func() {
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon = NewHostSideManager(dummyPluginHost, &DummyDevicePlugin{}).
-			WithPathManager(pathManager).
-			WithSriovManager(m)
+		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m))
 	})
 
 	g.AfterEach(func() {
