@@ -172,7 +172,7 @@ func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Re
 }
 
 func (d *HostSideManager) Listen() (net.Listener, error) {
-	d.startedWg.Add(1)
+	d.startedWg.Add(3)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
 	addr, port, err := d.vsp.Start()
@@ -196,7 +196,6 @@ func (d *HostSideManager) Listen() (net.Listener, error) {
 }
 
 func (d *HostSideManager) ListenAndServe() error {
-	var wg sync.WaitGroup
 	done := make(chan error, 3)
 	listener, err := d.Listen()
 
@@ -205,19 +204,17 @@ func (d *HostSideManager) ListenAndServe() error {
 		return err
 	}
 
-	wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
-		if err := d.Serve(listener); err != nil {
+		if err := d.ServeHelper(listener); err != nil {
 			done <- err
 		} else {
 			done <- nil
 		}
 		d.log.Info("Stopping CNI server")
-		wg.Done()
+		d.startedWg.Done()
 	}()
 
-	wg.Add(1)
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.ListenAndServe(); err != nil {
@@ -226,12 +223,11 @@ func (d *HostSideManager) ListenAndServe() error {
 			done <- nil
 		}
 		d.log.Info("Stopping Device Plugin server")
-		wg.Done()
+		d.startedWg.Done()
 	}()
 
 	d.setupReconcilers()
 	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
-	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
@@ -240,7 +236,7 @@ func (d *HostSideManager) ListenAndServe() error {
 			done <- nil
 		}
 		d.log.Info("Stopping manager")
-		wg.Done()
+		d.startedWg.Done()
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
@@ -250,13 +246,19 @@ func (d *HostSideManager) ListenAndServe() error {
 	cancelManager()
 	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
-	wg.Wait()
+	d.startedWg.Wait()
 
 	return err
 }
 
 func (d *HostSideManager) Serve(listener net.Listener) error {
 	defer d.startedWg.Done()
+	defer d.startedWg.Done()
+	defer d.startedWg.Done()
+	return d.ServeHelper(listener)
+}
+
+func (d *HostSideManager) ServeHelper(listener net.Listener) error {
 	err := d.cniserver.Serve(listener)
 	if err != nil {
 		d.log.Error(err, "Error from CNI server while serving shim")
