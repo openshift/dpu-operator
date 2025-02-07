@@ -60,7 +60,17 @@ type BridgeController interface {
 	DeletePort(portName string) error
 }
 
+type FxpRuleBuilder struct {
+	Action   string
+	P4br     string
+	Control  string
+	Metadata string
+}
+
 type P4RTClient interface {
 	AddRules(macAddr []byte, vlan int)
 	DeleteRules(macAddr []byte, vlan int)
+	ProgramFXPP4Rules(ruleSets []FxpRuleBuilder) error
+	GetBin() string
+	GetIpPort() string
 }

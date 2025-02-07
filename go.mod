@@ -7,7 +7,7 @@ require (
 	github.com/containernetworking/plugins v1.5.0
 	github.com/go-logr/logr v1.4.2
 	github.com/gorilla/mux v1.8.1
-	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250129203714-90004d7df05a
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250206232827-56622a78dbc5
 	github.com/jaypipes/ghw v0.13.0
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.5.0
@@ -20,7 +20,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/net v0.30.0
+	golang.org/x/net v0.33.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	k8s.io/api v0.31.1
@@ -104,12 +104,12 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/term v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect

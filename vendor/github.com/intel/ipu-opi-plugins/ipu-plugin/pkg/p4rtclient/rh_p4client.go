@@ -29,20 +29,33 @@ const (
 )
 
 type rhP4Client struct {
-	p4RtBin    string
+	p4rtBin    string
+	p4rtIpPort string
 	portMuxVsi int
 	p4br       string
 	bridgeType types.BridgeType
 }
 
-func NewRHP4Client(p4RtBin string, portMuxVsi int, p4BridgeName string, brType types.BridgeType) types.P4RTClient {
+func NewRHP4Client(p4rtBin string, p4rtIpPort string, portMuxVsi int, p4BridgeName string, brType types.BridgeType) types.P4RTClient {
 	log.Debug("Creating Redhat P4Client instance")
 	return &rhP4Client{
-		p4RtBin:    p4RtBin,
+		p4rtBin:    p4rtBin,
+		p4rtIpPort: p4rtIpPort,
 		portMuxVsi: portMuxVsi,
 		p4br:       p4BridgeName,
 		bridgeType: brType,
 	}
+}
+
+func (p *rhP4Client) GetBin() string {
+	return p.p4rtBin
+}
+func (p *rhP4Client) GetIpPort() string {
+	return p.p4rtIpPort
+}
+func (p *rhP4Client) ProgramFXPP4Rules(ruleSets []types.FxpRuleBuilder) error {
+	// Dummy func for interface
+	return nil
 }
 
 func (p *rhP4Client) AddRules(macAddr []byte, vlan int) {
@@ -53,7 +66,7 @@ func (p *rhP4Client) AddRules(macAddr []byte, vlan int) {
 	log.WithField("number of rules", len(ruleSets)).Debug("adding FXP rules")
 
 	for _, r := range ruleSets {
-		if err := utils.RunP4rtCtlCommand(p.p4RtBin, r...); err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing add rule command")
 		}
 	}
@@ -68,7 +81,7 @@ func (p *rhP4Client) DeleteRules(macAddr []byte, vlan int) {
 	log.WithField("number of rules", len(ruleSets)).Debug("deleting FXP rules")
 
 	for _, r := range ruleSets {
-		if err := utils.RunP4rtCtlCommand(p.p4RtBin, r...); err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing del rule command")
 		}
 	}
@@ -136,7 +149,7 @@ func (p *rhP4Client) getDelRuleSets(macAddr []byte, vlan int) []fxpRuleParams {
 	return ruleSets
 }
 
-func CreateNetworkFunctionRules(p4rtbin string, vfMacList []string, apf1 string, apf2 string) {
+func CreateNetworkFunctionRules(p *p4rtclient, vfMacList []string, apf1 string, apf2 string) {
 
 	ruleSets := []fxpRuleParams{}
 
@@ -182,15 +195,15 @@ func CreateNetworkFunctionRules(p4rtbin string, vfMacList []string, apf1 string,
 	)
 
 	for _, r := range ruleSets {
-		if err := utils.RunP4rtCtlCommand(p4rtbin, r...); err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing del rule command")
 		} else {
-			log.Infof("Finished running: %s", p4rtbin+" "+strings.Join(r, " "))
+			log.Infof("Finished running: %s", p.p4rtBin+" "+strings.Join(r, " "))
 		}
 	}
 }
 
-func DeleteNetworkFunctionRules(p4rtbin string, vfMacList []string, apf1 string, apf2 string) {
+func DeleteNetworkFunctionRules(p *p4rtclient, vfMacList []string, apf1 string, apf2 string) {
 
 	ruleSets := []fxpRuleParams{}
 
@@ -236,10 +249,10 @@ func DeleteNetworkFunctionRules(p4rtbin string, vfMacList []string, apf1 string,
 	)
 
 	for _, r := range ruleSets {
-		if err := utils.RunP4rtCtlCommand(p4rtbin, r...); err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing del rule command")
 		} else {
-			log.Infof("Finished running: %s", p4rtbin+" "+strings.Join(r, " "))
+			log.Infof("Finished running: %s", p.p4rtBin+" "+strings.Join(r, " "))
 		}
 	}
 }
@@ -253,7 +266,7 @@ func DeleteNetworkFunctionRules(p4rtbin string, vfMacList []string, apf1 string,
 * Function CreatePointToPointVFRules will create all the point to point rules between all the initilised VFs on the host.
 * Function DeletePointToPointVFRules will remove all the point to point rules between all the initilised VFs on the host.
  */
-func CreatePointToPointVFRules(p4rtbin string, vfMacList []string) {
+func CreatePointToPointVFRules(p *p4rtclient, vfMacList []string) {
 
 	ruleSets := []fxpRuleParams{}
 
@@ -286,15 +299,15 @@ func CreatePointToPointVFRules(p4rtbin string, vfMacList []string) {
 	}
 
 	for _, r := range ruleSets {
-		if err := utils.RunP4rtCtlCommand(p4rtbin, r...); err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing del rule command")
 		} else {
-			log.Infof("Finished running: %s", p4rtbin+" "+strings.Join(r, " "))
+			log.Infof("Finished running: %s", p.p4rtBin+" "+strings.Join(r, " "))
 		}
 	}
 }
 
-func DeletePointToPointVFRules(p4rtbin string, vfMacList []string) {
+func DeletePointToPointVFRules(p *p4rtclient, vfMacList []string) {
 
 	ruleSets := []fxpRuleParams{}
 
@@ -327,10 +340,10 @@ func DeletePointToPointVFRules(p4rtbin string, vfMacList []string) {
 	}
 
 	for _, r := range ruleSets {
-		if err := utils.RunP4rtCtlCommand(p4rtbin, r...); err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing del rule command")
 		} else {
-			log.Infof("Finished running: %s", p4rtbin+" "+strings.Join(r, " "))
+			log.Infof("Finished running: %s", p.p4rtBin+" "+strings.Join(r, " "))
 		}
 	}
 }
