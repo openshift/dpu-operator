@@ -204,7 +204,6 @@ func (d *HostSideManager) Listen() (net.Listener, error) {
 }
 
 func (d *HostSideManager) ListenAndServe() error {
-	done := make(chan error, 3)
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -212,6 +211,12 @@ func (d *HostSideManager) ListenAndServe() error {
 		return err
 	}
 
+	return d.Serve(listener)
+}
+
+func (d *HostSideManager) Serve(listener net.Listener) error {
+	var err error
+	done := make(chan error, 3)
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.ServeHelper(listener); err != nil {
@@ -251,19 +256,12 @@ func (d *HostSideManager) ListenAndServe() error {
 	// are forced to exit.
 	err = <-done
 
-	cancelManager()
-	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
+	d.dp.Stop()
+	cancelManager()
 	d.startedWg.Wait()
 
 	return err
-}
-
-func (d *HostSideManager) Serve(listener net.Listener) error {
-	defer d.startedWg.Done()
-	defer d.startedWg.Done()
-	defer d.startedWg.Done()
-	return d.ServeHelper(listener)
 }
 
 func (d *HostSideManager) ServeHelper(listener net.Listener) error {
