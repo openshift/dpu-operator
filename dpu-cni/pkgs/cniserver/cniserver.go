@@ -32,6 +32,22 @@ type Server struct {
 	pathManager      utils.PathManager
 }
 
+// Start starts the server and begins serving on the given listener
+func (s *Server) ListenAndServe() error {
+	klog.Infof("Starting DPU CNI Server")
+	listener, err := s.Listen()
+	if err != nil {
+		klog.Errorf("Failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
+	}
+
+	klog.Infof("DPU CNI Server is now serving requests.")
+	if err := s.Serve(listener); err != nil {
+		klog.Errorf("DPU CNI server Serve() failed: %v", err)
+		return err
+	}
+	return nil
+}
+
 // Listen creates a listener to a unix socket located in `socketPath`
 func (s *Server) Listen() (net.Listener, error) {
 	err := s.pathManager.EnsureSocketDirExists(s.pathManager.CNIServerPath())
@@ -48,6 +64,12 @@ func (s *Server) Listen() (net.Listener, error) {
 		return nil, fmt.Errorf("failed to set file permissions on DPU CNI socket: %v", err)
 	}
 	return listener, nil
+}
+
+func (s *Server) ShutdownAndWait() {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	s.Shutdown(ctx)
 }
 
 func processRequest(request *cnitypes.Request) (*cni100.Result, error) {
@@ -260,22 +282,6 @@ func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(result); err != nil {
 		klog.Errorf("Error writing HTTP response: %v", err)
 	}
-}
-
-// Start starts the server and begins serving on the given listener
-func (s *Server) ListenAndServe() error {
-	klog.Infof("Starting DPU CNI Server")
-	listener, err := s.Listen()
-	if err != nil {
-		klog.Errorf("Failed to start the CNI server using socket %s. Reason: %+v", cnitypes.ServerSocketPath, err)
-	}
-
-	klog.Infof("DPU CNI Server is now serving requests.")
-	if err := s.Serve(listener); err != nil {
-		klog.Errorf("DPU CNI server Serve() failed: %v", err)
-		return err
-	}
-	return nil
 }
 
 // NewCNIServer creates a new HTTP router instances to handle the CNI server requests.

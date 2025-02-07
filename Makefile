@@ -101,9 +101,16 @@ fast_e2e_test: prepare-e2e-test
 e2e-test: deploy_clusters e2e-test-suite deploy_tft_tests
 	@echo "E2E Test Completed"
 
+.PHONY: redeploy-both-incremental
+redeploy-both-incremental:
+	$(MAKE) local-pushx-incremental
+	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
+	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
+	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
+	KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
+
 .PHONY: redeploy-both
 redeploy-both:
-	# $(MAKE) local-buildx-incremental-manager
 	$(MAKE) local-pushx
 	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
 	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
@@ -274,6 +281,13 @@ local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller w
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	@echo "Waiting for namespace 'openshift-dpu-operator' to be removed..."
+	@while $(KUBECTL) get ns openshift-dpu-operator >/dev/null 2>&1; do \
+		echo "Namespace still exists... waiting"; \
+		sleep 5; \
+	done
+	@echo "Namespace 'openshift-dpu-operator' has been removed."
+
 
 .PHONY: local-build
 local-build: ## Build all container images necessary to run the whole operator
@@ -321,7 +335,7 @@ local-buildx-intel-vsp: prepare-multi-arch go-cache
 
 TMP_FILE=/tmp/dpu-operator-incremental-build
 define build_image_incremental
-    bin/incremental -dockerfile $(2) -base-uri $($(1)) -output-file $(TMP_FILE)
+    bin/incremental -dockerfile $(2) -base-uri $($(1))-base -output-file $(TMP_FILE)
     # Pass the newly generated Dockerfile to build_image
     $(call build_image,$(1),$(TMP_FILE))
 endef
@@ -353,10 +367,16 @@ local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-intel-vsp
 	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
 
-
 .PHONY: incremental-local-buildx
 incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp
 	@echo "local-buildx-incremental completed"
+
+.PHONY: local-pushx-incremental
+local-pushx-incremental: ## Push all container images necessary to run the whole operator
+	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)
+	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
+	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
+	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
 
 .PHONY: local-pushx
 local-pushx: ## Push all container images necessary to run the whole operator
@@ -364,7 +384,11 @@ local-pushx: ## Push all container images necessary to run the whole operator
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
 	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
-
+	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)-base
+	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)-base
+	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)-base
+	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)-base
+	
 .PHONY: local-push
 local-push: ## Push all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) push $(DPU_OPERATOR_IMAGE)

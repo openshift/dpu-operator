@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
@@ -78,24 +77,32 @@ func (d *HostSideManager) DeleteBridgePort(pf int, vf int, vlan int, mac string)
 	return err
 }
 
-func NewHostSideManager(vsp plugin.VendorPlugin, dp deviceplugin.DevicePlugin) *HostSideManager {
-	return &HostSideManager{
+func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager)) *HostSideManager {
+	h := &HostSideManager{
 		vsp:         vsp,
-		dp:          dp,
 		log:         ctrl.Log.WithName("HostDaemon"),
 		sm:          sriov.NewSriovManager(),
 		pathManager: *utils.NewPathManager("/"),
 	}
+
+	for _, opt := range opts {
+		opt(h)
+	}
+
+	h.dp = deviceplugin.NewDevicePlugin(false, h.pathManager)
+	return h
 }
 
-func (d *HostSideManager) WithPathManager(pathManager *utils.PathManager) *HostSideManager {
-	d.pathManager = *pathManager
-	return d
+func WithPathManager2(pathManager *utils.PathManager) func(*HostSideManager) {
+	return func(d *HostSideManager) {
+		d.pathManager = *pathManager
+	}
 }
 
-func (d *HostSideManager) WithSriovManager(manager sriov.Manager) *HostSideManager {
-	d.sm = manager
-	return d
+func WithSriovManager(manager sriov.Manager) func(*HostSideManager) {
+	return func(d *HostSideManager) {
+		d.sm = manager
+	}
 }
 
 func (d *HostSideManager) WithManager(manager ctrl.Manager) *HostSideManager {
@@ -173,7 +180,7 @@ func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Re
 }
 
 func (d *HostSideManager) Listen() (net.Listener, error) {
-	d.startedWg.Add(1)
+	d.startedWg.Add(3)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
 	addr, port, err := d.vsp.Start()
@@ -197,7 +204,6 @@ func (d *HostSideManager) Listen() (net.Listener, error) {
 }
 
 func (d *HostSideManager) ListenAndServe() error {
-	var wg sync.WaitGroup
 	done := make(chan error, 3)
 	listener, err := d.Listen()
 
@@ -206,19 +212,17 @@ func (d *HostSideManager) ListenAndServe() error {
 		return err
 	}
 
-	wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
-		if err := d.Serve(listener); err != nil {
+		if err := d.ServeHelper(listener); err != nil {
 			done <- err
 		} else {
 			done <- nil
 		}
 		d.log.Info("Stopping CNI server")
-		wg.Done()
+		d.startedWg.Done()
 	}()
 
-	wg.Add(1)
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.ListenAndServe(); err != nil {
@@ -227,12 +231,11 @@ func (d *HostSideManager) ListenAndServe() error {
 			done <- nil
 		}
 		d.log.Info("Stopping Device Plugin server")
-		wg.Done()
+		d.startedWg.Done()
 	}()
 
 	d.setupReconcilers()
 	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
-	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
@@ -241,7 +244,7 @@ func (d *HostSideManager) ListenAndServe() error {
 			done <- nil
 		}
 		d.log.Info("Stopping manager")
-		wg.Done()
+		d.startedWg.Done()
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
@@ -251,13 +254,19 @@ func (d *HostSideManager) ListenAndServe() error {
 	cancelManager()
 	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
-	wg.Wait()
+	d.startedWg.Wait()
 
 	return err
 }
 
 func (d *HostSideManager) Serve(listener net.Listener) error {
 	defer d.startedWg.Done()
+	defer d.startedWg.Done()
+	defer d.startedWg.Done()
+	return d.ServeHelper(listener)
+}
+
+func (d *HostSideManager) ServeHelper(listener net.Listener) error {
 	err := d.cniserver.Serve(listener)
 	if err != nil {
 		d.log.Error(err, "Error from CNI server while serving shim")
@@ -268,9 +277,7 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 
 func (d *HostSideManager) Stop() {
 	if d.cniserver != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-		d.cniserver.Shutdown(ctx)
+		d.cniserver.ShutdownAndWait()
 		d.startedWg.Wait()
 		d.cniserver = nil
 	}
@@ -281,6 +288,7 @@ var (
 )
 
 func (d *HostSideManager) setupReconcilers() {
+	d.log.Info("HostSideManager.setupReconcilers()")
 	if d.manager == nil {
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme: scheme.Scheme,

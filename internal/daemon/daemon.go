@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net"
 
-	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
-	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
 
@@ -33,6 +31,7 @@ type Daemon struct {
 	log       logr.Logger
 	vspImages map[string]string
 	config    *rest.Config
+	mgr       SideManager
 }
 
 func NewDaemon(mode string, client client.Client, vspImages map[string]string, config *rest.Config) Daemon {
@@ -47,7 +46,7 @@ func NewDaemon(mode string, client client.Client, vspImages map[string]string, c
 	}
 }
 
-func (d *Daemon) Run() error {
+func (d *Daemon) ListenAndServe() error {
 	ce := utils.NewClusterEnvironment(d.client)
 	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
@@ -62,12 +61,12 @@ func (d *Daemon) Run() error {
 	if err != nil {
 		return err
 	}
-	daemon, err := d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
+	d.mgr, err = d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
 	if err != nil {
 		d.log.Error(err, "Failed to start daemon")
 		return err
 	}
-	return daemon.ListenAndServe()
+	return d.mgr.ListenAndServe()
 }
 
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
@@ -77,13 +76,10 @@ func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[s
 		return nil, err
 	}
 
-	deviceHandler := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode))
-	dp := deviceplugin.NewDevicePlugin(deviceHandler)
-
 	if dpuMode {
-		return NewDpuSideManger(plugin, dp, config), nil
+		return NewDpuSideManger(plugin, config), nil
 	} else {
-		return NewHostSideManager(plugin, dp), nil
+		return NewHostSideManager(plugin), nil
 	}
 }
 

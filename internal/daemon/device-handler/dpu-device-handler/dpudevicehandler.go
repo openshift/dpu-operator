@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovutils"
-	dp "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
+	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -41,7 +41,7 @@ func normalizeDeviceToPci(device string) (string, error) {
 	return pciAddr, nil
 }
 
-func (d *dpuDeviceHandler) GetDevices() (*dp.DeviceList, error) {
+func (d *dpuDeviceHandler) GetDevices() (*dh.DeviceList, error) {
 	// Wait for devices to be done initializing
 	<-d.setupDevicesDone
 
@@ -55,7 +55,7 @@ func (d *dpuDeviceHandler) GetDevices() (*dp.DeviceList, error) {
 		return nil, fmt.Errorf("failed to handle GetDevices request: %v", err)
 	}
 
-	devices := make(dp.DeviceList)
+	devices := make(dh.DeviceList)
 
 	// TODO: We need to properly enforce API boundaries at the VSP level. The host side requires pci-addresses when handling devices, however the dpu side requires a higher level of abstraction. For now, just enforce PCI addresses for device ID on the host only.
 	for _, device := range Devices.Devices {
