@@ -94,16 +94,15 @@ func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager))
 }
 
 func WithPathManager2(pathManager *utils.PathManager) func(*HostSideManager) {
-    return func(d *HostSideManager) {
-        d.pathManager = *pathManager
-    }
+	return func(d *HostSideManager) {
+		d.pathManager = *pathManager
+	}
 }
 
-
 func WithSriovManager(manager sriov.Manager) func(*HostSideManager) {
-    return func(d *HostSideManager) {
-        d.sm = manager
-    }
+	return func(d *HostSideManager) {
+		d.sm = manager
+	}
 }
 
 func (d *HostSideManager) WithManager(manager ctrl.Manager) *HostSideManager {

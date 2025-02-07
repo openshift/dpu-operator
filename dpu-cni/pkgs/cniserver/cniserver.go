@@ -284,7 +284,6 @@ func (s *Server) HttpCNIPost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 // NewCNIServer creates a new HTTP router instances to handle the CNI server requests.
 func NewCNIServer(addHandler processRequestFunc, delHandler processRequestFunc, options ...func(*Server)) *Server {
 	klog.Infof("DPU CNI Server creating new router.")

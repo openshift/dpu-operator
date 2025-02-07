@@ -8,12 +8,12 @@ import (
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovutils"
+	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 )
 
 // dpuDeviceHandler handles NF networking devices

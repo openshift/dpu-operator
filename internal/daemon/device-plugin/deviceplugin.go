@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
+	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
-	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
 )
 
 const (
