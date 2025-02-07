@@ -226,7 +226,8 @@ var _ = g.Describe("Host Daemon", func() {
 			hostListen, err := hostDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				hostDaemon.Serve(hostListen)
+				err := hostDaemon.Serve(hostListen)
+				Expect(err).NotTo(HaveOccurred())
 			}()
 
 			cniVersion := "0.4.0"

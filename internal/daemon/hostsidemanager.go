@@ -26,19 +26,20 @@ import (
 )
 
 type HostSideManager struct {
-	dev         bool
-	log         logr.Logger
-	conn        *grpc.ClientConn
-	client      pb.BridgePortServiceClient
-	vsp         plugin.VendorPlugin
-	dp          deviceplugin.DevicePlugin
-	addr        string
-	port        int32
-	cniserver   *cniserver.Server
-	sm          sriov.Manager
-	manager     ctrl.Manager
-	startedWg   sync.WaitGroup
-	pathManager utils.PathManager
+	dev           bool
+	log           logr.Logger
+	conn          *grpc.ClientConn
+	client        pb.BridgePortServiceClient
+	vsp           plugin.VendorPlugin
+	dp            deviceplugin.DevicePlugin
+	addr          string
+	port          int32
+	cniserver     *cniserver.Server
+	sm            sriov.Manager
+	manager       ctrl.Manager
+	startedWg     sync.WaitGroup
+	pathManager   utils.PathManager
+	stopRequested bool
 }
 
 func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -79,10 +80,11 @@ func (d *HostSideManager) DeleteBridgePort(pf int, vf int, vlan int, mac string)
 
 func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager)) *HostSideManager {
 	h := &HostSideManager{
-		vsp:         vsp,
-		log:         ctrl.Log.WithName("HostDaemon"),
-		sm:          sriov.NewSriovManager(),
-		pathManager: *utils.NewPathManager("/"),
+		vsp:           vsp,
+		log:           ctrl.Log.WithName("HostDaemon"),
+		sm:            sriov.NewSriovManager(),
+		pathManager:   *utils.NewPathManager("/"),
+		stopRequested: false,
 	}
 
 	for _, opt := range opts {
@@ -261,6 +263,9 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 	cancelManager()
 	d.startedWg.Wait()
 
+	if d.stopRequested {
+		err = nil
+	}
 	return err
 }
 
@@ -274,6 +279,8 @@ func (d *HostSideManager) ServeHelper(listener net.Listener) error {
 }
 
 func (d *HostSideManager) Stop() {
+	d.log.Info("Stopping HostSideManager")
+	d.stopRequested = true
 	if d.cniserver != nil {
 		d.cniserver.ShutdownAndWait()
 		d.startedWg.Wait()
