@@ -48,15 +48,14 @@ type server struct {
 	p4cpInstall     string
 	Ports           map[string]*types.BridgePortInfo
 	bridgeCtlr      types.BridgeController
-	p4RtClient      types.P4RTClient
+	p4rtClient      types.P4RTClient
 	mode            string
 	daemonHostIp    string
 	daemonIpuIp     string
 	daemonPort      int
-	p4rtbin         string
 }
 
-func NewIpuPlugin(port int, brCtlr types.BridgeController, p4rtbin string,
+func NewIpuPlugin(port int, brCtlr types.BridgeController,
 	p4Client types.P4RTClient, servingAddr, servingProto, bridge, intf, p4cpInstall, mode, daemonHostIp, daemonIpuIp string, daemonPort int) types.Runnable {
 	return &server{
 		servingAddr:     servingAddr,
@@ -69,29 +68,27 @@ func NewIpuPlugin(port int, brCtlr types.BridgeController, p4rtbin string,
 		p4cpInstall:     p4cpInstall,
 		Ports:           make(map[string]*types.BridgePortInfo),
 		bridgeCtlr:      brCtlr,
-		p4RtClient:      p4Client,
+		p4rtClient:      p4Client,
 		mode:            mode,
 		daemonHostIp:    daemonHostIp,
 		daemonIpuIp:     daemonIpuIp,
 		daemonPort:      daemonPort,
-		p4rtbin:         p4rtbin,
 	}
 }
 
-func waitForInfraP4d() (string, error) {
+func waitForInfraP4d(p4rtClient types.P4RTClient) (string, error) {
 	ctx := context.Background()
-	maxRetries := 50
-	retryInterval := 4 * time.Second
+	maxRetries := 10
+	retryInterval := 2 * time.Second
 
 	var err error
 	var count int
 	var conn *grpc.ClientConn
-	port := "localhost:9559"
 
 	for count = 0; count < maxRetries; count++ {
 		time.Sleep(retryInterval)
-		conn, err = grpc.Dial(port, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		log.Infof("Connecting to server %s retry count:%d", port, count)
+		conn, err = grpc.Dial(p4rtClient.GetIpPort(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		log.Infof("Connecting to server %s retry count:%d", p4rtClient.GetIpPort(), count)
 		if err != nil {
 			log.Warnf("Cannot connect to server: %v", err)
 			continue
@@ -136,7 +133,7 @@ func (s *server) Run() error {
 
 	if s.mode == types.IpuMode {
 		// Wait for the infrap4d connection to come up
-		if _, err := waitForInfraP4d(); err != nil {
+		if _, err := waitForInfraP4d(s.p4rtClient); err != nil {
 			return err
 		}
 		// Create bridge if it doesn't exist
@@ -145,10 +142,10 @@ func (s *server) Run() error {
 			return fmt.Errorf("host bridge error")
 		}
 	}
-	pb2.RegisterLifeCycleServiceServer(s.grpcSrvr, NewLifeCycleService(s.daemonHostIp, s.daemonIpuIp, s.daemonPort, s.mode, s.p4rtbin, s.bridgeCtlr))
+	pb2.RegisterLifeCycleServiceServer(s.grpcSrvr, NewLifeCycleService(s.daemonHostIp, s.daemonIpuIp, s.daemonPort, s.mode, s.p4rtClient, s.bridgeCtlr))
 	if s.mode == types.IpuMode {
 		pb.RegisterBridgePortServiceServer(s.grpcSrvr, s)
-		pb2.RegisterNetworkFunctionServiceServer(s.grpcSrvr, NewNetworkFunctionService(s.Ports, s.bridgeCtlr, s.p4RtClient, s.p4rtbin))
+		pb2.RegisterNetworkFunctionServiceServer(s.grpcSrvr, NewNetworkFunctionService(s.Ports, s.bridgeCtlr, s.p4rtClient))
 	}
 	pb2.RegisterDeviceServiceServer(s.grpcSrvr, NewDevicePluginService(s.mode))
 
@@ -174,8 +171,8 @@ func (s *server) Stop() {
 		s.bridgeCtlr.DeleteBridges()
 	}
 
-	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", s.p4rtbin, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
-	p4rtclient.DeletePhyPortRules(s.p4rtbin, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", s.p4rtClient.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.DeletePhyPortRules(s.p4rtClient, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
 
 	vfMacList, err := utils.GetVfMacList()
 	if err != nil {
@@ -184,12 +181,12 @@ func (s *server) Stop() {
 	if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
 		log.Errorf("No VFs initialized on the host")
 	} else {
-		log.Infof("DeletePeerToPeerP4Rules, path->%s, vfMacList->%v", s.p4rtbin, vfMacList)
-		p4rtclient.DeletePeerToPeerP4Rules(s.p4rtbin, vfMacList)
+		log.Infof("DeletePeerToPeerP4Rules, path->%s, vfMacList->%v", s.p4rtClient.GetBin(), vfMacList)
+		p4rtclient.DeletePeerToPeerP4Rules(s.p4rtClient, vfMacList)
 	}
 
-	log.Infof("DeleteLAGP4Rules, path->%s", s.p4rtbin)
-	p4rtclient.DeleteLAGP4Rules(s.p4rtbin)
+	log.Infof("DeleteLAGP4Rules, path->%s", s.p4rtClient.GetBin())
+	p4rtclient.DeleteLAGP4Rules(s.p4rtClient)
 
 	s.grpcSrvr.GracefulStop()
 	if s.listener != nil {

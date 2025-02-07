@@ -80,10 +80,10 @@ func GetMacIntValueFromBytes(macAddr []byte) uint64 {
 
 var p4rtCtlCommand = exec.Command
 
-func RunP4rtCtlCommand(p4RtBin string, params ...string) error {
+func RunP4rtCtlCommand(p4rtBin string, p4rtIpPort string, params ...string) error {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := p4rtCtlCommand(p4RtBin, params...)
+	cmd := p4rtCtlCommand(p4rtBin, append([]string{"-g", p4rtIpPort}, params...)...)
 
 	// Set required env var for python implemented protobuf
 	cmd.Env = os.Environ()
@@ -96,11 +96,11 @@ func RunP4rtCtlCommand(p4RtBin string, params ...string) error {
 			"err":    err,
 			"stdout": stdout.String(),
 			"stderr": stderr.String(),
-		}).Errorf("error while executing %s", p4RtBin)
+		}).Errorf("error while executing %s", p4rtBin)
 		return err
 	}
 
-	log.WithField("params", params).Debugf("successfully executed %s", p4RtBin)
+	log.WithField("params", params).Debugf("successfully executed %s", p4rtBin)
 	return nil
 }
 

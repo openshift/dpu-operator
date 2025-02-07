@@ -35,6 +35,7 @@ spec:
         - mountPath: /proc
           mountPropagation: Bidirectional
           name: host-proc
+      dnsPolicy: ClusterFirstWithHostNet
       volumes:
       - hostPath:
           path: /proc
