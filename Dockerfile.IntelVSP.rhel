@@ -13,11 +13,19 @@ RUN dnf install -y NetworkManager openvswitch3.4 iproute python3 python3-pip ope
 #By setting workdir, the directory is created automatically
 WORKDIR /opt/p4/p4-cp-nws/bin/
 
+RUN mkdir -p /opt/p4/p4-cp-nws/bin/p4
+
 COPY ./cmd/intelvsp/fxp-net_linux-networking.pkg /
 COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
 #TODO: Update to newer package, according to release.
-COPY ./cmd/intelvsp/p4runtime-2023.11.0-py3-none-any.whl /opt/p4/p4-cp-nws/bin/
-RUN python3 -m pip install --no-cache-dir /opt/p4/p4-cp-nws/bin/p4runtime-2023.11.0-py3-none-any.whl grpcio'=='1.59.3 protobuf'=='4.25.0 netaddr'=='0.9.0
+
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/p4 /opt/p4/p4-cp-nws/bin/p4
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4/p4-cp-nws/bin/p4
+
+RUN python3 -m pip install --no-cache-dir googleapis-common-protos==1.66.0 grpcio'=='1.59.3 protobuf'=='4.25.0 netaddr'=='0.9.0
+
+RUN chmod a+x /opt/p4/p4-cp-nws/bin/p4/copy_p4rt_python_deps.sh
+RUN /opt/p4/p4-cp-nws/bin/p4/copy_p4rt_python_deps.sh
 
 COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /usr/bin/ipuplugin
 WORKDIR /
