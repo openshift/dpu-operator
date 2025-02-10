@@ -136,7 +136,7 @@ func (dp *dpServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest
 	return resp, nil
 }
 
-func (dp *dpServer) listen() (net.Listener, error) {
+func (dp *dpServer) Listen() (net.Listener, error) {
 	pluginEndpoint := dp.pathManager.PluginEndpoint()
 
 	err := dp.cleanup()
@@ -156,7 +156,7 @@ func (dp *dpServer) listen() (net.Listener, error) {
 	return lis, nil
 }
 
-func (dp *dpServer) serve(lis net.Listener) error {
+func (dp *dpServer) Serve(lis net.Listener) error {
 	defer dp.startedWg.Done()
 	// EXCEPTIONAL CODE!!! (DO NOT COPY): The issue is that Kubelet was written
 	// in a way that uses deprecated gRPC DialOptions specifically "WithBlock".
@@ -199,14 +199,14 @@ func (dp *dpServer) serve(lis net.Listener) error {
 }
 
 func (dp *dpServer) ListenAndServe() error {
-	listener, err := dp.listen()
+	listener, err := dp.Listen()
 	if err != nil {
 		dp.log.Error(err, "failed to listen on the Device Plugin server.")
 		return err
 	}
 
 	dp.log.Info("Device Plugin server is now serving requests.")
-	if err := dp.serve(listener); err != nil {
+	if err := dp.Serve(listener); err != nil {
 		dp.log.Error(err, "Device Plugin server Serve() failed.")
 		return err
 	}
