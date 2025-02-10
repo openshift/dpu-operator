@@ -38,4 +38,4 @@ else
     deploy_cluster_and_dpu_operator
 fi
 
-bash hack/deploy_traffic_flow_tests.sh
+bash hack/traffic_flow_tests.sh

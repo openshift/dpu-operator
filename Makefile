@@ -89,16 +89,16 @@ endif
 deploy_clusters: prepare-e2e-test
 	hack/both.sh
 
-.PHONY: deploy_tft_tests
-deploy_tft_tests:
-	hack/deploy_traffic_flow_tests.sh
+.PHONY: traffic-flow-tests
+traffic-flow-tests:
+	hack/traffic_flow_tests.sh
 
 .PHONY: fast_e2e_test
 fast_e2e_test: prepare-e2e-test
 	hack/deploy_fast.sh
 
 .PHONY: e2e_test
-e2e-test: deploy_clusters e2e-test-suite deploy_tft_tests
+e2e-test: deploy_clusters e2e-test-suite traffic-flow-tests
 	@echo "E2E Test Completed"
 
 .PHONY: redeploy-both-incremental
