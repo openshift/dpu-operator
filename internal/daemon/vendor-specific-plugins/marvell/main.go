@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -205,7 +204,7 @@ func (vsp *mrvlVspServer) GetDeviceHealth(nfInterfaceName string) string {
 func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
 	klog.Infof("Received Init() request: DpuMode: %v", in.DpuMode)
 	vsp.isDPUMode = in.DpuMode
-	ipPort, err := vsp.fetchIP(in.DpuMode)
+	ipPort, err := vsp.configureIP(in.DpuMode)
 	if vsp.isDPUMode {
 		if vsp.deviceStore == nil {
 			vsp.deviceStore = make(map[string]mrvlDeviceInfo)
@@ -395,94 +394,40 @@ func (vsp *mrvlVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) (*pb.Vf
 	return out, nil
 }
 
-// dpuIpPort function to get the IPv6 Address of DPU being used for Comm Channel
-// It will return the IpPort and error
-func (vsp *mrvlVspServer) dpuIpPort() (pb.IpPort, error) {
-	klog.Infof("GetInterface Name: DPUdeviceID: %s", DPUdeviceID)
-	IfName, err := mrvlutils.GetNameByDeviceID(DPUdeviceID)
-	if err != nil {
-		klog.Errorf("Error occurred in getting Interface Name: %v", err)
-		return pb.IpPort{}, err
+func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
+	var addr string
+	var deviceID string
+	if dpuMode {
+		addr = IPv6AddrDpu
+		deviceID = DPUdeviceID
+	} else {
+		addr = IPv6AddrHost
+		deviceID = HostDeviceID
 	}
-	klog.Infof("Interface Name: %s", IfName)
-
-	err = enableIPV6LinkLocal(IfName, IPv6AddrDpu)
-	if err != nil {
-		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
-		return pb.IpPort{}, err
-	}
-	klog.Infof("IPv6 Link Local Address Enabled: IfName: %s", IfName)
-	IfDetails, err := net.InterfaceByName(IfName)
-	if err != nil {
-		klog.Errorf("Error occurred in getting InterfaceDetails By Name: %v", err)
-		return pb.IpPort{}, err
-	}
-	addrs, err := IfDetails.Addrs()
-	if err != nil {
-		klog.Errorf("Error occurred in getting IP Address: %v", err)
-		return pb.IpPort{}, err
-	}
-	var IPv6Addres string
-	for _, addr := range addrs {
-		if ipNet, ok := addr.(*net.IPNet); ok && ipNet.IP.To4() == nil {
-			IPv6Addres = ipNet.IP.String()
-		}
-	}
-	if IPv6Addres == "" {
-		klog.Errorf("IPv6 Address is not found")
-		return pb.IpPort{}, errors.New("there is no IPv6 Address")
-	}
-	klog.Infof("IPv6 Address: %s", IPv6Addres)
-	ConnStr := "[" + IPv6Addres + "%" + IfName + "]"
-	klog.Infof("Connection String: %s", ConnStr)
-	return pb.IpPort{
-		Ip:   ConnStr,
-		Port: DefaultPort,
-	}, nil
-}
-
-// hostIpPort function to get the IPv6 Address of Host being used for Comm Channel
-// It will return the IpPort and error
-func (vsp *mrvlVspServer) hostIpPort() (pb.IpPort, error) {
-	klog.Infof("GetInterface Name: HostDeviceID: %s", HostDeviceID)
-	// Get the Interface Name on Host for the given Device ID
-	ifName, err := mrvlutils.GetNameByDeviceID(HostDeviceID)
+	ifName, err := mrvlutils.GetNameByDeviceID(deviceID)
 	if err != nil {
 		klog.Errorf("Error occurred in getting Interface Name: %v", err)
 		return pb.IpPort{}, err
 	}
 	klog.Infof("Interface Name: %s", ifName)
-
-	err = enableIPV6LinkLocal(ifName, IPv6AddrHost)
+	err = enableIPV6LinkLocal(ifName, addr)
+	addr = IPv6AddrDpu
 	if err != nil {
 		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
 		return pb.IpPort{}, err
 	}
-	klog.Infof("IPv6 Link Local Address Enabled: IfName: %s", ifName)
-	klog.Infof("Get Neighbour IP: InterfaceName: %s", ifName)
-	LinkLocalIpv6, err := getNeighbourIPs(ifName)
-	if err != nil {
-		klog.Errorf("Error occurred in getting Neighbour IP: %v", err)
-		return pb.IpPort{}, err
+	var connStr string
+	if dpuMode {
+		connStr = "[" + addr + "%" + ifName + "]"
+	} else {
+		connStr = "[" + addr + "%25" + ifName + "]"
 	}
-	ConnStr := "[" + LinkLocalIpv6 + "%25" + ifName + "]"
-	klog.Infof("IPv6 Address: %s", LinkLocalIpv6)
-	klog.Infof("Connection String: %s", ConnStr)
+	klog.Infof("IPv6 Link Local Address Enabled IfName: %v, Connection String: %s", ifName, connStr)
 	return pb.IpPort{
-		Ip:   ConnStr,
+		Ip:   connStr,
 		Port: DefaultPort,
 	}, nil
-}
 
-// FetchIp Will fetch the IPv6 Address of VF being used for Comm Channel based on dpuMode on either host or DPU
-func (vsp *mrvlVspServer) fetchIP(dpuMode bool) (pb.IpPort, error) {
-	if dpuMode {
-		klog.Info("DPU Mode")
-		return vsp.dpuIpPort()
-	} else {
-		klog.Info("Host Mode")
-		return vsp.hostIpPort()
-	}
 }
 
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
@@ -510,37 +455,7 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 	if err != nil {
 		return fmt.Errorf("Error configuring IPv6 address %s/64 on link %s: %v", ipv6Addr, interfaceName, err)
 	}
-
-	// Ping IPv6 Multicast group to get the IPv6 Neighbour Entry in Arp Table
-	exec.Command("ping6", "-c", "2", "-I", interfaceName, "ff02::1").Run()
-
 	return nil
-}
-
-// getNeighbourIPs function to get the Neighbour IP of the given Interface Name
-// It will return the Neighbour IP and error
-func getNeighbourIPs(Ifname string) (string, error) {
-	link, err := netlink.LinkByName(Ifname)
-	if err != nil {
-		return "", err
-	}
-
-	neighbours, err := netlink.NeighList(link.Attrs().Index, netlink.FAMILY_V6)
-	if err != nil {
-		return "", err
-	}
-	if len(neighbours) == 0 {
-		return "", errors.New("neighbour list is empty")
-	}
-	var IPv6Address string
-	for _, neighbour := range neighbours {
-		if strings.HasPrefix(neighbour.IP.String(), "fe80::") {
-			IPv6Address = neighbour.IP.String()
-			break
-		}
-	}
-
-	return IPv6Address, nil
 }
 
 // Listen function to listen on the UNIX domain socket
