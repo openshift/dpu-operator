@@ -72,7 +72,7 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func
 		opt(d)
 	}
 
-	d.dp = deviceplugin.NewDevicePlugin(true, d.pathManager)
+	d.dp = deviceplugin.NewDevicePlugin(vsp, true, d.pathManager)
 
 	return d
 }

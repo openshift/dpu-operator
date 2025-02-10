@@ -16,6 +16,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
+	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/internal/testutils"
@@ -139,6 +140,18 @@ func (d *DummyDpuDaemon) Serve(listen net.Listener) error {
 
 func (d *DummyDpuDaemon) Stop() {
 	d.server.Stop()
+}
+
+func (d *DummyPlugin) GetDevices() (*pb2.DeviceListResponse, error) {
+	ret := pb2.DeviceListResponse{}
+	return &ret, nil
+}
+
+func (g *DummyPlugin) SetNumVfs(count int32) (*pb2.VfCount, error) {
+	c := &pb2.VfCount{
+		VfCnt: count,
+	}
+	return c, nil
 }
 
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {

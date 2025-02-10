@@ -55,6 +55,8 @@ type VendorPlugin interface {
 	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
 	CreateNetworkFunction(input string, output string) error
 	DeleteNetworkFunction(input string, output string) error
+	GetDevices() (*pb.DeviceListResponse, error)
+	SetNumVfs(vfCount int32) (*pb.VfCount, error)
 }
 
 type GrpcPlugin struct {
@@ -63,6 +65,7 @@ type GrpcPlugin struct {
 	k8sClient   client.Client
 	opiClient   opi.BridgePortServiceClient
 	nfclient    pb.NetworkFunctionServiceClient
+	dsClient    pb.DeviceServiceClient
 	dpuMode     bool
 	vsp         VspTemplateVars
 	conn        *grpc.ClientConn
@@ -182,6 +185,7 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.client = pb.NewLifeCycleServiceClient(conn)
 	g.nfclient = pb.NewNetworkFunctionServiceClient(conn)
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
+	g.dsClient = pb.NewDeviceServiceClient(conn)
 	return nil
 }
 
@@ -222,4 +226,23 @@ func (g *GrpcPlugin) DeleteNetworkFunction(input string, output string) error {
 	req := pb.NFRequest{Input: input, Output: output}
 	_, err = g.nfclient.DeleteNetworkFunction(context.TODO(), &req)
 	return err
+}
+
+func (g *GrpcPlugin) GetDevices() (*pb.DeviceListResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("GetDevices failed to ensure GRPC connection: %v", err)
+	}
+	return g.dsClient.GetDevices(context.Background(), &pb.Empty{})
+}
+
+func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("SetNumvfs failed to ensure GRPC connection: %v", err)
+	}
+	c := &pb.VfCount{
+		VfCnt: count,
+	}
+	return g.dsClient.SetNumVfs(context.Background(), c)
 }

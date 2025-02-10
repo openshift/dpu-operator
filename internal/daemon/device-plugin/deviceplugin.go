@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
+	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,6 +34,7 @@ type dpServer struct {
 	pathManager   utils.PathManager
 	deviceHandler dh.DeviceHandler
 	startedWg     sync.WaitGroup
+	vsp           plugin.VendorPlugin
 }
 
 type DevicePlugin interface {
@@ -322,14 +324,15 @@ func WithPathManager(pathManager utils.PathManager) func(*dpServer) {
 	}
 }
 
-func NewDevicePlugin(dpuMode bool, pm utils.PathManager, opts ...func(*dpServer)) *dpServer {
-	dh := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode), dpudevicehandler.WithPathManager(pm))
+func NewDevicePlugin(vsp plugin.VendorPlugin, dpuMode bool, pm utils.PathManager, opts ...func(*dpServer)) *dpServer {
+	dh := dpudevicehandler.NewDpuDeviceHandler(vsp, dpudevicehandler.WithDpuMode(dpuMode), dpudevicehandler.WithPathManager(pm))
 	dp := &dpServer{
 		devices:       make(map[string]pluginapi.Device),
 		grpcServer:    grpc.NewServer(),
 		log:           ctrl.Log.WithName("DevicePlugin"),
 		pathManager:   pm,
 		deviceHandler: dh,
+		vsp:           vsp,
 	}
 
 	for _, opt := range opts {

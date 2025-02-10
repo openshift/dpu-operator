@@ -89,7 +89,7 @@ func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager))
 		opt(h)
 	}
 
-	h.dp = deviceplugin.NewDevicePlugin(false, h.pathManager)
+	h.dp = deviceplugin.NewDevicePlugin(vsp, false, h.pathManager)
 	return h
 }
 
