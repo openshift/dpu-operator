@@ -2,6 +2,8 @@ package sfcreconciler
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -125,9 +127,17 @@ func (r *SfcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
+var uniqueCounter int64 = 0
+
+func (r *SfcReconciler) uniqueName() string {
+	val := atomic.AddInt64(&uniqueCounter, 1)
+	return fmt.Sprintf("%s%d", "servicefunctionchain", val)
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *SfcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&configv1.ServiceFunctionChain{}).
+		Named(r.uniqueName()).
 		Complete(r)
 }
