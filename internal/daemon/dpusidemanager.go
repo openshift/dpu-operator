@@ -39,7 +39,6 @@ type DpuSideManager struct {
 	cniserver     *cniserver.Server
 	manager       ctrl.Manager
 	macStore      map[string][]string
-	wg            sync.WaitGroup
 	startedWg     sync.WaitGroup
 	cancelManager context.CancelFunc
 	config        *rest.Config
@@ -160,9 +159,10 @@ func (d *DpuSideManager) ListenAndServe() error {
 }
 
 func (d *DpuSideManager) Serve(listener net.Listener) error {
+	var wg sync.WaitGroup
 	done := make(chan error, 4)
 
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting OPI server")
 		d.server = grpc.NewServer()
@@ -172,11 +172,11 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping OPI server")
-		d.wg.Done()
+		d.log.Info("Stopped OPI server")
+		wg.Done()
 	}()
 
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.ListenAndServe(); err != nil {
@@ -184,11 +184,11 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping Device Plugin server")
-		d.wg.Done()
+		d.log.Info("Stopped Device Plugin server")
+		wg.Done()
 	}()
 
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
@@ -196,12 +196,12 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping CNI server")
-		d.wg.Done()
+		d.log.Info("Stopped CNI server")
+		wg.Done()
 	}()
 
 	ctx, cancelManager := utils.CancelFunc()
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
@@ -209,8 +209,8 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping manager")
-		d.wg.Done()
+		d.log.Info("Stoppped manager")
+		wg.Done()
 	}()
 	d.cancelManager = cancelManager
 
@@ -225,14 +225,16 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
 	d.server.Stop()
-	d.wg.Wait()
+	wg.Wait()
 	d.startedWg.Done()
 	return err
 }
 
 func (d *DpuSideManager) Stop() {
+	d.log.Info("Stopping DpuSideManager")
 	d.server.Stop()
 	d.startedWg.Wait()
+	d.log.Info("Stopped DpuSideManager")
 }
 
 func (d *DpuSideManager) setupReconcilers() {

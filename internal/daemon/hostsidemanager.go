@@ -193,7 +193,7 @@ func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Re
 }
 
 func (d *HostSideManager) Listen() (net.Listener, error) {
-	d.startedWg.Add(3)
+	d.startedWg.Add(1)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
 	addr, port, err := d.vsp.Start()
@@ -232,8 +232,10 @@ func (d *HostSideManager) ListenAndServe() error {
 }
 
 func (d *HostSideManager) Serve(listener net.Listener) error {
+	var wg sync.WaitGroup
 	var err error
 	done := make(chan error, 3)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.Serve(listener); err != nil {
@@ -241,11 +243,11 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping CNI server")
-		d.startedWg.Done()
+		d.log.Info("Stopped CNI server")
+		wg.Done()
 	}()
 
-
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.Serve(d.dpListener); err != nil {
@@ -253,12 +255,14 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping Device Plugin server")
-		d.startedWg.Done()
+		d.log.Info("Stopped Device Plugin server")
+		wg.Done()
 	}()
 
 	d.setupReconcilers()
 	ctx, cancelManager := utils.CancelFunc()
+
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
@@ -266,8 +270,8 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stopping manager")
-		d.startedWg.Done()
+		d.log.Info("Stopped manager")
+		wg.Done()
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
@@ -277,7 +281,8 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 	d.cniserver.Shutdown(context.TODO())
 	d.dp.Stop()
 	cancelManager()
-	d.startedWg.Wait()
+	wg.Wait()
+	d.startedWg.Done()
 
 	if d.stopRequested {
 		err = nil
@@ -293,6 +298,7 @@ func (d *HostSideManager) Stop() {
 		d.startedWg.Wait()
 		d.cniserver = nil
 	}
+	d.log.Info("Stopped HostSideManager")
 }
 
 var (
