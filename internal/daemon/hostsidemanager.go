@@ -41,6 +41,7 @@ type HostSideManager struct {
 	startedWg     sync.WaitGroup
 	pathManager   utils.PathManager
 	stopRequested bool
+	dpListener    net.Listener
 }
 
 func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -211,6 +212,10 @@ func (d *HostSideManager) Listen() (net.Listener, error) {
 	}
 
 	d.cniserver = cniserver.NewCNIServer(add, del, cniserver.WithPathManager(d.pathManager))
+	d.dpListener, err = d.dp.Listen()
+	if err != nil {
+		return nil, fmt.Errorf("HostSideManager Failed to Listen while calling device plugin listen: %v", err)
+	}
 
 	return d.cniserver.Listen()
 }
@@ -231,7 +236,7 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 	done := make(chan error, 3)
 	go func() {
 		d.log.Info("Starting CNI server")
-		if err := d.ServeHelper(listener); err != nil {
+		if err := d.cniserver.Serve(listener); err != nil {
 			done <- err
 		} else {
 			done <- nil
@@ -240,9 +245,10 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		d.startedWg.Done()
 	}()
 
+
 	go func() {
 		d.log.Info("Starting Device Plugin server")
-		if err := d.dp.ListenAndServe(); err != nil {
+		if err := d.dp.Serve(d.dpListener); err != nil {
 			done <- err
 		} else {
 			done <- nil
@@ -277,15 +283,6 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		err = nil
 	}
 	return err
-}
-
-func (d *HostSideManager) ServeHelper(listener net.Listener) error {
-	err := d.cniserver.Serve(listener)
-	if err != nil {
-		d.log.Error(err, "Error from CNI server while serving shim")
-		return err
-	}
-	return nil
 }
 
 func (d *HostSideManager) Stop() {

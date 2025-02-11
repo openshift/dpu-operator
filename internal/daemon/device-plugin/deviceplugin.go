@@ -39,6 +39,8 @@ type dpServer struct {
 
 type DevicePlugin interface {
 	ListenAndServe() error
+	Serve(lis net.Listener) error
+	Listen() (net.Listener, error)
 	Stop() error
 }
 
@@ -213,7 +215,6 @@ func (dp *dpServer) ListenAndServe() error {
 		return err
 	}
 	return nil
-
 }
 
 func (dp *dpServer) ensureDevicePluginServerStarted() error {
