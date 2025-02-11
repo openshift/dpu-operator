@@ -2,7 +2,7 @@ clusters:
   - name : "iso_cluster"
     api_vip: "192.168.122.99"
     ingress_vip: "192.168.122.101"
-    network_api_port: "eno12409"
+    network_api_port: "{{secondary_network_port()}}"
     kind: "iso"
     install_iso: "{{iso_server()}}/RHEL-9.6.0-20250130.2-aarch64-dvd1-w-kickstart.iso"
     masters:
