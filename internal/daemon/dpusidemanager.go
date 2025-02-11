@@ -42,7 +42,6 @@ type DpuSideManager struct {
 	wg            sync.WaitGroup
 	startedWg     sync.WaitGroup
 	cancelManager context.CancelFunc
-	done          chan error
 	config        *rest.Config
 	pathManager   utils.PathManager
 }
@@ -64,7 +63,6 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func
 		pathManager: *utils.NewPathManager("/"),
 		log:         ctrl.Log.WithName("DpuDaemon"),
 		macStore:    make(map[string][]string),
-		done:        make(chan error, 5),
 		config:      config,
 	}
 
@@ -162,6 +160,7 @@ func (d *DpuSideManager) ListenAndServe() error {
 }
 
 func (d *DpuSideManager) Serve(listener net.Listener) error {
+	done := make(chan error, 4)
 
 	d.wg.Add(1)
 	go func() {
@@ -169,9 +168,9 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		d.server = grpc.NewServer()
 		pb.RegisterBridgePortServiceServer(d.server, d)
 		if err := d.server.Serve(listener); err != nil {
-			d.done <- fmt.Errorf("Error from OPI server: %v", err)
+			done <- fmt.Errorf("Error from OPI server: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
 		d.log.Info("Stopping OPI server")
 		d.wg.Done()
@@ -181,9 +180,9 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.ListenAndServe(); err != nil {
-			d.done <- fmt.Errorf("Error from Device Plugin server: %v", err)
+			done <- fmt.Errorf("Error from Device Plugin server: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
 		d.log.Info("Stopping Device Plugin server")
 		d.wg.Done()
@@ -193,9 +192,9 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
-			d.done <- fmt.Errorf("Error from CNI server: %v", err)
+			done <- fmt.Errorf("Error from CNI server: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
 		d.log.Info("Stopping CNI server")
 		d.wg.Done()
@@ -206,9 +205,9 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
-			d.done <- fmt.Errorf("Error from manager: %v", err)
+			done <- fmt.Errorf("Error from manager: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
 		d.log.Info("Stopping manager")
 		d.wg.Done()
@@ -217,7 +216,7 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 
 	// Block on any go routines writing to the done channel when an error occurs or they
 	// are forced to exit.
-	err := <-d.done
+	err := <-done
 	if err != nil {
 		d.log.Error(err, "one of the go-routines failed")
 	}
@@ -232,7 +231,7 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 }
 
 func (d *DpuSideManager) Stop() {
-	d.done <- nil
+	d.server.Stop()
 	d.startedWg.Wait()
 }
 
