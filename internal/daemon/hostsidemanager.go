@@ -30,6 +30,7 @@ type HostSideManager struct {
 	log           logr.Logger
 	conn          *grpc.ClientConn
 	client        pb.BridgePortServiceClient
+	config        *rest.Config
 	vsp           plugin.VendorPlugin
 	dp            deviceplugin.DevicePlugin
 	addr          string
@@ -92,6 +93,9 @@ func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager))
 	}
 
 	h.dp = deviceplugin.NewDevicePlugin(vsp, false, h.pathManager)
+	if h.config == nil {
+		h.config = ctrl.GetConfigOrDie()
+	}
 	return h
 }
 
@@ -104,6 +108,12 @@ func WithPathManager2(pathManager *utils.PathManager) func(*HostSideManager) {
 func WithSriovManager(manager sriov.Manager) func(*HostSideManager) {
 	return func(d *HostSideManager) {
 		d.sm = manager
+	}
+}
+
+func WithClient(client *rest.Config) func(*HostSideManager) {
+	return func(d *HostSideManager) {
+		d.config = client
 	}
 }
 
@@ -295,7 +305,7 @@ var (
 func (d *HostSideManager) setupReconcilers() {
 	d.log.Info("HostSideManager.setupReconcilers()")
 	if d.manager == nil {
-		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		mgr, err := ctrl.NewManager(d.config, ctrl.Options{
 			Scheme: scheme.Scheme,
 			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				opts.DefaultNamespaces = map[string]cache.Config{

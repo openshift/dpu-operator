@@ -199,13 +199,13 @@ var _ = g.Describe("Host Daemon", func() {
 	)
 	g.BeforeEach(func() {
 		testCluster = &testutils.KindCluster{Name: "dpu-operator-test-cluster"}
-		testCluster.EnsureExists()
+		client := testCluster.EnsureExists()
 		pathManager = utils.NewPathManager(testCluster.TempDirPath())
 		Expect(err).NotTo(HaveOccurred())
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m))
+		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
 	})
 
 	g.AfterEach(func() {
