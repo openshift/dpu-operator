@@ -201,7 +201,7 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		d.wg.Done()
 	}()
 
-	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
+	ctx, cancelManager := utils.CancelFunc()
 	d.wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")

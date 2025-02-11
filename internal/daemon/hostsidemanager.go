@@ -235,7 +235,7 @@ func (d *HostSideManager) ListenAndServe() error {
 	}()
 
 	d.setupReconcilers()
-	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
+	ctx, cancelManager := utils.CancelFunc()
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
