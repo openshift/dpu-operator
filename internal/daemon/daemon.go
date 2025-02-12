@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/openshift/dpu-operator/internal/platform"
+	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 
 	"github.com/go-logr/logr"
@@ -25,19 +26,18 @@ type SideManager interface {
 }
 
 type Daemon struct {
-	client    client.Client
 	mode      string
 	pm        *utils.PathManager
 	log       logr.Logger
 	vspImages map[string]string
 	config    *rest.Config
 	mgr       SideManager
+	client    client.Client
 }
 
-func NewDaemon(mode string, client client.Client, vspImages map[string]string, config *rest.Config) Daemon {
+func NewDaemon(mode string, config *rest.Config, vspImages map[string]string) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
-		client:    client,
 		mode:      mode,
 		pm:        utils.NewPathManager("/"),
 		log:       log,
@@ -58,6 +58,15 @@ func (d *Daemon) ListenAndServe() error {
 }
 
 func (d *Daemon) Listen() (net.Listener, error) {
+	var err error
+	d.client, err = client.New(d.config, client.Options{
+		Scheme: scheme.Scheme,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create client: %v", err)
+	}
+
 	ce := utils.NewClusterEnvironment(d.client)
 	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
