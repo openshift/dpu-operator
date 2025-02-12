@@ -4,7 +4,7 @@ set -e
 
 bash hack/prepare-venv.sh
 
-cd ocp-traffic-flow-tests
+cd kubernetes-traffic-flow-tests
 source /tmp/tft-venv/bin/activate
 
 export KUBECONFIG=/root/kubeconfig.ocpcluster
@@ -27,4 +27,4 @@ temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
-python main.py $temp_file
+./tft.py $temp_file
