@@ -47,26 +47,41 @@ func NewDaemon(mode string, client client.Client, vspImages map[string]string, c
 }
 
 func (d *Daemon) ListenAndServe() error {
+	listener, err := d.Listen()
+
+	if err != nil {
+		d.log.Error(err, "Failed to listen")
+		return err
+	}
+
+	return d.Serve(listener)
+}
+
+func (d *Daemon) Listen() (net.Listener, error) {
 	ce := utils.NewClusterEnvironment(d.client)
 	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	d.log.Info("Detected OpenShift", "flavour", flavour)
 	err = d.prepareCni(flavour)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	dpuMode, err := d.isDpuMode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	d.mgr, err = d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
 	if err != nil {
 		d.log.Error(err, "Failed to start daemon")
-		return err
+		return nil, err
 	}
-	return d.mgr.ListenAndServe()
+	return d.mgr.Listen()
+}
+
+func (d *Daemon) Serve(listener net.Listener) error {
+	return d.mgr.Serve(listener)
 }
 
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
