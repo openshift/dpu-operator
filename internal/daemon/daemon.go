@@ -35,11 +35,11 @@ type Daemon struct {
 	client    client.Client
 }
 
-func NewDaemon(mode string, config *rest.Config, vspImages map[string]string) Daemon {
+func NewDaemon(mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		mode:      mode,
-		pm:        utils.NewPathManager("/"),
+		pm:        pathManager,
 		log:       log,
 		vspImages: vspImages,
 		config:    config,
@@ -93,6 +93,11 @@ func (d *Daemon) Serve(listener net.Listener) error {
 	return d.mgr.Serve(listener)
 }
 
+
+func (d *Daemon) Stop() {
+	d.mgr.Stop()
+}
+
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
 	platform := platform.NewPlatformInfo()
 	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
@@ -101,9 +106,9 @@ func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[s
 	}
 
 	if dpuMode {
-		return NewDpuSideManger(plugin, config), nil
+		return NewDpuSideManger(plugin, config, WithPathManager(*d.pm)), nil
 	} else {
-		return NewHostSideManager(plugin), nil
+		return NewHostSideManager(plugin, WithPathManager2(d.pm)), nil
 	}
 }
 
