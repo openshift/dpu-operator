@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -26,6 +27,7 @@ type Flavour string
 const (
 	OpenShiftFlavour  Flavour = "OpenShift"
 	MicroShiftFlavour Flavour = "MicroShift"
+	KindFlavour       Flavour = "Kind"
 	UnknownFlavour    Flavour = "Unknown"
 )
 
@@ -44,6 +46,14 @@ func (ce *ClusterEnvironment) Flavour(ctx context.Context) (Flavour, error) {
 	}
 	if openShift {
 		return OpenShiftFlavour, nil
+	}
+
+	kind, err := ce.isKind(ctx)
+	if err != nil {
+		return UnknownFlavour, err
+	}
+	if kind {
+		return KindFlavour, nil
 	}
 	return UnknownFlavour, nil
 }
@@ -73,4 +83,26 @@ func (ce *ClusterEnvironment) isOpenShift(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("Failed to check if running on openshift: %v", err)
 	}
 	return true, nil
+}
+
+func (ce *ClusterEnvironment) isKind(ctx context.Context) (bool, error) {
+	nodes := &v1.NodeList{}
+	err := ce.client.List(ctx, nodes)
+	if err != nil {
+		return false, fmt.Errorf("failed to list nodes: %v", err)
+	}
+
+	if len(nodes.Items) != 1 {
+		return false, nil
+	}
+
+	node := nodes.Items[0]
+
+	for _, image := range node.Status.Images {
+		if strings.Contains(image.Names[0], "docker.io/kindest") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 
 	"github.com/go-logr/logr"
+	"github.com/spf13/afero"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,11 +34,13 @@ type Daemon struct {
 	config    *rest.Config
 	mgr       SideManager
 	client    client.Client
+	fs        afero.Fs
 }
 
-func NewDaemon(mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
+func NewDaemon(fs afero.Fs, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
+		fs:        fs,
 		mode:      mode,
 		pm:        pathManager,
 		log:       log,
@@ -72,7 +75,7 @@ func (d *Daemon) Listen() (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.log.Info("Detected OpenShift", "flavour", flavour)
+	d.log.Info("Detected Kuberentes flavour", "flavour", flavour)
 	err = d.prepareCni(flavour)
 	if err != nil {
 		return nil, err
@@ -92,7 +95,6 @@ func (d *Daemon) Listen() (net.Listener, error) {
 func (d *Daemon) Serve(listener net.Listener) error {
 	return d.mgr.Serve(listener)
 }
-
 
 func (d *Daemon) Stop() {
 	d.mgr.Stop()
@@ -118,12 +120,12 @@ func (d *Daemon) prepareCni(flavour utils.Flavour) error {
 		d.log.Error(err, "Failed to get cni path")
 		return err
 	}
-	err = utils.CopyFile("/dpu-cni", cniPath)
+
+	err = utils.CopyFile(d.fs, "/dpu-cni", cniPath)
 	if err != nil {
-		d.log.Error(err, "Failed to prepare CNI binary", "path", cniPath)
-		return err
+		return fmt.Errorf("Failed to prepare CNI binary from /dpu-cni to %v", cniPath)
 	}
-	err = utils.MakeExecutable(cniPath)
+	err = utils.MakeExecutable(d.fs, cniPath)
 	if err != nil {
 		return err
 	}

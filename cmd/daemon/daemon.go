@@ -27,10 +27,9 @@ func main() {
 	log := ctrl.Log.WithName("Daemon Init")
 	log.Info("Daemon init")
 
-
 	vspImages := plugin.CreateVspImagesMap(true, log)
 
-	d := daemon.NewDaemon(mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
+	d := daemon.NewDaemon(afero.NewOsFs(), mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
 	if err := d.ListenAndServe(); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)
