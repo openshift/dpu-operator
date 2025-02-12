@@ -48,12 +48,12 @@ func NewDaemon(mode string, client client.Client, vspImages map[string]string, c
 
 func (d *Daemon) ListenAndServe() error {
 	ce := utils.NewClusterEnvironment(d.client)
-	flavour, err := ce.Flavour(context.TODO())
+	flavours, err := ce.Flavours(context.TODO())
 	if err != nil {
 		return err
 	}
-	d.log.Info("Detected OpenShift", "flavour", flavour)
-	err = d.prepareCni(flavour)
+	d.log.Info("Detected Flavours", "flavours", flavours)
+	err = d.prepareCni(flavours)
 	if err != nil {
 		return err
 	}
@@ -83,8 +83,8 @@ func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[s
 	}
 }
 
-func (d *Daemon) prepareCni(flavour utils.Flavour) error {
-	cniPath, err := d.pm.CniPath(flavour)
+func (d *Daemon) prepareCni(flavours utils.FlavourSet) error {
+	cniPath, err := d.pm.CniPath(flavours)
 	if err != nil {
 		d.log.Error(err, "Failed to get cni path")
 		return err

@@ -34,13 +34,13 @@ func (p *PathManager) PluginEndpointFilename() string {
 	return filepath.Base(p.PluginEndpoint())
 }
 
-func (p *PathManager) CniPath(flavour Flavour) (string, error) {
+func (p *PathManager) CniPath(flavours FlavourSet) (string, error) {
 	// Some k8s cluster flavours use /var/lib (in the case of RHCOS based)
 	// and some use /opt (in the case of RHEL based)
-	switch flavour {
-	case MicroShiftFlavour:
+	switch {
+	case flavours.Contains(ClassicRhelFlavour):
 		return p.wrap("/opt/cni/bin/dpu-cni"), nil
-	case OpenShiftFlavour:
+	case flavours.Contains(OstreeFlavour):
 		return p.wrap("/var/lib/cni/bin/dpu-cni"), nil
 	default:
 		return "", fmt.Errorf("unknown flavour")
