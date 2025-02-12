@@ -8,18 +8,17 @@ import (
 )
 
 type ctxManager struct {
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	once       sync.Once
+	ctx  context.Context
+	once sync.Once
 }
 
 var instance *ctxManager
 
 func CancelFunc() (context.Context, context.CancelFunc) {
 	instance.once.Do(func() {
-		instance.ctx, instance.cancelFunc = context.WithCancel(ctrl.SetupSignalHandler())
+		instance.ctx = ctrl.SetupSignalHandler()
 	})
-	return instance.ctx, instance.cancelFunc
+	return context.WithCancel(instance.ctx)
 }
 
 func init() {
