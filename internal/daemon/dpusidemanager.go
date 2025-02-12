@@ -32,19 +32,16 @@ type DpuSideManager struct {
 	pb.UnimplementedBridgePortServiceServer
 	pb2.UnimplementedDeviceServiceServer
 
-	vsp           plugin.VendorPlugin
-	dp            deviceplugin.DevicePlugin
-	log           logr.Logger
-	server        *grpc.Server
-	cniserver     *cniserver.Server
-	manager       ctrl.Manager
-	macStore      map[string][]string
-	wg            sync.WaitGroup
-	startedWg     sync.WaitGroup
-	cancelManager context.CancelFunc
-	done          chan error
-	config        *rest.Config
-	pathManager   utils.PathManager
+	vsp         plugin.VendorPlugin
+	dp          deviceplugin.DevicePlugin
+	log         logr.Logger
+	server      *grpc.Server
+	cniserver   *cniserver.Server
+	manager     ctrl.Manager
+	macStore    map[string][]string
+	startedWg   sync.WaitGroup
+	config      *rest.Config
+	pathManager utils.PathManager
 }
 
 func (s *DpuSideManager) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
@@ -64,7 +61,6 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func
 		pathManager: *utils.NewPathManager("/"),
 		log:         ctrl.Log.WithName("DpuDaemon"),
 		macStore:    make(map[string][]string),
-		done:        make(chan error, 5),
 		config:      config,
 	}
 
@@ -72,7 +68,7 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func
 		opt(d)
 	}
 
-	d.dp = deviceplugin.NewDevicePlugin(true, d.pathManager)
+	d.dp = deviceplugin.NewDevicePlugin(vsp, true, d.pathManager)
 
 	return d
 }
@@ -162,78 +158,81 @@ func (d *DpuSideManager) ListenAndServe() error {
 }
 
 func (d *DpuSideManager) Serve(listener net.Listener) error {
+	var wg sync.WaitGroup
+	done := make(chan error, 4)
 
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting OPI server")
 		d.server = grpc.NewServer()
 		pb.RegisterBridgePortServiceServer(d.server, d)
 		if err := d.server.Serve(listener); err != nil {
-			d.done <- fmt.Errorf("Error from OPI server: %v", err)
+			done <- fmt.Errorf("Error from OPI server: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
-		d.log.Info("Stopping OPI server")
-		d.wg.Done()
+		d.log.Info("Stopped OPI server")
+		wg.Done()
 	}()
 
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting Device Plugin server")
 		if err := d.dp.ListenAndServe(); err != nil {
-			d.done <- fmt.Errorf("Error from Device Plugin server: %v", err)
+			done <- fmt.Errorf("Error from Device Plugin server: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
-		d.log.Info("Stopping Device Plugin server")
-		d.wg.Done()
+		d.log.Info("Stopped Device Plugin server")
+		wg.Done()
 	}()
 
-	d.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
 		if err := d.cniserver.ListenAndServe(); err != nil {
-			d.done <- fmt.Errorf("Error from CNI server: %v", err)
+			done <- fmt.Errorf("Error from CNI server: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
-		d.log.Info("Stopping CNI server")
-		d.wg.Done()
+		d.log.Info("Stopped CNI server")
+		wg.Done()
 	}()
 
-	ctx, cancelManager := context.WithCancel(ctrl.SetupSignalHandler())
-	d.wg.Add(1)
+	ctx, cancelManager := utils.CancelFunc()
+	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
 		if err := d.manager.Start(ctx); err != nil {
-			d.done <- fmt.Errorf("Error from manager: %v", err)
+			done <- fmt.Errorf("Error from manager: %v", err)
 		} else {
-			d.done <- nil
+			done <- nil
 		}
-		d.log.Info("Stopping manager")
-		d.wg.Done()
+		d.log.Info("Stoppped manager")
+		wg.Done()
 	}()
-	d.cancelManager = cancelManager
 
 	// Block on any go routines writing to the done channel when an error occurs or they
 	// are forced to exit.
-	err := <-d.done
+	err := <-done
 	if err != nil {
 		d.log.Error(err, "one of the go-routines failed")
 	}
 
-	d.cancelManager()
+	cancelManager()
 	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
 	d.server.Stop()
-	d.wg.Wait()
+	wg.Wait()
 	d.startedWg.Done()
 	return err
 }
 
 func (d *DpuSideManager) Stop() {
-	d.done <- nil
+	d.log.Info("Stopping DpuSideManager")
+	d.server.Stop()
 	d.startedWg.Wait()
+	d.log.Info("Stopped DpuSideManager")
 }
 
 func (d *DpuSideManager) setupReconcilers() {

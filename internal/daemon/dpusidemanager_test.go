@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"os"
+	"time"
 
 	g "github.com/onsi/ginkgo/v2"
 	"k8s.io/client-go/rest"
@@ -21,7 +22,11 @@ import (
 func waitAllNodesDpuAllocatable(client client.Client) {
 	var nodes corev1.NodeList
 	Eventually(func() error {
-		return client.List(context.Background(), &nodes)
+		// Call to client might hang if we don't put a bound on how long it can run
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		return client.List(ctx, &nodes)
 	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
 
 	Eventually(func() bool {

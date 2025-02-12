@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	dh "github.com/openshift/dpu-operator/internal/daemon/device-handler"
 	dpudevicehandler "github.com/openshift/dpu-operator/internal/daemon/device-handler/dpu-device-handler"
+	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,10 +34,13 @@ type dpServer struct {
 	pathManager   utils.PathManager
 	deviceHandler dh.DeviceHandler
 	startedWg     sync.WaitGroup
+	vsp           plugin.VendorPlugin
 }
 
 type DevicePlugin interface {
 	ListenAndServe() error
+	Serve(lis net.Listener) error
+	Listen() (net.Listener, error)
 	Stop() error
 }
 
@@ -136,7 +140,7 @@ func (dp *dpServer) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest
 	return resp, nil
 }
 
-func (dp *dpServer) listen() (net.Listener, error) {
+func (dp *dpServer) Listen() (net.Listener, error) {
 	pluginEndpoint := dp.pathManager.PluginEndpoint()
 
 	err := dp.cleanup()
@@ -156,7 +160,7 @@ func (dp *dpServer) listen() (net.Listener, error) {
 	return lis, nil
 }
 
-func (dp *dpServer) serve(lis net.Listener) error {
+func (dp *dpServer) Serve(lis net.Listener) error {
 	defer dp.startedWg.Done()
 	// EXCEPTIONAL CODE!!! (DO NOT COPY): The issue is that Kubelet was written
 	// in a way that uses deprecated gRPC DialOptions specifically "WithBlock".
@@ -199,19 +203,18 @@ func (dp *dpServer) serve(lis net.Listener) error {
 }
 
 func (dp *dpServer) ListenAndServe() error {
-	listener, err := dp.listen()
+	listener, err := dp.Listen()
 	if err != nil {
 		dp.log.Error(err, "failed to listen on the Device Plugin server.")
 		return err
 	}
 
 	dp.log.Info("Device Plugin server is now serving requests.")
-	if err := dp.serve(listener); err != nil {
+	if err := dp.Serve(listener); err != nil {
 		dp.log.Error(err, "Device Plugin server Serve() failed.")
 		return err
 	}
 	return nil
-
 }
 
 func (dp *dpServer) ensureDevicePluginServerStarted() error {
@@ -322,14 +325,15 @@ func WithPathManager(pathManager utils.PathManager) func(*dpServer) {
 	}
 }
 
-func NewDevicePlugin(dpuMode bool, pm utils.PathManager, opts ...func(*dpServer)) *dpServer {
-	dh := dpudevicehandler.NewDpuDeviceHandler(dpudevicehandler.WithDpuMode(dpuMode), dpudevicehandler.WithPathManager(pm))
+func NewDevicePlugin(vsp plugin.VendorPlugin, dpuMode bool, pm utils.PathManager, opts ...func(*dpServer)) *dpServer {
+	dh := dpudevicehandler.NewDpuDeviceHandler(vsp, dpudevicehandler.WithDpuMode(dpuMode), dpudevicehandler.WithPathManager(pm))
 	dp := &dpServer{
 		devices:       make(map[string]pluginapi.Device),
 		grpcServer:    grpc.NewServer(),
 		log:           ctrl.Log.WithName("DevicePlugin"),
 		pathManager:   pm,
 		deviceHandler: dh,
+		vsp:           vsp,
 	}
 
 	for _, opt := range opts {

@@ -16,6 +16,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
+	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/internal/testutils"
@@ -141,6 +142,18 @@ func (d *DummyDpuDaemon) Stop() {
 	d.server.Stop()
 }
 
+func (d *DummyPlugin) GetDevices() (*pb2.DeviceListResponse, error) {
+	ret := pb2.DeviceListResponse{}
+	return &ret, nil
+}
+
+func (g *DummyPlugin) SetNumVfs(count int32) (*pb2.VfCount, error) {
+	c := &pb2.VfCount{
+		VfCnt: count,
+	}
+	return c, nil
+}
+
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\", \"OrigVfState\": {\"EffectiveMac\": \"00:11:22:33:44:55\"}, \"vlan\": 7}"
 	cmdArgs := &skel.CmdArgs{
@@ -186,13 +199,13 @@ var _ = g.Describe("Host Daemon", func() {
 	)
 	g.BeforeEach(func() {
 		testCluster = &testutils.KindCluster{Name: "dpu-operator-test-cluster"}
-		testCluster.EnsureExists()
+		client := testCluster.EnsureExists()
 		pathManager = utils.NewPathManager(testCluster.TempDirPath())
 		Expect(err).NotTo(HaveOccurred())
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m))
+		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
 	})
 
 	g.AfterEach(func() {
@@ -213,7 +226,8 @@ var _ = g.Describe("Host Daemon", func() {
 			hostListen, err := hostDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				hostDaemon.Serve(hostListen)
+				err := hostDaemon.Serve(hostListen)
+				Expect(err).NotTo(HaveOccurred())
 			}()
 
 			cniVersion := "0.4.0"
