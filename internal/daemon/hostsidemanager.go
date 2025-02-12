@@ -196,6 +196,7 @@ func (d *HostSideManager) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
+	d.setupReconcilers()
 	addr, port, err := d.vsp.Start()
 	if err != nil {
 		d.log.Error(err, "VSP init returned error")
@@ -259,7 +260,6 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		wg.Done()
 	}()
 
-	d.setupReconcilers()
 	ctx, cancelManager := utils.CancelFunc()
 
 	wg.Add(1)
