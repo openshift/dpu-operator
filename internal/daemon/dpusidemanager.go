@@ -32,17 +32,16 @@ type DpuSideManager struct {
 	pb.UnimplementedBridgePortServiceServer
 	pb2.UnimplementedDeviceServiceServer
 
-	vsp           plugin.VendorPlugin
-	dp            deviceplugin.DevicePlugin
-	log           logr.Logger
-	server        *grpc.Server
-	cniserver     *cniserver.Server
-	manager       ctrl.Manager
-	macStore      map[string][]string
-	startedWg     sync.WaitGroup
-	cancelManager context.CancelFunc
-	config        *rest.Config
-	pathManager   utils.PathManager
+	vsp         plugin.VendorPlugin
+	dp          deviceplugin.DevicePlugin
+	log         logr.Logger
+	server      *grpc.Server
+	cniserver   *cniserver.Server
+	manager     ctrl.Manager
+	macStore    map[string][]string
+	startedWg   sync.WaitGroup
+	config      *rest.Config
+	pathManager utils.PathManager
 }
 
 func (s *DpuSideManager) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
@@ -212,7 +211,6 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		d.log.Info("Stoppped manager")
 		wg.Done()
 	}()
-	d.cancelManager = cancelManager
 
 	// Block on any go routines writing to the done channel when an error occurs or they
 	// are forced to exit.
@@ -221,7 +219,7 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		d.log.Error(err, "one of the go-routines failed")
 	}
 
-	d.cancelManager()
+	cancelManager()
 	d.dp.Stop()
 	d.cniserver.Shutdown(context.TODO())
 	d.server.Stop()
