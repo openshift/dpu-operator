@@ -42,6 +42,8 @@ func (p *PathManager) CniPath(flavour Flavour) (string, error) {
 		return p.wrap("/opt/cni/bin/dpu-cni"), nil
 	case OpenShiftFlavour:
 		return p.wrap("/var/lib/cni/bin/dpu-cni"), nil
+	case KindFlavour:
+		return p.wrap("/opt/cni/bin/dpu-cni"), nil
 	default:
 		return "", fmt.Errorf("unknown flavour")
 	}
