@@ -17,6 +17,7 @@ require (
 	github.com/openshift/dpu-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openshift/dpu-operator/dpu-api v0.0.0-20241023094403-a185e0f16e84
 	github.com/opiproject/opi-api v0.0.0-20240808163627-6cd218088dda
+	github.com/spf13/afero v1.11.0
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/zap v1.26.0
@@ -94,7 +95,6 @@ require (
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
-	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect

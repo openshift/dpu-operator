@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/spf13/afero"
 )
 
 type PCIAllocation interface {
@@ -16,23 +17,27 @@ type PCIAllocation interface {
 
 type PCIAllocator struct {
 	dataDir string
+	fs      afero.Fs
 }
 
 // NewPCIAllocator returns a new PCI allocator
 // it will use the <dataDir>/pci folder to store the information about allocated PCI addresses
 func NewPCIAllocator(dataDir string) *PCIAllocator {
-	return &PCIAllocator{dataDir: filepath.Join(dataDir, "pci")}
+	return &PCIAllocator{
+		dataDir: filepath.Join(dataDir, "pci"),
+		fs:      afero.NewOsFs(),
+	}
 }
 
 // SaveAllocatedPCI creates a file with the pci address as a name and the network namespace as the content
 // return error if the file was not created
 func (p *PCIAllocator) SaveAllocatedPCI(pciAddress, ns string) error {
-	if err := os.MkdirAll(p.dataDir, 0600); err != nil {
+	if err := p.fs.MkdirAll(p.dataDir, 0600); err != nil {
 		return fmt.Errorf("failed to create the sriov data directory(%q): %v", p.dataDir, err)
 	}
 
 	path := filepath.Join(p.dataDir, pciAddress)
-	err := os.WriteFile(path, []byte(ns), 0600)
+	err := afero.WriteFile(p.fs, path, []byte(ns), 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write used PCI address lock file in the path(%q): %v", path, err)
 	}
@@ -44,7 +49,7 @@ func (p *PCIAllocator) SaveAllocatedPCI(pciAddress, ns string) error {
 // return error if the file doesn't exist
 func (p *PCIAllocator) DeleteAllocatedPCI(pciAddress string) error {
 	path := filepath.Join(p.dataDir, pciAddress)
-	if err := os.Remove(path); err != nil {
+	if err := p.fs.Remove(path); err != nil {
 		return fmt.Errorf("error removing PCI address lock file %s: %v", path, err)
 	}
 	return nil
@@ -55,7 +60,7 @@ func (p *PCIAllocator) DeleteAllocatedPCI(pciAddress string) error {
 // The function will return an error if the pci is still allocated to a running pod
 func (p *PCIAllocator) IsAllocated(pciAddress string) (bool, error) {
 	path := filepath.Join(p.dataDir, pciAddress)
-	_, err := os.Stat(path)
+	_, err := p.fs.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -64,7 +69,7 @@ func (p *PCIAllocator) IsAllocated(pciAddress string) (bool, error) {
 		return false, fmt.Errorf("failed to check for pci address file for %s: %v", path, err)
 	}
 
-	dat, err := os.ReadFile(path)
+	dat, err := afero.ReadFile(p.fs, path)
 	if err != nil {
 		return false, fmt.Errorf("failed to read for pci address file for %s: %v", path, err)
 	}
@@ -76,8 +81,8 @@ func (p *PCIAllocator) IsAllocated(pciAddress string) (bool, error) {
 	if err != nil {
 		// FIXME: Fix Logging
 		//logging.Debug("Mark the PCI address as released",
-		//	"func", "IsAllocated",
-		//	"pciAddress", pciAddress)
+		//  "func", "IsAllocated",
+		//  "pciAddress", pciAddress)
 		err = p.DeleteAllocatedPCI(pciAddress)
 		if err != nil {
 			return false, fmt.Errorf("error deleting the pci allocation for vf pci address %s: %v", pciAddress, err)
