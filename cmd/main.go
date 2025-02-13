@@ -94,10 +94,10 @@ func main() {
 	}
 
 	webhookImage := os.Getenv("WEBHOOK_IMAGE")
-        if webhookImage == "" {
-                setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
-                os.Exit(1)
-        }
+	if webhookImage == "" {
+		setupLog.Error(err, "Failed to set WEBHOOk_IMAGE env var")
+		os.Exit(1)
+	}
 
 	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, webhookImage)
 

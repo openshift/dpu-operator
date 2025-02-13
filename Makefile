@@ -245,8 +245,8 @@ build-marvell-vsp:
 	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(VSP_BIN).${GOARCH} internal/daemon/vendor-specific-plugins/marvell/main.go
 
 .PHONY: build-webhook
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} GOBIN=${WEBHOOK_BIN} go install github.com/k8snetworkplumbingwg/network-resources-injector/cmd/webhook@latest
-	mv ${WEBHOOK_BIN}/webhook {WEBHOOK_BIN}/webhook.${GOARCH}
+build-webhook:
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${WEBHOOK_BIN}.${GOARCH} cmd/webhook/webhook.go
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
