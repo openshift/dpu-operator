@@ -28,12 +28,18 @@ spec:
           privileged: true
         imagePullPolicy: {{.ImagePullPolicy}}
         env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
         - name: NAMESPACE
-          value: {{.Namespace}}
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: IntelVspImage
           value: {{.IntelVspImage}}
         - name: MarvellVspImage
