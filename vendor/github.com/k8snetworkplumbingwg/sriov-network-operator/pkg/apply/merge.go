@@ -1,9 +1,13 @@
 package apply
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	constants "github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/consts"
 )
 
 // MergeMetadataForUpdate merges the read-only fields of metadata.
@@ -30,6 +34,10 @@ func MergeObjectForUpdate(current, updated *uns.Unstructured) error {
 	}
 
 	if err := MergeServiceAccountForUpdate(current, updated); err != nil {
+		return err
+	}
+
+	if err := MergeWebhookForUpdate(current, updated); err != nil {
 		return err
 	}
 
@@ -93,7 +101,7 @@ func MergeServiceForUpdate(current, updated *uns.Unstructured) error {
 // any secrets ourselves.
 func MergeServiceAccountForUpdate(current, updated *uns.Unstructured) error {
 	gvk := updated.GroupVersionKind()
-	if gvk.Group == "" && gvk.Kind == "ServiceAccount" {
+	if gvk.Group == "" && gvk.Kind == constants.ServiceAccount {
 		curSecrets, ok, err := uns.NestedSlice(current.Object, "secrets")
 		if err != nil {
 			return err
@@ -114,6 +122,91 @@ func MergeServiceAccountForUpdate(current, updated *uns.Unstructured) error {
 	return nil
 }
 
+// MergeWebhookForUpdate ensures the Webhook.ClientConfig.CABundle is never removed from a webhook
+func MergeWebhookForUpdate(current, updated *uns.Unstructured) error {
+	gvk := updated.GroupVersionKind()
+	if gvk.Group != "admissionregistration.k8s.io" {
+		return nil
+	}
+
+	if gvk.Kind != "ValidatingWebhookConfiguration" && gvk.Kind != "MutatingWebhookConfiguration" {
+		return nil
+	}
+
+	updatedWebhooks, ok, err := uns.NestedSlice(updated.Object, "webhooks")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	currentWebhooks, ok, err := uns.NestedSlice(current.Object, "webhooks")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	for _, updatedWebhook := range updatedWebhooks {
+		updateWebhookMap := updatedWebhook.(map[string]interface{})
+		caBundle, ok, err := uns.NestedString(updateWebhookMap, "clientConfig", "caBundle")
+		if err != nil {
+			return nil
+		}
+
+		// if the updated object already contains a CABundle, leave it as is. If it's nil, update its value with the current one
+		if ok && caBundle != "" {
+			continue
+		}
+
+		webhookName, ok, err := uns.NestedString(updateWebhookMap, "name")
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			return fmt.Errorf("webhook name not found in %v", updateWebhookMap)
+		}
+
+		currentWebhook := findByName(currentWebhooks, webhookName)
+		if currentWebhook == nil {
+			// Webhook not yet present in the cluster
+			continue
+		}
+
+		currentCABundle, ok, err := uns.NestedString(*currentWebhook, "clientConfig", "caBundle")
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			// Cluster webook does not have a CABundle
+			continue
+		}
+
+		uns.SetNestedField(updateWebhookMap, currentCABundle, "clientConfig", "caBundle")
+	}
+
+	err = uns.SetNestedSlice(updated.Object, updatedWebhooks, "webhooks")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func findByName(objList []interface{}, name string) *map[string]interface{} {
+	for _, obj := range objList {
+		objMap := obj.(map[string]interface{})
+		if objMap["name"] == name {
+			return &objMap
+		}
+	}
+	return nil
+}
+
 // mergeAnnotations copies over any annotations from current to updated,
 // with updated winning if there's a conflict
 func mergeAnnotations(current, updated *uns.Unstructured) {
@@ -127,7 +220,7 @@ func mergeAnnotations(current, updated *uns.Unstructured) {
 	for k, v := range updatedAnnotations {
 		curAnnotations[k] = v
 	}
-	if len(curAnnotations) > 1 {
+	if len(curAnnotations) > 0 {
 		updated.SetAnnotations(curAnnotations)
 	}
 }
@@ -145,7 +238,7 @@ func mergeLabels(current, updated *uns.Unstructured) {
 	for k, v := range updatedLabels {
 		curLabels[k] = v
 	}
-	if len(curLabels) > 1 {
+	if len(curLabels) > 0 {
 		updated.SetLabels(curLabels)
 	}
 }
