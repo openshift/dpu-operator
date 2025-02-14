@@ -17,7 +17,7 @@ fi
 
 export KUBECONFIG=/root/kubeconfig.microshift
 nodes=$(oc get nodes)
-export acc=$(echo "$nodes" | grep -oP '^\d{3}-acc')
+export acc=$(echo "$nodes" | grep -oP '^\d+-acc')
 if [ -z "$acc" ]; then
   echo "Error: acc is empty"
   exit 1
