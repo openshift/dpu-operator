@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
@@ -136,7 +137,7 @@ func (gp *GrpcPlugin) deployVsp() {
 
 	if vspImage != "" {
 		gp.log.Info("Deploying VSP", "vspImage", vspImage, "command", gp.vsp.Command, "args", gp.vsp.Args)
-		err := render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, nil, nil)
+		err := render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, nil, scheme.Scheme)
 		if err != nil {
 			gp.log.Error(err, "Failed to start vendor plugin container", "vspImage", gp.vsp.VendorSpecificPluginImage)
 		}
