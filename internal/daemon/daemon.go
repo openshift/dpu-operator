@@ -102,7 +102,7 @@ func (d *Daemon) Stop() {
 
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
 	platform := platform.NewPlatformInfo()
-	plugin, err := platform.VspPlugin(dpuMode, vspImages, client)
+	plugin, err := platform.NewVspPlugin(dpuMode, vspImages, client)
 	if err != nil {
 		return nil, err
 	}

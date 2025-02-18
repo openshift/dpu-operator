@@ -35,6 +35,21 @@ func NewPlatformInfo() *PlatformInfo {
 	}
 }
 
+func (pi *PlatformInfo) NewVspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+	var detector VendorDetector
+	var err error
+
+	if dpuMode {
+		detector, err = pi.detectDpuPlatform(true)
+	} else {
+		detector, err = pi.detectDpuSystem(true)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return detector.VspPlugin(dpuMode, vspImages, client), nil
+}
+
 func (pi *PlatformInfo) Getvendorname() (string, error) {
 	klog.Infof("Detecting  Platform is DPU or not")
 	for _, detector := range pi.Detectors {
@@ -169,19 +184,4 @@ func (pi *PlatformInfo) detectDpuSystem(required bool) (VendorDetector, error) {
 		return nil, nil
 	}
 	return detectors[0], nil
-}
-
-func (pi *PlatformInfo) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
-	var detector VendorDetector
-	var err error
-
-	if dpuMode {
-		detector, err = pi.detectDpuPlatform(true)
-	} else {
-		detector, err = pi.detectDpuSystem(true)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return detector.VspPlugin(dpuMode, vspImages, client), nil
 }
