@@ -69,9 +69,10 @@ var _ = g.Describe("DPU side maanger", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
-		dpuPlugin := plugin.NewGrpcPlugin(true,
+		dpuPlugin, err := plugin.NewGrpcPlugin(true,
 			client,
 			plugin.WithPathManager(pathManager))
+		Expect(err).NotTo(HaveOccurred())
 		dpuDaemon = NewDpuSideManger(dpuPlugin, config, WithPathManager(pathManager))
 
 		dpuListen, err := dpuDaemon.Listen()

@@ -8,10 +8,12 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -132,21 +134,32 @@ func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
 	}
 }
 
-func (gp *GrpcPlugin) deployVsp() {
+func (gp *GrpcPlugin) deployVsp() error {
 	vspImage := gp.vsp.VendorSpecificPluginImage
 
-	if vspImage != "" {
-		gp.log.Info("Deploying VSP", "vspImage", vspImage, "command", gp.vsp.Command, "args", gp.vsp.Args)
-		err := render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, nil, scheme.Scheme)
-		if err != nil {
-			gp.log.Error(err, "Failed to start vendor plugin container", "vspImage", gp.vsp.VendorSpecificPluginImage)
-		}
-	} else {
+	// It is not mandatory that a vsp image is provided. If not, we can assume this will be handled by the user and still return a GrpcClient
+	if vspImage == "" {
 		gp.log.Info("WARNING: VSP Image not set, skipping vendor plugin container startup")
+		return nil
 	}
+
+	// Retrieve the Dpu Operator Config which owns the Dpu Daemonset so we can ensure the vsp shares the same owner reference.
+	dpuOperatorConfig := &configv1.DpuOperatorConfig{}
+	err := gp.k8sClient.Get(context.TODO(), client.ObjectKey{Name: vars.DpuOperatorConfigName, Namespace: vars.Namespace}, dpuOperatorConfig)
+	if err != nil {
+		return fmt.Errorf("encountered error when retrieving DpuOperatorConfig %s: %v", vars.DpuOperatorConfigName, err)
+	}
+
+	gp.log.Info("Deploying VSP", "vspImage", vspImage, "command", gp.vsp.Command, "args", gp.vsp.Args)
+	err = render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, dpuOperatorConfig, scheme.Scheme)
+	if err != nil {
+		return fmt.Errorf("failed to start vendor plugin container (vspImage: %s): %v", vspImage, err)
+	}
+
+	return nil
 }
 
-func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)) *GrpcPlugin {
+func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)) (*GrpcPlugin, error) {
 	gp := &GrpcPlugin{
 		dpuMode:     dpuMode,
 		vsp:         VspTemplateVars{},
@@ -159,9 +172,12 @@ func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)
 		opt(gp)
 	}
 
-	gp.deployVsp()
+	err := gp.deployVsp()
+	if err != nil {
+		return nil, err
+	}
 
-	return gp
+	return gp, nil
 }
 
 func (g *GrpcPlugin) ensureConnected() error {
