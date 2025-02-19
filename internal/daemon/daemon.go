@@ -49,7 +49,7 @@ func NewDaemon(fs afero.Fs, mode string, config *rest.Config, vspImages map[stri
 	}
 }
 
-func (d *Daemon) ListenAndServe() error {
+func (d *Daemon) Start(ctx context.Context) error {
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -57,7 +57,19 @@ func (d *Daemon) ListenAndServe() error {
 		return err
 	}
 
-	return d.Serve(listener)
+	errChan := make(chan error, 1)
+
+	go func() {
+		errChan <- d.Serve(listener)
+	}()
+
+	select {
+	case err := <-errChan:
+		return err
+	case <-ctx.Done():
+		d.mgr.Stop()
+		return ctx.Err()
+	}
 }
 
 func (d *Daemon) Listen() (net.Listener, error) {
@@ -94,10 +106,6 @@ func (d *Daemon) Listen() (net.Listener, error) {
 
 func (d *Daemon) Serve(listener net.Listener) error {
 	return d.mgr.Serve(listener)
-}
-
-func (d *Daemon) Stop() {
-	d.mgr.Stop()
 }
 
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
