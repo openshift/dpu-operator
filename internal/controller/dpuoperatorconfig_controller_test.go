@@ -31,12 +31,13 @@ import (
 
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/testutils"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 )
 
 var (
-	testNamespace              = "openshift-dpu-operator"
+	testNamespace              = vars.Namespace
 	testDpuOperatorConfigName  = "default"
 	testDpuOperatorConfigKind  = "DpuOperatorConfig"
 	testDpuDaemonName          = "dpu-daemon"

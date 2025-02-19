@@ -19,6 +19,7 @@ import (
 	sfcreconciler "github.com/openshift/dpu-operator/internal/daemon/sfc-reconciler"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -244,7 +245,7 @@ func (d *DpuSideManager) setupReconcilers() {
 			Scheme: scheme.Scheme,
 			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 				opts.DefaultNamespaces = map[string]cache.Config{
-					"openshift-dpu-operator": {},
+					vars.Namespace: {},
 				}
 				return cache.New(config, opts)
 			},

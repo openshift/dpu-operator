@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/pkgs/render"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -113,7 +114,7 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]string {
 	// All the CRs will be in the same namespace as the operator config
 	data := map[string]string{
-		"Namespace":              "openshift-dpu-operator",
+		"Namespace":              vars.Namespace,
 		"ImagePullPolicy":        r.imagePullPolicy,
 		"Mode":                   "auto",
 		"DpuOperatorDaemonImage": r.dpuDaemonImage,

@@ -78,7 +78,7 @@ type GrpcPlugin struct {
 func NewVspTemplateVars() VspTemplateVars {
 	return VspTemplateVars{
 		VendorSpecificPluginImage: "",
-		Namespace:                 "openshift-dpu-operator",
+		Namespace:                 vars.Namespace,
 		ImagePullPolicy:           "Always",
 		Command:                   "[ ]",
 		Args:                      "[ ]",
