@@ -18,6 +18,7 @@ import (
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/testutils"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,7 +73,7 @@ var _ = g.Describe("Dpu side", g.Ordered, func() {
 	g.It("Should create a pod when creating an SFC", func() {
 		nfName := "example-nf"
 		nfImage := "example-nf-image-url"
-		ns := "openshift-dpu-operator"
+		ns := vars.Namespace
 
 		Eventually(func() bool {
 			return testutils.GetPod(dpuSideClient, nfName, ns) == nil

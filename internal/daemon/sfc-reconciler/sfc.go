@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -33,7 +34,7 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "openshift-dpu-operator",
+			Namespace: vars.Namespace,
 			Annotations: map[string]string{
 				"k8s.v1.cni.cncf.io/networks": "dpunfcni-conf, dpunfcni-conf",
 			},

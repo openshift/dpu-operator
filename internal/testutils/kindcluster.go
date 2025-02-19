@@ -20,12 +20,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
 var (
-	testNamespace             = "openshift-dpu-operator"
+	testNamespace             = vars.Namespace
 	testDpuOperatorConfigName = "default"
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"

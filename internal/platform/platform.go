@@ -16,7 +16,7 @@ type PlatformInfoProvider interface {
 
 type VendorDetector interface {
 	IsDpuPlatform() (bool, error)
-	VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) *plugin.GrpcPlugin
+	VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error)
 	IsDPU(pci ghw.PCIDevice) (bool, error)
 	GetVendorName() string
 }
@@ -33,6 +33,26 @@ func NewPlatformInfo() *PlatformInfo {
 			// add more detectors here
 		},
 	}
+}
+
+func (pi *PlatformInfo) NewVspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+	var detector VendorDetector
+	var err error
+
+	if dpuMode {
+		detector, err = pi.detectDpuPlatform(true)
+	} else {
+		detector, err = pi.detectDpuSystem(true)
+	}
+	if err != nil {
+		return nil, err
+	}
+	vspPlugin, err := detector.VspPlugin(dpuMode, vspImages, client)
+	if err != nil {
+		return nil, errors.Errorf("Error encountered when deploying VspPlugin: %v", err)
+	}
+
+	return vspPlugin, nil
 }
 
 func (pi *PlatformInfo) Getvendorname() (string, error) {
@@ -169,19 +189,4 @@ func (pi *PlatformInfo) detectDpuSystem(required bool) (VendorDetector, error) {
 		return nil, nil
 	}
 	return detectors[0], nil
-}
-
-func (pi *PlatformInfo) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
-	var detector VendorDetector
-	var err error
-
-	if dpuMode {
-		detector, err = pi.detectDpuPlatform(true)
-	} else {
-		detector, err = pi.detectDpuSystem(true)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return detector.VspPlugin(dpuMode, vspImages, client), nil
 }

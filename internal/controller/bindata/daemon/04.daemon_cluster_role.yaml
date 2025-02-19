@@ -15,3 +15,18 @@ rules:
   - nodes
   verbs:
   - get
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dpuoperatorconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dpuoperatorconfigs/finalizers
+  verbs:
+  - update

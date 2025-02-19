@@ -17,7 +17,6 @@ func init() {
 	utilruntime.Must(corev1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(v1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme.Scheme))
-	utilruntime.Must(configv1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(netattdefv1.AddToScheme(scheme.Scheme))
 	//+kubebuilder:scaffold:scheme
 }
