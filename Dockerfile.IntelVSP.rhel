@@ -4,7 +4,10 @@ ARG TARGETARCH
 
 WORKDIR /workspace
 COPY . .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
+
+# Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
+# As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
+RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
 
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETARCH
