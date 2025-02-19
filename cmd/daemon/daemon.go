@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 
 	daemon "github.com/openshift/dpu-operator/internal/daemon"
@@ -30,7 +31,7 @@ func main() {
 	vspImages := plugin.CreateVspImagesMap(true, log)
 
 	d := daemon.NewDaemon(afero.NewOsFs(), mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
-	if err := d.ListenAndServe(); err != nil {
+	if err := d.Start(context.Background()); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)
 	}
