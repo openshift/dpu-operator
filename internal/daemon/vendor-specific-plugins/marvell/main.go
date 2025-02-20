@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -441,6 +442,12 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 		klog.Infof("nmcli device set %s managed no failed with error %v", interfaceName, err1)
 	}
 
+	optimistic_dad_file := "/proc/sys/net/ipv6/conf/" + interfaceName + "/optimistic_dad"
+	err1 = os.WriteFile(optimistic_dad_file, []byte("1"), os.ModeAppend)
+	if err1 != nil {
+		klog.Errorf("Error setting %s: %v", optimistic_dad_file, err1)
+	}
+
 	// Ensure to set addrgenmode and toggle link state (which can result in creating
 	// the IPv6 link local address. Ignore errors here.
 	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
@@ -451,7 +458,7 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 		return fmt.Errorf("Error setting link %s up: %v", interfaceName, err)
 	}
 
-	err = exec.Command("ip", "addr", "replace", ipv6Addr+"/64", "dev", interfaceName).Run()
+	err = exec.Command("ip", "addr", "replace", ipv6Addr+"/64", "dev", interfaceName, "optimistic").Run()
 	if err != nil {
 		return fmt.Errorf("Error configuring IPv6 address %s/64 on link %s: %v", ipv6Addr, interfaceName, err)
 	}
