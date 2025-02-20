@@ -17,7 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -63,4 +65,9 @@ type DpuOperatorConfigList struct {
 
 func init() {
 	SchemeBuilder.Register(&DpuOperatorConfig{}, &DpuOperatorConfigList{})
+}
+
+var DpuOperatorConfigNamespacedName = types.NamespacedName{
+	Name:      vars.DpuOperatorConfigName,
+	Namespace: vars.Namespace,
 }
