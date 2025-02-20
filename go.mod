@@ -5,12 +5,15 @@ go 1.23.4
 require (
 	github.com/containernetworking/cni v1.2.3
 	github.com/containernetworking/plugins v1.5.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-logr/logr v1.4.2
+	github.com/golang/glog v1.2.4
 	github.com/gorilla/mux v1.8.1
 	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250206232827-56622a78dbc5
 	github.com/jaypipes/ghw v0.13.0
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.5.0
+	github.com/k8snetworkplumbingwg/network-resources-injector v1.7.1
 	github.com/k8snetworkplumbingwg/sriov-network-operator v1.2.0
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.1
@@ -46,7 +49,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
-	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -117,6 +119,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/k8snetworkplumbingwg/multus-cni.v4 v4.0.2 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
