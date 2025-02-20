@@ -70,50 +70,52 @@ var _ = g.Describe("Dpu side", g.Ordered, func() {
 	g.AfterEach(func() {
 	})
 
-	g.It("Should create a pod when creating an SFC", func() {
-		nfName := "example-nf"
-		nfImage := "example-nf-image-url"
-		ns := vars.Namespace
+	g.Context("ServiceFunctionChain", func() {
+		g.It("Should create a pod when creating an SFC", func() {
+			nfName := "example-nf"
+			nfImage := "example-nf-image-url"
+			ns := vars.Namespace
 
-		Eventually(func() bool {
-			return testutils.GetPod(dpuSideClient, nfName, ns) == nil
-		}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				return testutils.GetPod(dpuSideClient, nfName, ns) == nil
+			}, timeout, interval).Should(BeTrue())
 
-		sfc := &configv1.ServiceFunctionChain{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "sfc-test",
-				Namespace: ns,
-			},
-			Spec: configv1.ServiceFunctionChainSpec{
-				NetworkFunctions: []configv1.NetworkFunction{
-					{
-						Name:  nfName,
-						Image: nfImage,
+			sfc := &configv1.ServiceFunctionChain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "sfc-test",
+					Namespace: ns,
+				},
+				Spec: configv1.ServiceFunctionChainSpec{
+					NetworkFunctions: []configv1.NetworkFunction{
+						{
+							Name:  nfName,
+							Image: nfImage,
+						},
 					},
 				},
-			},
-		}
-		err := dpuSideClient.Create(context.TODO(), sfc)
-		Expect(err).NotTo(HaveOccurred())
-
-		podList := &corev1.PodList{}
-		err = dpuSideClient.List(context.TODO(), podList, client.InNamespace(ns))
-		Expect(err).NotTo(HaveOccurred())
-
-		Eventually(func() bool {
-			pod := testutils.GetPod(dpuSideClient, nfName, ns)
-			if pod != nil {
-				return pod.Spec.Containers[0].Image == nfImage
 			}
-			return false
-		}, timeout, interval).Should(BeTrue())
+			err := dpuSideClient.Create(context.TODO(), sfc)
+			Expect(err).NotTo(HaveOccurred())
 
-		err = dpuSideClient.Delete(context.TODO(), sfc)
-		Expect(err).NotTo(HaveOccurred())
-		fmt.Println("Finishing up")
+			podList := &corev1.PodList{}
+			err = dpuSideClient.List(context.TODO(), podList, client.InNamespace(ns))
+			Expect(err).NotTo(HaveOccurred())
 
-		Eventually(func() bool {
-			return testutils.GetPod(dpuSideClient, nfName, ns) == nil
-		}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				pod := testutils.GetPod(dpuSideClient, nfName, ns)
+				if pod != nil {
+					return pod.Spec.Containers[0].Image == nfImage
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			err = dpuSideClient.Delete(context.TODO(), sfc)
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("Finishing up")
+
+			Eventually(func() bool {
+				return testutils.GetPod(dpuSideClient, nfName, ns) == nil
+			}, timeout, interval).Should(BeTrue())
+		})
 	})
 })
