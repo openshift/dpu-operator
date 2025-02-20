@@ -38,7 +38,7 @@ import (
 
 var (
 	testNamespace              = vars.Namespace
-	testDpuOperatorConfigName  = "default"
+	testDpuOperatorConfigName  = vars.DpuOperatorConfigName
 	testDpuOperatorConfigKind  = "DpuOperatorConfig"
 	testDpuDaemonName          = "dpu-daemon"
 	testNetworkFunctionNADDpu  = "dpunfcni-conf"
@@ -212,7 +212,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 		Context("When DpuOperatorConfig CR exists with host mode", func() {
 			BeforeAll(func() {
 				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR("operator-config", "host", ns)
+				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
 				createNameSpace(mgr.GetClient(), ns)
 				createDpuOperatorCR(mgr.GetClient(), cr)
 			})
@@ -229,7 +229,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			})
 			AfterAll(func() {
 				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR("operator-config", "host", ns)
+				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
 				deleteDpuOperatorCR(mgr.GetClient(), cr)
 			})
 		})

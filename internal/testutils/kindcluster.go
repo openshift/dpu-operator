@@ -27,7 +27,7 @@ import (
 
 var (
 	testNamespace             = vars.Namespace
-	testDpuOperatorConfigName = "default"
+	testDpuOperatorConfigName = vars.DpuOperatorConfigName
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
 	testClusterName           = "dpu-operator-test-cluster"
