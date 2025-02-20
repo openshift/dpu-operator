@@ -2,9 +2,10 @@ package daemon
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
@@ -27,103 +28,128 @@ type SideManager interface {
 }
 
 type Daemon struct {
-	mode      string
-	pm        *utils.PathManager
-	log       logr.Logger
-	vspImages map[string]string
-	config    *rest.Config
-	mgr       SideManager
-	client    client.Client
-	fs        afero.Fs
+	mode              string
+	pm                *utils.PathManager
+	log               logr.Logger
+	vspImages         map[string]string
+	config            *rest.Config
+	managers          []SideManager
+	client            client.Client
+	fs                afero.Fs
+	dpuDetectorManger *platform.DpuDetectorManager
+	running           sync.WaitGroup
 }
 
-func NewDaemon(fs afero.Fs, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
+func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
-		fs:        fs,
-		mode:      mode,
-		pm:        pathManager,
-		log:       log,
-		vspImages: vspImages,
-		config:    config,
+		fs:                fs,
+		mode:              mode,
+		pm:                pathManager,
+		log:               log,
+		vspImages:         vspImages,
+		config:            config,
+		dpuDetectorManger: platform.NewDpuDetectorManager(p),
+		running:           sync.WaitGroup{},
+		managers:          make([]SideManager, 0),
 	}
 }
 
 func (d *Daemon) Start(ctx context.Context) error {
-	listener, err := d.Listen()
-
+	var ret error
+	d.running.Add(1)
+	d.log.Info("Preparing CNI binary")
+	err := d.Prepare()
 	if err != nil {
-		d.log.Error(err, "Failed to listen")
 		return err
 	}
-
 	errChan := make(chan error, 1)
-
 	go func() {
-		errChan <- d.Serve(listener)
+		d.detectLoop(errChan, ctx)
 	}()
 
+	d.log.Info("Entering wait")
 	select {
 	case err := <-errChan:
-		return err
+		ret = err
 	case <-ctx.Done():
-		d.mgr.Stop()
-		return ctx.Err()
+		ret = ctx.Err()
 	}
+	d.log.Info("Stopping all managers")
+	for _, mgr := range d.managers {
+		mgr.Stop()
+	}
+	d.running.Done()
+	return ret
 }
 
-func (d *Daemon) Listen() (net.Listener, error) {
+func (d *Daemon) Prepare() error {
 	var err error
 	d.client, err = client.New(d.config, client.Options{
 		Scheme: scheme.Scheme,
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create client: %v", err)
+		return fmt.Errorf("Failed to create client: %v", err)
 	}
 
 	ce := utils.NewClusterEnvironment(d.client)
 	flavour, err := ce.Flavour(context.TODO())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	d.log.Info("Detected Kuberentes flavour", "flavour", flavour)
-	err = d.prepareCni(flavour)
-	if err != nil {
-		return nil, err
-	}
-	dpuMode, err := d.isDpuMode()
-	if err != nil {
-		return nil, err
-	}
-	d.mgr, err = d.createDaemon(dpuMode, d.config, d.vspImages, d.client)
-	if err != nil {
-		d.log.Error(err, "Failed to start daemon")
-		return nil, err
-	}
-	return d.mgr.Listen()
+	return d.prepareCni(flavour)
 }
 
-func (d *Daemon) Serve(listener net.Listener) error {
-	return d.mgr.Serve(listener)
+func (d *Daemon) detectLoop(errChan chan error, ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if len(d.managers) == 1 {
+				continue
+			}
+			d.log.Info("Scanning for DPUs")
+			sideManager, err := d.createDaemon()
+			if err != nil {
+				d.log.Error(err, "Got error while detecting DPUs")
+				errChan <- err
+			}
+			if sideManager != nil {
+				d.managers = append(d.managers, sideManager)
+				go func() {
+					err := sideManager.ListenAndServe()
+					if err != nil {
+						d.log.Error(err, "Failed to listen on sideManager")
+					}
+				}()
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
-func (d *Daemon) Stop() {
-	d.mgr.Stop()
-}
-
-func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
-	platform := platform.NewPlatformInfo()
-	plugin, err := platform.NewVspPlugin(dpuMode, vspImages, client)
+func (d *Daemon) createDaemon() (SideManager, error) {
+	dpuMode, plugin, err := d.dpuDetectorManger.Detect(d.vspImages, d.client, *d.pm)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to detect DPUs: %v", err)
 	}
+	if plugin != nil {
+		if dpuMode {
+			return NewDpuSideManger(plugin, d.config, WithPathManager(*d.pm)), nil
+		} else {
+			return NewHostSideManager(plugin, WithPathManager2(d.pm)), nil
+		}
+	}
+	return nil, nil
+}
 
-	if dpuMode {
-		return NewDpuSideManger(plugin, config, WithPathManager(*d.pm)), nil
-	} else {
-		return NewHostSideManager(plugin, WithPathManager2(d.pm)), nil
-	}
+func (d *Daemon) Wait() {
+	d.running.Wait()
 }
 
 func (d *Daemon) prepareCni(flavour utils.Flavour) error {
@@ -143,22 +169,4 @@ func (d *Daemon) prepareCni(flavour utils.Flavour) error {
 	}
 	d.log.Info("Prepared CNI binary", "path", cniPath)
 	return nil
-}
-
-func (d *Daemon) isDpuMode() (bool, error) {
-	if d.mode == "host" {
-		return false, nil
-	} else if d.mode == "dpu" {
-		return true, nil
-	} else if d.mode == "auto" {
-		platform := platform.NewPlatformInfo()
-		detectedDpuMode, err := platform.IsDpu()
-		if err != nil {
-			return false, fmt.Errorf("Failed to query platform info: %v", err)
-		}
-		d.log.Info("Autodetected mode", "isDPU", detectedDpuMode)
-		return detectedDpuMode, nil
-	} else {
-		return false, errors.New("Invalid mode")
-	}
 }
