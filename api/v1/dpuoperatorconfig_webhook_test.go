@@ -18,22 +18,100 @@ package v1
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/openshift/dpu-operator/pkgs/vars"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("DpuOperatorConfig Webhook", func() {
+var _ = Describe("Webhook Unit Test", func() {
+	Context("Unit Unit", func() {
+		It("check validate DpuOperatorConfig", func() {
+			var err error
 
-	Context("When creating DpuOperatorConfig under Validating Webhook", func() {
-		It("Should deny if a required field is empty", func() {
+			config := &DpuOperatorConfig{}
+			config.SetName(vars.DpuOperatorConfigName)
+			config.Spec = DpuOperatorConfigSpec{
+				Mode:     "host",
+				LogLevel: 2,
+			}
 
-			// TODO(user): Add your logic here
+			_, err = config.validateDpuOperatorConfig()
+			Expect(err).NotTo(HaveOccurred())
 
-		})
-
-		It("Should admit if all required fields are provided", func() {
-
-			// TODO(user): Add your logic here
-
+			config.SetName("dpu-operator-config2")
+			_, err = config.validateDpuOperatorConfig()
+			Expect(err).To(HaveOccurred())
 		})
 	})
+})
 
+var _ = Describe("Webhook Test", func() {
+	Context("Validating Webhook for DpuOperatorConfig", func() {
+
+		It("should initially not have a DpuOperatorConfig", func() {
+			config := &DpuOperatorConfig{}
+			err := k8sClient.Get(ctx, DpuOperatorConfigNamespacedName, config)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should succeed to create default DpuOperatorConfig", func() {
+			var err error
+
+			createValid := &DpuOperatorConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      vars.DpuOperatorConfigName,
+					Namespace: vars.Namespace,
+				},
+				Spec: DpuOperatorConfigSpec{
+					Mode: "host",
+				},
+			}
+			err = k8sClient.Create(ctx, createValid)
+			Expect(err).NotTo(HaveOccurred())
+
+			config := &DpuOperatorConfig{}
+
+			err = k8sClient.Get(ctx, DpuOperatorConfigNamespacedName, config)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Delete(ctx, config)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, DpuOperatorConfigNamespacedName, config)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should reject invalid DpuOperatorConfig", func() {
+			var err error
+
+			createInvalidMode := &DpuOperatorConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      vars.DpuOperatorConfigName,
+					Namespace: vars.Namespace,
+				},
+				Spec: DpuOperatorConfigSpec{
+					Mode: "invalid",
+				},
+			}
+			err = k8sClient.Create(ctx, createInvalidMode)
+			Expect(err).To(HaveOccurred())
+
+			createInvalidName := &DpuOperatorConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "invalid",
+					Namespace: vars.Namespace,
+				},
+				Spec: DpuOperatorConfigSpec{
+					Mode: "host",
+				},
+			}
+			err = k8sClient.Create(ctx, createInvalidName)
+			Expect(err).To(HaveOccurred())
+
+			config := &DpuOperatorConfig{}
+			err = k8sClient.Get(ctx, DpuOperatorConfigNamespacedName, config)
+			Expect(err).To(HaveOccurred())
+		})
+	})
 })
