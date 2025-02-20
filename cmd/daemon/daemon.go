@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 
 	daemon "github.com/openshift/dpu-operator/internal/daemon"
+	"github.com/openshift/dpu-operator/internal/platform"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
@@ -29,8 +31,9 @@ func main() {
 
 	vspImages := plugin.CreateVspImagesMap(true, log)
 
-	d := daemon.NewDaemon(afero.NewOsFs(), mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
-	if err := d.ListenAndServe(); err != nil {
+	platform := &platform.HardwarePlatform{}
+	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
+	if err := d.Start(context.Background()); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)
 	}
