@@ -19,6 +19,24 @@ const (
 	SysBusPci string = "/sys/bus/pci/devices"
 )
 
+// GetAllVfsByDeviceID returns the list of all VFs associated with the given device ID
+func GetAllVfsByDeviceID(deviceID string) ([]string, error) {
+	pci, err := ghw.PCI()
+	if err != nil {
+		return nil, err
+	}
+	var targetAddresses []string
+	for _, dev := range pci.Devices {
+		if dev.Vendor.ID == VendorID && dev.Product.ID == deviceID {
+			targetAddresses = append(targetAddresses, dev.Address)
+		}
+	}
+	if len(targetAddresses) == 0 {
+		return nil, errors.New("no devices found with given Vendor ID and Device ID")
+	}
+	return targetAddresses, nil
+}
+
 // Mapped_VF returns the PCI address of the VF mapped to the given PF
 func Mapped_VF(pf_count int, pfid int, vfid int) (string, error) {
 	pci, err := ghw.PCI()
