@@ -371,7 +371,7 @@ func getPluginMode() string {
 
 func convertNameToIpAndPort(p4rtName string) (string, error) {
 
-	p4rtIp := "localhost"
+	p4rtIp := "127.0.0.1"
 	ip, err := net.LookupIP(p4rtName)
 	if err != nil {
 		log.Errorf("Couldn't resolve Name %s to IP: err->%s", p4rtName, err)

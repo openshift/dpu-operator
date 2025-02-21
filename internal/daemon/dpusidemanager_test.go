@@ -48,7 +48,7 @@ func waitAllNodesDpuAllocatable(client client.Client) {
 	}, testutils.TestInitialSetupTimeout, testutils.TestRetryInterval).Should(BeTrue())
 }
 
-var _ = g.Describe("DPU side maanger", Ordered, func() {
+var _ = g.Describe("DPU side manager", Ordered, func() {
 	var (
 		dpuDaemon   *DpuSideManager
 		config      *rest.Config

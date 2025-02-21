@@ -247,7 +247,7 @@ func discoverHostDevices(mode string) (map[string]*pb.Device, error) {
 	for _, file := range files {
 		deviceCodeByte, err := os.ReadFile(filepath.Join(sysClassNet, file.Name(), "device/device"))
 		if err != nil {
-			fmt.Printf("Error: %s\n", err)
+			continue
 		}
 
 		device_code := strings.TrimSpace(string(deviceCodeByte))

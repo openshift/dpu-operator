@@ -202,11 +202,11 @@ check-podman:
 
 .PHONY: test
 test: podman-check manifests generate fmt vet envtest ginkgo
-	FAST_TEST=false KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" timeout 30m $(GINKGO) --repeat 4 $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./internal/... -coverprofile cover.out
+	FAST_TEST=false KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" timeout 30m $(GINKGO) --repeat 4 $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./internal/... ./pkgs/... -coverprofile cover.out
 
 .PHONY: fast-test
 fast-test: envtest ginkgo
-	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./internal/... -coverprofile cover.out
+	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./internal/... ./pkgs/... -coverprofile cover.out
 ##@ Build
 .PHONY: e2e-test-suite
 e2e-test-suite: envtest ginkgo

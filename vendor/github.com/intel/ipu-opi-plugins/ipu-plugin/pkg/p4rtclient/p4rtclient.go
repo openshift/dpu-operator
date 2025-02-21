@@ -18,11 +18,18 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"strconv"
 
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+        mirror_profile_id = 3
+        bridgeId = 0
+        phyPort = 0
 )
 
 type fxpRuleParams []string
@@ -76,6 +83,25 @@ func getVsiVportInfo(macAddr string) (int, int) {
 	return vfVsi, vfVport
 }
 
+func getStrippedMacAndVsi(macAddr string)  (int, string, error) {
+        vsi, err := utils.ImcQueryfindVsiGivenMacAddr(types.IpuMode, macAddr)
+        if err != nil {
+                log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", macAddr)
+                return 0, "", err
+        }
+        //skip 0x in front of vsi
+        vsi = vsi[2:]
+
+        vsiInt64, err := strconv.ParseInt(vsi, 16, 32)
+        if err != nil {
+                log.Info("error from ParseInt ", err)
+                return 0, "", err
+        }
+        Vsi := int(vsiInt64)
+        macAddrStrip := strings.ReplaceAll(macAddr, ":", "")
+	return Vsi, macAddrStrip, nil
+}
+
 func programPhyVportP4Rules(p4rtClient types.P4RTClient, phyPort int, prMac string) error {
 	vsi, err := utils.ImcQueryfindVsiGivenMacAddr(types.IpuMode, prMac)
 	if err != nil {
@@ -103,6 +129,7 @@ func programPhyVportP4Rules(p4rtClient types.P4RTClient, phyPort int, prMac stri
 				phyPort, phyPort,
 			),
 		},
+/* rx_phy_port_to_pr_map rule is commented here as it gets handled at the mirror_profile. keeping the below rule for reference only.
 		{
 			Action:  "add-entry",
 			P4br:    "br0",
@@ -112,6 +139,7 @@ func programPhyVportP4Rules(p4rtClient types.P4RTClient, phyPort int, prMac stri
 				phyPort, prVport,
 			),
 		},
+*/
 		{
 			Action:  "add-entry",
 			P4br:    "br0",
@@ -159,6 +187,7 @@ func deletePhyVportP4Rules(p4rtClient types.P4RTClient, phyPort int, prMac strin
 				phyPort,
 			),
 		},
+/* rx_phy_port_to_pr_map rule is commented here as it gets handled at the mirror_profile. keeping the below rule for reference only.
 		{
 			Action:  "del-entry",
 			P4br:    "br0",
@@ -168,6 +197,7 @@ func deletePhyVportP4Rules(p4rtClient types.P4RTClient, phyPort int, prMac strin
 				phyPort,
 			),
 		},
+*/
 		{
 			Action:  "del-entry",
 			P4br:    "br0",
@@ -520,9 +550,9 @@ func AddPhyPortRules(p4rtClient types.P4RTClient, prP0mac string, prP1mac string
 	//Add Port 0 P4 rules
 	programPhyVportP4Rules(p4rtClient, 0, prP0mac)
 	//Add Port 1 P4 rules
-	programPhyVportP4Rules(p4rtClient, 1, prP1mac)
+  //programPhyVportP4Rules(p4RtBin, 1, prP1mac)
 	//Add bridge id for non P4 OVS bridge ports
-	programPhyVportBridgeId(p4rtClient, 1, 77)
+  //programPhyVportBridgeId(p4RtBin, 1, 77)
 
 	return nil
 }
@@ -537,9 +567,9 @@ func DeletePhyPortRules(p4rtClient types.P4RTClient, prP0mac string, prP1mac str
 	//Add Port 0 P4 rules
 	deletePhyVportP4Rules(p4rtClient, 0, prP0mac)
 	//Add Port 1 P4 rules
-	deletePhyVportP4Rules(p4rtClient, 1, prP1mac)
+  //deletePhyVportP4Rules(p4RtBin, 1, prP1mac)
 	//Add bridge id for non P4 OVS bridge ports
-	deletePhyVportBridgeId(p4rtClient, 1, 77)
+  //deletePhyVportBridgeId(p4RtBin, 1, 77)
 
 	return nil
 
@@ -899,4 +929,145 @@ func DeleteLAGP4Rules(p4rtClient types.P4RTClient) error {
 		log.Info("DeleteLAGP4Rules FXP P4 rules were delete successfully")
 	}
 	return nil
+}
+
+
+func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, d5Mac string) error {
+        d4Vsi, _, err := getStrippedMacAndVsi(d4Mac)
+        if err != nil {
+                log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d4Mac)
+                return err
+        }
+
+        d5Vsi, d5MacAddr, err := getStrippedMacAndVsi(d5Mac)
+        if err != nil {
+                log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d5Mac)
+                return err
+        }
+
+        phyVportP4ruleSets := []types.FxpRuleBuilder{
+                {
+                        Action:  "add-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.mir_prof",
+                        Metadata: fmt.Sprintf(
+                                "mirror_prof_key=%d,action=linux_networking_control.mir_prof_action(vport_id=%d,mode=0,port_dest_type=0,dest_id=%d,func_valid=1,store_vsi=1)",
+                                mirror_profile_id, d5Vsi, d5Vsi,
+                        ),
+                },
+                {
+                        Action:  "add-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.rx_phy_port_to_pr_map",
+                        Metadata: fmt.Sprintf(
+                                "vmeta.common.port_id=0x00,zero_padding=0x0000,action=linux_networking_control.mirror_and_send(%d,%d)",
+                                d4Vsi+16, mirror_profile_id,
+                        ),
+                },
+                {
+                        Action:  "add-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.tx_acc_vsi",
+                        Metadata: fmt.Sprintf(
+                                "vmeta.common.vsi=%d,zero_padding=0,action=linux_networking_control.l2_fwd_and_bypass_bridge(%d)",
+                                d5Vsi, phyPort,
+                        ),
+                },
+/* rx_source_port rule is commented here as it gets handled at the PhyVportP4Rules. keeping the below rule for reference only.
+                {
+                        Action:  "add-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.rx_source_port",
+                        Metadata: fmt.Sprintf(
+                                "vmeta.common.port_id=0,zero_padding=0,action=linux_networking_control.set_source_port(%d)",
+                                phyPort,
+                        ),
+                },
+*/
+                {
+                        Action:  "add-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.source_port_to_bridge_map",
+                        Metadata: fmt.Sprintf(
+                                "user_meta.cmeta.source_port=%d/0xffff,hdrs.vlan_ext[vmeta.common.depth].hdr.vid=%d/0xfff,priority=1,action=linux_networking_control.set_bridge_id(bridge_id=%d)",
+                                phyPort, phyPort, bridgeId,
+                        ),
+                },
+                {
+                        Action:  "add-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.l2_fwd_rx_table",
+                        Metadata: fmt.Sprintf(
+                                "user_meta.pmeta.bridge_id=%d,dst_mac=0x%s,action=linux_networking_control.l2_fwd(%d)",
+                                bridgeId, d5MacAddr, d5Vsi+16,
+                        ),
+                },
+        }
+        return p4rtClient.ProgramFXPP4Rules(phyVportP4ruleSets)
+}
+
+func DeleteRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d5Mac string) error {
+        d5Vsi, d5MacAddr, err := getStrippedMacAndVsi(d5Mac)
+        if err != nil {
+                log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d5Mac)
+                return err
+        }
+
+        phyVportP4ruleSets := []types.FxpRuleBuilder{
+                {
+                        Action:  "del-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.mir_prof",
+                        Metadata: fmt.Sprintf(
+                                "mirror_prof_key=%d",
+                                mirror_profile_id,
+                        ),
+                },
+                {
+                        Action:  "del-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.rx_phy_port_to_pr_map",
+                        Metadata: fmt.Sprintf(
+                                "vmeta.common.port_id=0x00,zero_padding=0x0000",
+                        ),
+                },
+                {
+                        Action:  "del-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.tx_acc_vsi",
+                        Metadata: fmt.Sprintf(
+                                "vmeta.common.vsi=%d,zero_padding=0",
+                                d5Vsi,
+                        ),
+                },
+/* rx_source_port rule is commented here as it gets handled at the PhyVportP4Rules. keeping the below rule for reference only.
+                {
+                        Action:  "del-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.rx_source_port",
+                        Metadata: fmt.Sprintf(
+                                "vmeta.common.port_id=0,zero_padding=0",
+                        ),
+                },
+*/
+                {
+                        Action:  "del-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.source_port_to_bridge_map",
+                        Metadata: fmt.Sprintf(
+                                "user_meta.cmeta.source_port=%d/0xffff,hdrs.vlan_ext[vmeta.common.depth].hdr.vid=%d/0xfff,priority=1",
+                                phyPort, phyPort,
+                        ),
+                },
+                {
+                        Action:  "del-entry",
+                        P4br:    "br0",
+                        Control: "linux_networking_control.l2_fwd_rx_table",
+                        Metadata: fmt.Sprintf(
+                                "user_meta.pmeta.bridge_id=%d,dst_mac=0x%s",
+                                bridgeId, d5MacAddr,
+                        ),
+                },
+        }
+        return p4rtClient.ProgramFXPP4Rules(phyVportP4ruleSets)
 }
