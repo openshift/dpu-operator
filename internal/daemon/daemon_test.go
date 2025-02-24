@@ -12,6 +12,8 @@ import (
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/internal/utils"
+	"github.com/openshift/dpu-operator/internal/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"github.com/spf13/afero"
 )
 
@@ -28,12 +30,20 @@ var _ = g.Describe("Full Daemon", func() {
 		daemon       Daemon
 		fakePlatform *platform.FakePlatform
 		cancel       context.CancelFunc
+		k8sClient    client.Client
 	)
 	g.BeforeEach(func() {
 		var ctx context.Context
+		var err error
 		testCluster = &testutils.KindCluster{Name: "dpu-operator-test-cluster"}
 		config := testCluster.EnsureExists()
 		pathManager := utils.NewPathManager(testCluster.TempDirPath())
+		k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+		ns := testutils.DpuOperatorNamespace()
+		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+		testutils.CreateNamespace(k8sClient, ns)
+		testutils.CreateDpuOperatorCR(k8sClient, cr)
 
 		fs := afero.NewMemMapFs()
 		utils.Touch(fs, "/dpu-cni")
@@ -65,5 +75,8 @@ var _ = g.Describe("Full Daemon", func() {
 		klog.Info("Cleaning up")
 		cancel()
 		daemon.Wait()
+		ns := testutils.DpuOperatorNamespace()
+		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+		testutils.DeleteDpuOperatorCR(k8sClient, cr)
 	})
 })
