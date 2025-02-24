@@ -41,6 +41,7 @@ type DataProcessingUnitStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:shortName=dpu
+//+kubebuilder:resource:scope=Cluster
 // DataProcessingUnit is the Schema for the dataprocessingunits API
 type DataProcessingUnit struct {
 	metav1.TypeMeta   `json:",inline"`
