@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jaypipes/ghw"
@@ -38,6 +39,13 @@ func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
 	}
 }
 
+func normalizePciAddress(pciAddress string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	normalized := re.ReplaceAllString(pciAddress, "-")
+	normalized = strings.ToLower(normalized)
+	return normalized
+}
+
 func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (*configv1.DataProcessingUnit, error) {
 	// VFs for the Intel IPU have the same PCIe info as the PF
 	isVF, err := d.isVirtualFunction(pci.Address)
@@ -52,7 +60,7 @@ func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (*configv1.DataProcessingUnit, 
 	}
 
 	ret := configv1.DataProcessingUnit{}
-	ret.SetName("e2100_" + strings.Replace(pci.Address, ":", "_", -1))
+	ret.SetName("e2100-" + normalizePciAddress(pci.Address))
 	ret.Spec.DpuType = "IPU Adapter E2100-CCQDA2"
 	ret.Spec.IsDpuSide = false
 
