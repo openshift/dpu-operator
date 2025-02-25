@@ -59,3 +59,9 @@ func (p *FakePlatform) RemoveAllPciDevices() {
 	defer p.mu.Unlock()
 	p.devices = make([]*ghw.PCIDevice, 0)
 }
+
+func (p *FakePlatform) AddPciDevice(dev *ghw.PCIDevice) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.devices = append(p.devices, dev)
+}
