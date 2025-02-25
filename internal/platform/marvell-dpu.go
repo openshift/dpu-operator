@@ -1,8 +1,6 @@
 package platform
 
 import (
-	"strings"
-
 	"github.com/jaypipes/ghw"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
@@ -42,7 +40,7 @@ func (pi *MarvellDetector) IsDPU(pci ghw.PCIDevice) (*configv1.DataProcessingUni
 		pci.Product.ID == MrvlHostDeviceID {
 
 		ret := configv1.DataProcessingUnit{}
-		ret.SetName("octeon10-" + strings.Replace(pci.Address, ":", "_", -1))
+		ret.SetName("octeon10-" + normalizePciAddress(pci.Address))
 		ret.Spec.DpuType = "Marvell Octeon 10"
 		ret.Spec.IsDpuSide = false
 
@@ -64,7 +62,7 @@ func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (*configv1.DataProce
 			pci.Product.ID == MrvlDPUdeviceID {
 
 			ret := configv1.DataProcessingUnit{}
-			ret.SetName("octeon10_" + normalizePciAddress(pci.Address))
+			ret.SetName("octeon10-" + normalizePciAddress(pci.Address))
 			ret.Spec.DpuType = "Marvell Octeon 10"
 			ret.Spec.IsDpuSide = true
 			return &ret, nil
