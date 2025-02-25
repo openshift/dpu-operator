@@ -17,10 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	//"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -31,6 +32,7 @@ var dpuoperatorconfiglog = logf.Log.WithName("dpuoperatorconfig-resource")
 func (r *DpuOperatorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithValidator(r).
 		Complete()
 }
 
@@ -41,10 +43,11 @@ func (r *DpuOperatorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 //+kubebuilder:webhook:path=/validate-config-openshift-io-v1-dpuoperatorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=config.openshift.io,resources=dpuoperatorconfigs,verbs=create;update,versions=v1,name=vdpuoperatorconfig.kb.io,admissionReviewVersions=v1
 
-//var _ webhook.Validator = &DpuOperatorConfig{}
+var _ webhook.CustomValidator = &DpuOperatorConfig{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *DpuOperatorConfig) ValidateCreate() (admission.Warnings, error) {
+func (r *DpuOperatorConfig) ValidateCreate(tx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	r = obj.(*DpuOperatorConfig)
 	dpuoperatorconfiglog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
@@ -52,7 +55,8 @@ func (r *DpuOperatorConfig) ValidateCreate() (admission.Warnings, error) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *DpuOperatorConfig) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+func (r *DpuOperatorConfig) ValidateUpdate(ctx context.Context, oldObj runtime.Object, newObj runtime.Object) (admission.Warnings, error) {
+	r = newObj.(*DpuOperatorConfig)
 	dpuoperatorconfiglog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
@@ -60,7 +64,7 @@ func (r *DpuOperatorConfig) ValidateUpdate(old runtime.Object) (admission.Warnin
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *DpuOperatorConfig) ValidateDelete() (admission.Warnings, error) {
+func (r *DpuOperatorConfig) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	dpuoperatorconfiglog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
