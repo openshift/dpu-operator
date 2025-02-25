@@ -14,9 +14,14 @@ spec:
     shortNames:
     - dpu
     singular: dataprocessingunit
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Status of the DPU
+      jsonPath: .spec.status
+      name: Status
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: DataProcessingUnit is the Schema for the dataprocessingunits
@@ -42,10 +47,10 @@ spec:
           spec:
             description: DataProcessingUnitSpec defines the desired state of DataProcessingUnit
             properties:
-              foo:
-                description: Foo is an example field of DataProcessingUnit. Edit dataprocessingunit_types.go
-                  to remove/update
+              status:
                 type: string
+            required:
+            - status
             type: object
           status:
             description: DataProcessingUnitStatus defines the observed state of DataProcessingUnit
