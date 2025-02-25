@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"os"
 
 	g "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -97,6 +98,10 @@ var _ = g.Describe("Full Daemon", func() {
 			ns := testutils.DpuOperatorNamespace()
 			cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
 			testutils.DeleteDpuOperatorCR(k8sClient, cr)
+
+			if os.Getenv("FAST_TEST") == "false" {
+				testCluster.EnsureDeleted()
+			}
 		})
 	})
 
