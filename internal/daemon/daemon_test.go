@@ -2,19 +2,21 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	g "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/klog/v2"
 
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	mockvsp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/mock-vsp"
 	"github.com/openshift/dpu-operator/internal/platform"
+	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/internal/utils"
-	"github.com/openshift/dpu-operator/internal/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"github.com/spf13/afero"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func createVspTestImages() map[string]string {
@@ -66,8 +68,21 @@ var _ = g.Describe("Full Daemon", func() {
 
 	g.Context("Running on a DPU", func() {
 		g.It("Should have one DPU CR with IsDpuSide set", func() {
-			// Eventually, it should show up as a CR
-			time.Sleep(5 * time.Second)
+			Eventually(func() error {
+				dpuList := &configv1.DataProcessingUnitList{}
+				err := k8sClient.List(context.TODO(), dpuList)
+				if err != nil {
+					return err
+				}
+				if len(dpuList.Items) != 1 {
+					return fmt.Errorf("Got more than 1 DPU")
+				}
+				if dpuList.Items[0].Spec.IsDpuSide != true {
+					return fmt.Errorf("Got a single DPU but it has DPU side set to false")
+				}
+				return nil
+			}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
+			time.Sleep(time.Second * 10)
 		})
 	})
 

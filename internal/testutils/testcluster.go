@@ -2,13 +2,13 @@ package testutils
 
 import (
 	"context"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 )
@@ -50,7 +50,6 @@ func DpuOperatorCR(name string, mode string, ns *corev1.Namespace) *configv1.Dpu
 	}
 	return config
 }
-
 
 func CreateNamespace(client client.Client, ns *corev1.Namespace) {
 	// ignore error when creating the namespace since it can already exist

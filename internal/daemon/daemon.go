@@ -10,12 +10,15 @@ import (
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/spf13/afero"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var ()
@@ -38,6 +41,7 @@ type Daemon struct {
 	fs                afero.Fs
 	dpuDetectorManger *platform.DpuDetectorManager
 	running           sync.WaitGroup
+	dpuOperatorConfig *configv1.DpuOperatorConfig
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
@@ -52,14 +56,23 @@ func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Confi
 		dpuDetectorManger: platform.NewDpuDetectorManager(p),
 		running:           sync.WaitGroup{},
 		managers:          make([]SideManager, 0),
+		dpuOperatorConfig: &configv1.DpuOperatorConfig{},
 	}
 }
 
 func (d *Daemon) Start(ctx context.Context) error {
 	var ret error
+	var err error
+
+	k8sClient, err := client.New(d.config, client.Options{Scheme: scheme.Scheme})
+	err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: vars.DpuOperatorConfigName, Namespace: vars.Namespace}, d.dpuOperatorConfig)
+	if err != nil {
+		return fmt.Errorf("encountered error when retrieving DpuOperatorConfig %s: %v", vars.DpuOperatorConfigName, err)
+	}
+
 	d.running.Add(1)
 	d.log.Info("Preparing CNI binary")
-	err := d.Prepare()
+	err = d.Prepare()
 	if err != nil {
 		return err
 	}
@@ -113,7 +126,7 @@ func (d *Daemon) detectLoop(errChan chan error, ctx context.Context) {
 				continue
 			}
 			d.log.Info("Scanning for DPUs")
-			sideManager, err := d.createDaemon()
+			sideManager, dpu, err := d.createDaemon()
 			if err != nil {
 				d.log.Error(err, "Got error while detecting DPUs")
 				errChan <- err
@@ -126,6 +139,16 @@ func (d *Daemon) detectLoop(errChan chan error, ctx context.Context) {
 						d.log.Error(err, "Failed to listen on sideManager")
 					}
 				}()
+				dpu.Spec.Status = "Ready"
+				err = controllerutil.SetControllerReference(d.dpuOperatorConfig, dpu, d.client.Scheme())
+				if err != nil {
+					d.log.Error(err, "Failed to set owner reference on DPU resource")
+				}
+
+				err = d.client.Create(context.TODO(), dpu)
+				if err != nil {
+					d.log.Error(err, "Failed creating DPU custom resource")
+				}
 			}
 		case <-ctx.Done():
 			return
@@ -133,19 +156,19 @@ func (d *Daemon) detectLoop(errChan chan error, ctx context.Context) {
 	}
 }
 
-func (d *Daemon) createDaemon() (SideManager, error) {
-	dpuMode, plugin, err := d.dpuDetectorManger.Detect(d.vspImages, d.client, *d.pm)
+func (d *Daemon) createDaemon() (SideManager, *configv1.DataProcessingUnit, error) {
+	dpu, plugin, err := d.dpuDetectorManger.Detect(d.vspImages, d.client, *d.pm)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to detect DPUs: %v", err)
+		return nil, nil, fmt.Errorf("Failed to detect DPUs: %v", err)
 	}
 	if plugin != nil {
-		if dpuMode {
-			return NewDpuSideManger(plugin, d.config, WithPathManager(*d.pm)), nil
+		if dpu.Spec.IsDpuSide {
+			return NewDpuSideManger(plugin, d.config, WithPathManager(*d.pm)), dpu, nil
 		} else {
-			return NewHostSideManager(plugin, WithPathManager2(d.pm)), nil
+			return NewHostSideManager(plugin, WithPathManager2(d.pm)), dpu, nil
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (d *Daemon) Wait() {

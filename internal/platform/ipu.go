@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,29 +38,41 @@ func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
 	}
 }
 
-func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
+func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (*configv1.DataProcessingUnit, error) {
 	// VFs for the Intel IPU have the same PCIe info as the PF
 	isVF, err := d.isVirtualFunction(pci.Address)
 	if err != nil {
-		return false, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
+		return nil, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
 	}
 
-	return !isVF &&
-		pci.Class.Name == "Network controller" &&
-		pci.Vendor.Name == "Intel Corporation" &&
-		pci.Product.Name == "Infrastructure Data Path Function", nil
+	isDpuPciDevice := !isVF && pci.Class.Name == "Network controller" && pci.Vendor.Name == "Intel Corporation" && pci.Product.Name == "Infrastructure Data Path Function"
+
+	if !isDpuPciDevice {
+		return nil, nil
+	}
+
+	ret := configv1.DataProcessingUnit{}
+	ret.SetName("e2100_" + strings.Replace(pci.Address, ":", "_", -1))
+	ret.Spec.DpuType = "IPU Adapter E2100-CCQDA2"
+	ret.Spec.IsDpuSide = false
+
+	return &ret, nil
 }
 
-func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
+func (pi *IntelDetector) IsDpuPlatform(platform Platform) (*configv1.DataProcessingUnit, error) {
 	product, err := platform.Product()
 	if err != nil {
-		return false, errors.Errorf("Error getting product info: %v", err)
+		return nil, errors.Errorf("Error getting product info: %v", err)
 	}
 
 	if strings.Contains(product.Name, "IPU Adapter E2100-CCQDA2") {
-		return true, nil
+		ret := configv1.DataProcessingUnit{}
+		ret.SetName("e2100")
+		ret.Spec.DpuType = "IPU Adapter E2100-CCQDA2"
+		ret.Spec.IsDpuSide = true
+		return &ret, nil
 	}
-	return false, nil
+	return nil, nil
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
