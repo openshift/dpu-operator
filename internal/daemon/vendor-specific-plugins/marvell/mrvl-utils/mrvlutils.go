@@ -56,7 +56,7 @@ func Mapped_VF(pf_count int, pfid int, vfid int) (string, error) {
 	}
 	dpu_vfid := pf_count*vfid + pfid
 	size := len(list) - 1
-	if dpu_vfid >= size {
+	if dpu_vfid > size {
 		return "", errors.New("mapped VF out of bounds")
 	}
 
