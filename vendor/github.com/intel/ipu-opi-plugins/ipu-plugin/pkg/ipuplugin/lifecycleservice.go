@@ -1122,8 +1122,8 @@ func (e *ExecutableHandlerImpl) SetupAccApfs() error {
 		AccApfMacList, err = utils.GetAccApfMacList()
 
 		if err != nil {
-			log.Errorf("unable to reach the IMC %v", err)
-			return fmt.Errorf("unable to reach the IMC %v", err)
+			log.Errorf("SetupAccApfs: Error-> %v", err)
+			return fmt.Errorf("SetupAccApfs: Error-> %v", err)
 		}
 
 		if len(AccApfMacList) != ApfNumber {
@@ -1146,11 +1146,10 @@ func CheckAndAddPeerToPeerP4Rules(p types.P4RTClient) {
 	if !PeerToPeerP4RulesAdded {
 		vfMacList, err := utils.GetVfMacList()
 		if err != nil {
-			log.Errorf("CheckAndAddPeerToPeerP4Rules: unable to reach the IMC %v", err)
+			log.Errorf("CheckAndAddPeerToPeerP4Rules: Error-> %v", err)
 			return
 		}
-		//with use of strings.split in utils, we can get list of length 1 with empty string.
-		if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
+		if len(vfMacList) == 0 {
 			log.Infof("No VFs initialized on the host yet")
 		} else {
 			log.Infof("AddPeerToPeerP4Rules, path->%s, vfMacList->%v", p.GetBin(), vfMacList)
@@ -1179,6 +1178,10 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 
 	log.Infof("AddLAGP4Rules, path->%v", p.GetBin())
 	p4rtclient.AddLAGP4Rules(p)
+
+	//Add P4 rules to handle Primary network traffic via phy port0
+	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
 
 	return nil
 }
