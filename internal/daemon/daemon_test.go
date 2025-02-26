@@ -28,6 +28,21 @@ func createVspTestImages() map[string]string {
 	return vspImages
 }
 
+
+func EventuallyNoDpuCR(k8sClient client.Client) {
+	Eventually(func() error {
+		dpuList := &configv1.DataProcessingUnitList{}
+		err := k8sClient.List(context.TODO(), dpuList)
+		if err != nil {
+			return err
+		}
+		if len(dpuList.Items) != 0 {
+			return fmt.Errorf("Found %v DPU CRs but expecting 0", len(dpuList.Items))
+		}
+		return nil
+	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
+}
+
 var _ = g.Describe("Full Daemon", func() {
 	var (
 		testCluster  *testutils.KindCluster
@@ -102,6 +117,7 @@ var _ = g.Describe("Full Daemon", func() {
 			if os.Getenv("FAST_TEST") == "false" {
 				testCluster.EnsureDeleted()
 			}
+			EventuallyNoDpuCR(k8sClient)
 		})
 	})
 
@@ -174,6 +190,11 @@ var _ = g.Describe("Full Daemon", func() {
 			ns := testutils.DpuOperatorNamespace()
 			cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
 			testutils.DeleteDpuOperatorCR(k8sClient, cr)
+
+			if os.Getenv("FAST_TEST") == "false" {
+				testCluster.EnsureDeleted()
+			}
+			EventuallyNoDpuCR(k8sClient)
 		})
 	})
 })
