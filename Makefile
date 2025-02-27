@@ -179,6 +179,7 @@ vendor-check:
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
+	cd api && go fmt ./...
 
 .PHONY: fmt-check
 fmt-check:
