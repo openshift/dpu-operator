@@ -176,7 +176,7 @@ func (s *server) Stop() {
 
 	vfMacList, err := utils.GetVfMacList()
 	if err != nil {
-		log.Errorf("Unable to reach the IMC %v", err)
+		log.Errorf("Stop: Error->%v", err)
 	}
 	if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
 		log.Errorf("No VFs initialized on the host")
@@ -187,6 +187,9 @@ func (s *server) Stop() {
 
 	log.Infof("DeleteLAGP4Rules, path->%s", s.p4rtClient.GetBin())
 	p4rtclient.DeleteLAGP4Rules(s.p4rtClient)
+
+	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", s.p4rtClient, AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(s.p4rtClient, AccApfMacList[PHY_PORT1_INTF_INDEX])
 
 	s.grpcSrvr.GracefulStop()
 	if s.listener != nil {
