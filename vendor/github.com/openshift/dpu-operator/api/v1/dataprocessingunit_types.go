@@ -28,9 +28,9 @@ type DataProcessingUnitSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-    Status    string `json:"status"`
-    DpuType   string `json:"dpuType"`
-    IsDpuSide bool   `json:"isDpuSide"`
+	Status    string `json:"status"`
+	DpuType   string `json:"dpuType"`
+	IsDpuSide bool   `json:"isDpuSide"`
 }
 
 // DataProcessingUnitStatus defines the observed state of DataProcessingUnit
@@ -44,8 +44,6 @@ type DataProcessingUnitStatus struct {
 //+kubebuilder:resource:shortName=dpu,scope=Cluster
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=".spec.status",description="Status of the DPU"
 //+kubebuilder:printcolumn:name="AGE",type=date,JSONPath=".metadata.creationTimestamp",description="Time since creation"
-
-
 
 // DataProcessingUnit is the Schema for the dataprocessingunits API
 type DataProcessingUnit struct {
