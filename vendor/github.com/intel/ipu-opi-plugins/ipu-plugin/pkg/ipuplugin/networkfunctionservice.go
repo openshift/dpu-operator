@@ -45,11 +45,8 @@ func NewNetworkFunctionService(ports map[string]*types.BridgePortInfo, brCtlr ty
 func (s *NetworkFunctionServiceServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
 	vfMacList, err := utils.GetVfMacList()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Unable to reach the IMC %v", err)
-	}
-
-	if len(vfMacList) == 0 {
-		return nil, status.Error(codes.Internal, "No NFs initialized on the host")
+		log.Errorf("CreateNetworkFunction: Error-> %v", err)
+		return nil, status.Errorf(codes.Internal, "Error-> %v", err)
 	}
 
 	CheckAndAddPeerToPeerP4Rules(s.p4rtClient)
@@ -78,12 +75,10 @@ func (s *NetworkFunctionServiceServer) DeleteNetworkFunction(ctx context.Context
 	vfMacList, err := utils.GetVfMacList()
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Unable to reach the IMC %v", err)
+		log.Errorf("DeleteNetworkFunction: Error-> %v", err)
+		return nil, status.Errorf(codes.Internal, "Error-> %v", err)
 	}
 
-	if len(vfMacList) == 0 {
-		return nil, status.Error(codes.Internal, "No NFs initialized on the host")
-	}
 	if err := s.bridgeCtlr.DeletePort(AccIntfNames[NF_IN_PR_INTF_INDEX]); err != nil {
 		log.Errorf("failed to delete port to bridge: %v, for interface->%v", err, AccIntfNames[NF_IN_PR_INTF_INDEX])
 		return nil, fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[NF_IN_PR_INTF_INDEX])

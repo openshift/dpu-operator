@@ -713,11 +713,15 @@ set -x
 trap 'echo "Line $LINENO: $BASH_COMMAND"' DEBUG
 
 PORT_SETUP_SCRIPT=/work/scripts/port-setup.sh
-PORT_SETUP_LOG=/work/port-setup.log
-POST_INIT_LOG=/work/post-init.log
-PORT_SETUP_LOG2=/work/port-setup2.log
+POST_INIT_LOG=/work/scripts/post-init.log
+PORT_SETUP_LOG=/work/scripts/port-setup.log
+PORT_SETUP_LOG2=/work/scripts/port-setup2.log
+OPCODE_CFG_FILE=$(mktemp -p /tmp --suffix=.txt)
 
 /usr/bin/rm -f ${PORT_SETUP_SCRIPT} ${POST_INIT_LOG}
+/usr/bin/rm -f ${PORT_SETUP_LOG} ${POST_SETUP_LOG2}
+sleep 1
+sync
 
 exec 2>&1 1>${POST_INIT_LOG}
 
@@ -755,7 +759,8 @@ trap release_lock EXIT
 run_devmem_cmds() {
 retry=0
 while [[ \${ran_cmds} -eq 0 ]] ; do
-sleep 2
+sync
+sleep 4
 cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
 if [ \${#cli_entry[@]} -gt 1 ] ; then
 
@@ -775,6 +780,13 @@ if [ \${#cli_entry[@]} -gt 1 ] ; then
                   echo "RunDevMemCmds_Start: LogFile->"
                   # Critical section - only one script can be here at a time
                   set -x
+		  # OPCODE update to program the rx_phy_port_to_pr_map table default action with the correct vsi_id of D5 interface, which could potentially change
+		  # per reboot of IMC.
+		  # opcode 0x1305 is for DELETE an entry.
+                  echo "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00 act=set_vsi{act_val=\${vsi_id} val_type=0 dst_pe=0 slot=0x0}" > $OPCODE_CFG_FILE
+                  # opcode 0x1303 is for ADD an entry.
+		  echo "opcode=0x1303 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00 act=set_vsi{act_val=\${vsi_id} val_type=0 dst_pe=0 slot=0x0}" >> $OPCODE_CFG_FILE
+		  cli_client -x -f $OPCODE_CFG_FILE
                   devmem 0x20292002a0 64 \${VSI_GROUP_INIT}
                   devmem 0x2029200388 64 0x1
                   devmem 0x20292002a0 64 \${VSI_GROUP_WRITE}
@@ -833,7 +845,7 @@ while [[ \${ran_cmds} -eq 0 ]]; do
    d5_interface_up
    if [[ \$? -eq 1 ]]; then
       #echo "D5 interface up, sleep"
-      sleep 5
+      sleep 7
    else
       echo "D5 not found. ACC may have gone down, retry."
       ran_cmds=0
@@ -846,10 +858,18 @@ PORT_CONFIG_EOF
 /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
 /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"' '"${PORT_SETUP_LOG}"'' 0>&- &> ${PORT_SETUP_LOG} &
 
+PS_SCRIPT_NAME=$(basename ${PORT_SETUP_SCRIPT})
+
 log_retry=0
 while true ; do
    sync
 if [[ $log_retry -gt 10 ]]; then
+   echo "waited for log more than 10 secs, log not detected"
+   if pgrep -x "${PS_SCRIPT_NAME}" > /dev/null 2>&1; then
+      echo "Process '${PS_SCRIPT_NAME}' is running."
+   else
+      echo "Process '${PS_SCRIPT_NAME}' is not running."
+   fi
    echo "waited for log more than 10 secs, 2nd attempt for port_setup.sh below"
    /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
    /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"' '"${PORT_SETUP_LOG2}"'' 0>&- &> ${PORT_SETUP_LOG2} &
@@ -859,18 +879,17 @@ if [[ $log_retry -gt 10 ]]; then
    break
 fi
 if [[ -s ${PORT_SETUP_LOG}  ]]; then
-   log_retry=$((log_retry+1))
-   echo "log file empty. sleep and check"
+   echo "non-empty log file exists"
    sleep 1
-elif [ ! -f ${PORT_SETUP_LOG} ]; then
-   log_retry=$((log_retry+1))
-   echo "log file doesnt exist. sleep and check"
-   sleep 1
+   break
 else
+   log_retry=$((log_retry+1))
    if [ -f ${PORT_SETUP_LOG} ]; then
-      echo "log file exists. break"
-      break
+      echo "log file exists. but empty"
+   else
+      echo "log file doesnt exist"
    fi
+   sleep 1
 fi
 done`
 
@@ -896,9 +915,9 @@ if [ -e %s ]; then
     sed -i 's/pf_mac_address = "00:00:00:00:03:14";/pf_mac_address = "%s";/g' $CP_INIT_CFG
     sed -i 's/acc_apf = 4;/acc_apf = %s;/g' $CP_INIT_CFG
     sed -i 's/comm_vports = .*/comm_vports = (([5,0],[4,0]),([0,3],[5,3]),([0,2],[4,3]));/g' $CP_INIT_CFG
-    sed -i 's/uplink_vports = .*/uplink_vports = ([0,0,0],[0,1,1],[4,1,0],[4,5,1],[5,1,0],[5,2,1]);/g' $CP_INIT_CFG
-    sed -i 's/rep_vports = .*/rep_vports = ([0,0,0],[4,5,1]);/g' $CP_INIT_CFG
-    sed -i 's/exception_vports = .*/exception_vports = ([0,0,0],[4,5,1]); /g' $CP_INIT_CFG
+    sed -i 's/uplink_vports = .*/uplink_vports = ([4,5,0],[5,1,0],[5,2,1]);/g' $CP_INIT_CFG
+    sed -i 's/rep_vports = .*/rep_vports = ([4,5,0]);/g' $CP_INIT_CFG
+    sed -i 's/exception_vports = .*/exception_vports = ([4,5,0]); /g' $CP_INIT_CFG
 else
     echo "No custom package found. Continuing with default package"
 fi
@@ -1103,8 +1122,8 @@ func (e *ExecutableHandlerImpl) SetupAccApfs() error {
 		AccApfMacList, err = utils.GetAccApfMacList()
 
 		if err != nil {
-			log.Errorf("unable to reach the IMC %v", err)
-			return fmt.Errorf("unable to reach the IMC %v", err)
+			log.Errorf("SetupAccApfs: Error-> %v", err)
+			return fmt.Errorf("SetupAccApfs: Error-> %v", err)
 		}
 
 		if len(AccApfMacList) != ApfNumber {
@@ -1127,11 +1146,10 @@ func CheckAndAddPeerToPeerP4Rules(p types.P4RTClient) {
 	if !PeerToPeerP4RulesAdded {
 		vfMacList, err := utils.GetVfMacList()
 		if err != nil {
-			log.Errorf("CheckAndAddPeerToPeerP4Rules: unable to reach the IMC %v", err)
+			log.Errorf("CheckAndAddPeerToPeerP4Rules: Error-> %v", err)
 			return
 		}
-		//with use of strings.split in utils, we can get list of length 1 with empty string.
-		if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
+		if len(vfMacList) == 0 {
 			log.Infof("No VFs initialized on the host yet")
 		} else {
 			log.Infof("AddPeerToPeerP4Rules, path->%s, vfMacList->%v", p.GetBin(), vfMacList)
@@ -1160,6 +1178,10 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 
 	log.Infof("AddLAGP4Rules, path->%v", p.GetBin())
 	p4rtclient.AddLAGP4Rules(p)
+
+	//Add P4 rules to handle Primary network traffic via phy port0
+	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
 
 	return nil
 }
