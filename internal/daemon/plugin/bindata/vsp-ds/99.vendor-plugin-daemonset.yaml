@@ -35,6 +35,24 @@ spec:
         - mountPath: /proc
           mountPropagation: Bidirectional
           name: host-proc
+        - mountPath: /usr/local/bin/
+          mountPropagation: Bidirectional
+          name: ovs-bin
+        - mountPath: /var/run/openvswitch/
+          mountPropagation: Bidirectional
+          name: ovs-db
+        - mountPath: /usr/lib64/
+          mountPropagation: Bidirectional
+          name: host-lib64
+        - mountPath: /lib/modules
+          mountPropagation: HostToContainer
+          name: host-libmodules
+        - mountPath: /etc/openvswitch/
+          mountPropagation: Bidirectional
+          name: ovs-etc
+      env:
+       - name: LD_LIBRARY_PATH
+         value: /usr/lib64:$LD_LIBRARY_PATH
       dnsPolicy: ClusterFirstWithHostNet
       volumes:
       - hostPath:
@@ -53,3 +71,19 @@ spec:
           path: /var/run/
           type: ""
         name: vendor-plugin-sock
+      - hostPath:
+          path: /usr/bin/
+          type: ""
+        name: ovs-bin
+      - hostPath:
+          path: /var/run/openvswitch/
+          type: ""
+        name: ovs-db
+      - hostPath:
+          path: /usr/lib64/
+          type: ""
+        name: host-lib64
+      - hostPath:
+          path: /etc/openvswitch/
+          type: ""
+        name: ovs-etc
