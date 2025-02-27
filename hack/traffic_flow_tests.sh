@@ -17,7 +17,7 @@ fi
 
 export KUBECONFIG=/root/kubeconfig.microshift
 nodes=$(oc get nodes)
-export acc=$(echo "$nodes" | grep -oP '^\d{3}-acc')
+export acc=$(echo "$nodes" | grep -oP '^\d+-acc')
 if [ -z "$acc" ]; then
   echo "Error: acc is empty"
   exit 1
@@ -27,4 +27,4 @@ temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
-./tft.py $temp_file
+./tft.py -v debug "$temp_file"
