@@ -1,0 +1,12 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /workspace
+COPY . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-webhook
+
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+ARG TARGETARCH
+WORKDIR /
+
+COPY --from=builder /workspace/bin/webhook.${TARGETARCH} /webhook
