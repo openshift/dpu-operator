@@ -26,7 +26,6 @@ import (
 
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -34,7 +33,6 @@ const (
 	pbPythonEnvVar   = "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python"
 	hostToImcIpAddr  = "100.0.0.100"
 	accToImcIpAddr   = "192.168.0.1"
-	imcAddress       = "192.168.0.1:22"
 )
 
 var execCommand = exec.Command
@@ -121,95 +119,48 @@ func ExecuteScript(script string) (string, error) {
 }
 
 func ImcQueryfindVsiGivenMacAddr(mode string, mac string) (string, error) {
-	if (mode == types.HostMode) || (mode != types.IpuMode) {
-		log.Errorf("ImcQueryfindVsiGivenMacAddr: invalid mode-%v. access from host to IMC, not supported", mode)
-		return "", fmt.Errorf("ImcQueryfindVsiGivenMacAddr: invalid mode-%v. access from host to IMC, not supported", mode)
+	var ipAddr string
+	if mode == types.HostMode {
+		ipAddr = hostToImcIpAddr
+	} else if mode == types.IpuMode {
+		ipAddr = accToImcIpAddr
 	}
 
-	commands := fmt.Sprintf(`set -o pipefail && cli_client -cq | awk '{if(($17 == "%s")) {print $8}}'`, mac)
-	outputBytes, err := RunCmdOnImc(commands)
+	runCommand := fmt.Sprintf(`ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@"%s" "/usr/bin/cli_client -cq" \
+		| awk '{if(($17 == "%s")) {print $8}}'`, ipAddr, mac)
 
-	//Handle case where command ran without error, but empty output, due to config issue.
-	if (err != nil) || (len(outputBytes) == 0) {
-		log.Errorf("ImcQueryfindVsiGivenMacAddr: Error %v, from RunCmdOnImc (OR) empty (output)-%v", err, len(outputBytes))
-		return "", fmt.Errorf("ImcQueryfindVsiGivenMacAddr: Error %v, from RunCmdOnImc (OR) empty (output)-%v", err, len(outputBytes))
+	output, err := ExecuteScript(runCommand)
+	output = strings.TrimSpace(string(output))
+
+	if err != nil || output == "" {
+		log.Errorf("unable to reach IMC %v or null output->%v", err, output)
+		return "", fmt.Errorf("unable to reach IMC %v or null output->%v", err, output)
 	}
-
-	outputStr := strings.TrimSpace(string(outputBytes))
-	log.Infof("ImcQueryfindVsiGivenMacAddr: %s, len(output)-%v", outputStr, len(outputStr))
-
-	return outputStr, err
-}
-
-func RunCmdOnImc(cmd string) ([]byte, error) {
-
-	config := &ssh.ClientConfig{
-		User: "root",
-		Auth: []ssh.AuthMethod{
-			ssh.Password(""),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-	// Connect to the remote server.
-	client, err := ssh.Dial("tcp", imcAddress, config)
-	if err != nil {
-		log.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-		return nil, fmt.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-	}
-	defer client.Close()
-
-	// Start a session.
-	session, err := client.NewSession()
-	if err != nil {
-		log.Errorf("failed to create ssh session: %s", err)
-		return nil, fmt.Errorf("failed to create ssh session: %s", err)
-	}
-	defer session.Close()
-
-	// Run a command on the remote server and capture the output.
-	outputBytes, err := session.CombinedOutput(cmd)
-	if err != nil {
-		log.Errorf("cmd error: %s", err)
-		return nil, fmt.Errorf("cmd error: %s", err)
-	}
-
-	return outputBytes, nil
-
-}
-
-func GetAccApfMacList() ([]string, error) {
-	commands := `set -o pipefail && cli_client -cq | awk '{if(($2 == "0x4") && ($4 == "0x4")) {print $17}}'`
-	outputBytes, err := RunCmdOnImc(commands)
-
-	var outputStr []string
-	//Handle case where command ran without error, but empty output, due to config issue.
-	if (err != nil) || (len(outputBytes) == 0) {
-		log.Errorf("GetAccApfMacList: Error %v, from RunCmdOnImc (OR) empty (output)-%v", err, len(outputBytes))
-		return outputStr, fmt.Errorf("GetAccApfMacList: Error %v, from RunCmdOnImc (OR) empty (output)-%v", err, len(outputBytes))
-	}
-
-	outputStr = strings.Split(strings.TrimSpace(string(outputBytes)), "\n")
-	log.Infof("GetAccApfMacList: %s, len(output)-%v", outputStr, len(outputStr))
-
-	return outputStr, err
+	return output, nil
 }
 
 func GetVfMacList() ([]string, error) {
 	// reach out to the IMC to get the mac addresses of the VFs
-	commands := `set -o pipefail && cli_client -cq | awk '{if(($4 == "0x0") && ($6 == "yes")) {print $17}}'`
-	outputBytes, err := RunCmdOnImc(commands)
+	output, err := ExecuteScript(`ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@192.168.0.1 "/usr/bin/cli_client -cq" \
+		| awk '{if(($4 == "0x0") && ($6 == "yes")) {print $17}}'`)
 
-	var outputStr []string
-	//Handle case where command ran without error, but empty output, due to config issue.
-	if (err != nil) || (len(outputBytes) == 0) {
-		log.Errorf("GetVfMacList: Error %v, from RunCmdOnImc (OR) empty (output)-%v", err, len(outputBytes))
-		return outputStr, fmt.Errorf("GetVfMacList: Error %v, from RunCmdOnImc (OR) empty (output)-%v", err, len(outputBytes))
+	if err != nil {
+		return nil, fmt.Errorf("unable to reach the IMC %v", err)
 	}
 
-	outputStr = strings.Split(strings.TrimSpace(string(outputBytes)), "\n")
-	log.Infof("GetVfMacList: %s, len(output)-%v", outputStr, len(outputStr))
+	return strings.Split(strings.TrimSpace(output), "\n"), nil
+}
 
-	return outputStr, err
+func GetAccApfMacList() ([]string, error) {
+	// reach out to the IMC to get the mac addresses of the VFs
+	output, err := ExecuteScript(`ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@192.168.0.1 "/usr/bin/cli_client -cq" \
+		| awk '{if(($2 == "0x4") && ($4 == "0x4")) {print $17}}'`)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to reach the IMC %v", err)
+	}
+
+	return strings.Split(strings.TrimSpace(output), "\n"), nil
 }
 
 // Taken from the IPDK k8s-infra-offload project instead of including the full project as a module
