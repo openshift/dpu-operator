@@ -4,20 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jaypipes/ghw"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
 type IntelDetector struct {
-	Name string
+	name string
 }
 
 func NewIntelDetector() *IntelDetector {
-	return &IntelDetector{Name: "Intel IPU"}
+	return &IntelDetector{name: "Intel IPU"}
+}
+
+func (d *IntelDetector) Name() string {
+	return d.name
 }
 
 func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
@@ -32,37 +39,56 @@ func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
 	}
 }
 
-func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
+func normalizePciAddress(pciAddress string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	normalized := re.ReplaceAllString(pciAddress, "-")
+	normalized = strings.ToLower(normalized)
+	return normalized
+}
+
+func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (*configv1.DataProcessingUnit, error) {
 	// VFs for the Intel IPU have the same PCIe info as the PF
 	isVF, err := d.isVirtualFunction(pci.Address)
 	if err != nil {
-		return false, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
+		return nil, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
 	}
 
-	return !isVF &&
-		pci.Class.Name == "Network controller" &&
-		pci.Vendor.Name == "Intel Corporation" &&
-		pci.Product.Name == "Infrastructure Data Path Function", nil
+	isDpuPciDevice := !isVF && pci.Class.Name == "Network controller" && pci.Vendor.Name == "Intel Corporation" && pci.Product.Name == "Infrastructure Data Path Function"
+
+	if !isDpuPciDevice {
+		return nil, nil
+	}
+
+	ret := configv1.DataProcessingUnit{}
+	ret.SetName("e2100-" + normalizePciAddress(pci.Address))
+	ret.Spec.DpuType = "IPU Adapter E2100-CCQDA2"
+	ret.Spec.IsDpuSide = false
+
+	return &ret, nil
 }
 
-func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
-	product, err := ghw.Product()
+func (pi *IntelDetector) IsDpuPlatform(platform Platform) (*configv1.DataProcessingUnit, error) {
+	product, err := platform.Product()
 	if err != nil {
-		return false, errors.Errorf("Error getting product info: %v", err)
+		return nil, errors.Errorf("Error getting product info: %v", err)
 	}
 
 	if strings.Contains(product.Name, "IPU Adapter E2100-CCQDA2") {
-		return true, nil
+		ret := configv1.DataProcessingUnit{}
+		ret.SetName("e2100")
+		ret.Spec.DpuType = "IPU Adapter E2100-CCQDA2"
+		ret.Spec.IsDpuSide = true
+		return &ret, nil
 	}
-	return false, nil
+	return nil, nil
 }
 
-func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
 	template_vars.Command = `[ "/usr/bin/ipuplugin" ]`
 	template_vars.Args = `[ "-v=debug", "--p4rtName=vsp-p4-service.default.svc.cluster.local" ]`
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }
 
 func (d *IntelDetector) GetVendorName() string {
