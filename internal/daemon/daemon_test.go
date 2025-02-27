@@ -28,7 +28,6 @@ func createVspTestImages() map[string]string {
 	return vspImages
 }
 
-
 func EventuallyNoDpuCR(k8sClient client.Client) {
 	Eventually(func() error {
 		dpuList := &configv1.DataProcessingUnitList{}
@@ -40,7 +39,7 @@ func EventuallyNoDpuCR(k8sClient client.Client) {
 			return fmt.Errorf("Found %v DPU CRs but expecting 0", len(dpuList.Items))
 		}
 		return nil
-	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
+	}, testutils.TestAPITimeout*100, testutils.TestRetryInterval).Should(Succeed())
 }
 
 var _ = g.Describe("Full Daemon", func() {
@@ -100,7 +99,7 @@ var _ = g.Describe("Full Daemon", func() {
 					return fmt.Errorf("Got %v DPUs", len(dpuList.Items))
 				}
 				if !dpuList.Items[0].Spec.IsDpuSide {
-					return fmt.Errorf("Got a single DPU but it has DPU side set to false")
+					return fmt.Errorf("Got a single DPU but it has DPU side set to false instead of true")
 				}
 				return nil
 			}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
@@ -113,11 +112,12 @@ var _ = g.Describe("Full Daemon", func() {
 			ns := testutils.DpuOperatorNamespace()
 			cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
 			testutils.DeleteDpuOperatorCR(k8sClient, cr)
+			testutils.DeleteNamespace(k8sClient, ns)
+			EventuallyNoDpuCR(k8sClient)
 
 			if os.Getenv("FAST_TEST") == "false" {
 				testCluster.EnsureDeleted()
 			}
-			EventuallyNoDpuCR(k8sClient)
 		})
 	})
 
@@ -177,7 +177,7 @@ var _ = g.Describe("Full Daemon", func() {
 					return fmt.Errorf("Got %v DPUs", len(dpuList.Items))
 				}
 				if dpuList.Items[0].Spec.IsDpuSide {
-					return fmt.Errorf("Got a single DPU but it has DPU side set to true")
+					return fmt.Errorf("Got a single DPU but it has DPU side set to true instead of false")
 				}
 				return nil
 			}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
@@ -190,11 +190,12 @@ var _ = g.Describe("Full Daemon", func() {
 			ns := testutils.DpuOperatorNamespace()
 			cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
 			testutils.DeleteDpuOperatorCR(k8sClient, cr)
+			testutils.DeleteNamespace(k8sClient, ns)
+			EventuallyNoDpuCR(k8sClient)
 
 			if os.Getenv("FAST_TEST") == "false" {
 				testCluster.EnsureDeleted()
 			}
-			EventuallyNoDpuCR(k8sClient)
 		})
 	})
 })

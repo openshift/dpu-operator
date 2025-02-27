@@ -265,3 +265,31 @@ func DeleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 		return err
 	}, TestAPITimeout, TestRetryInterval).Should(Succeed())
 }
+
+func WaitForAllNodesReady(k8sClient client.Client) {
+	Eventually(func() error {
+		nodeList := &corev1.NodeList{}
+		if err := k8sClient.List(context.Background(), nodeList); err != nil {
+			return err
+		}
+
+		if len(nodeList.Items) == 0 {
+			return fmt.Errorf("no nodes found in the cluster")
+		}
+
+		for _, node := range nodeList.Items {
+			ready := false
+			for _, condition := range node.Status.Conditions {
+				if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+					ready = true
+					break
+				}
+			}
+			if !ready {
+				return fmt.Errorf("node %s is not ready", node.Name)
+			}
+		}
+
+		return nil
+	}, TestAPITimeout*10, TestRetryInterval).ShouldNot(HaveOccurred())
+}
