@@ -28,6 +28,9 @@ RUN mkdir -p /opt/p4/p4-cp-nws/bin/p4
 COPY ./cmd/intelvsp/fxp-net_linux-networking.pkg /
 COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
 
+RUN mkdir -p /ipu-mgmtd
+COPY ./cmd/intelvsp/ipu-mgmtd /ipu-mgmtd
+
 # Add steps for cachito
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
 ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
