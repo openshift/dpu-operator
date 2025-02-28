@@ -16,15 +16,20 @@ package utils
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
+	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
@@ -126,8 +131,9 @@ func ImcQueryfindVsiGivenMacAddr(mode string, mac string) (string, error) {
 		return "", fmt.Errorf("ImcQueryfindVsiGivenMacAddr: invalid mode-%v. access from host to IMC, not supported", mode)
 	}
 
-	commands := fmt.Sprintf(`set -o pipefail && cli_client -cq | awk '{if(($17 == "%s")) {print $8}}'`, mac)
-	outputBytes, err := RunCmdOnImc(commands)
+	cliCmd := `set -o pipefail && cli_client -cq `
+	subCmd := fmt.Sprintf(` | awk '{if(($17 == "%s")) {print $8}}'`, mac)
+	outputBytes, err := RunCliCmdOnImc(cliCmd, subCmd)
 
 	//Handle case where command ran without error, but empty output, due to config issue.
 	if (err != nil) || (len(outputBytes) == 0) {
@@ -141,8 +147,16 @@ func ImcQueryfindVsiGivenMacAddr(mode string, mac string) (string, error) {
 	return outputStr, err
 }
 
-func RunCmdOnImc(cmd string) ([]byte, error) {
+// Note: Added retry logic, since ipumgmtd is single-threaded, so concurrent usage,
+// of cli-client errors out.
+// we retry 5 times, with sleep(0.5s) between retries. If it exceeds max
+// attempts, we quit retry. retry logic is a best-effort attempt.
+// WARNING: Even if ipumgmtd throws error, cli_client tool still
+// returns success. Also this code(for retry) can break, if error string
+// or error code gets changed.
+func RunCliCmdOnImc(cliCmd string, subCmd string) ([]byte, error) {
 
+	maxRetryCnt := 5
 	config := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
@@ -158,28 +172,74 @@ func RunCmdOnImc(cmd string) ([]byte, error) {
 	}
 	defer client.Close()
 
-	// Start a session.
-	session, err := client.NewSession()
-	if err != nil {
-		log.Errorf("failed to create ssh session: %s", err)
-		return nil, fmt.Errorf("failed to create ssh session: %s", err)
-	}
-	defer session.Close()
+	var outputBytes []byte
+	i := 0
+retry:
+	for i < maxRetryCnt {
+		log.Infof("Loop cnt: %v", i)
+		// Start a session.
+		session, err := client.NewSession()
+		if err != nil {
+			log.Errorf("failed to create ssh session: %s", err)
+			return nil, fmt.Errorf("failed to create ssh session: %s", err)
+		}
+		defer session.Close()
 
-	// Run a command on the remote server and capture the output.
-	outputBytes, err := session.CombinedOutput(cmd)
-	if err != nil {
-		log.Errorf("cmd error: %s", err)
-		return nil, fmt.Errorf("cmd error: %s", err)
+		// Create an SFTP client.
+		sftpClient, err := sftp.NewClient(client)
+		if err != nil {
+			log.Errorf("failed to create SFTP client: %s", err)
+			return nil, fmt.Errorf("failed to create SFTP client: %s", err)
+		}
+		defer sftpClient.Close()
+
+		// Run a command on the remote server and capture the output.
+		outputBytes, err = session.CombinedOutput(cliCmd)
+		outputStr := string(outputBytes)
+		if err != nil {
+			log.Errorf("cmd->%v error: %v", cliCmd, err)
+			return nil, fmt.Errorf("cmd->%v error: %v", cliCmd, err)
+		}
+		errStr := "Process failure, err: -105"
+		if strings.Contains(outputStr, errStr) {
+			log.Infof("retry: '%s' contains '%s'\n", outputStr, errStr)
+			time.Sleep(500 * time.Millisecond)
+			i++
+			session.Close()
+			goto retry
+		} else {
+			CopyFile(outputStr, "/work/cli_output", sftpClient)
+			session.Close()
+			// Start a session.
+			session, err := client.NewSession()
+			if err != nil {
+				log.Errorf("failed to create ssh session: %s", err)
+				return nil, fmt.Errorf("failed to create ssh session: %s", err)
+			}
+			defer session.Close()
+			fullCmd := `set -o pipefail && cat /work/cli_output ` + subCmd
+			// Run a command on the remote server and capture the output.
+			outputBytes, err = session.CombinedOutput(fullCmd)
+			if err != nil {
+				log.Errorf("cmd->%v error: %v", fullCmd, err)
+				return nil, fmt.Errorf("cmd->%v error: %v", fullCmd, err)
+			}
+			break
+		}
 	}
 
+	if i == maxRetryCnt {
+		log.Errorf("RunCliCmdOnImc: Max retryCnt->%v reached", maxRetryCnt)
+		return nil, fmt.Errorf("RunCliCmdOnImc: Max retryCnt->%v reached", maxRetryCnt)
+	}
+	//success case
 	return outputBytes, nil
-
 }
 
 func GetAccApfMacList() ([]string, error) {
-	commands := `set -o pipefail && cli_client -cq | awk '{if(($2 == "0x4") && ($4 == "0x4")) {print $17}}'`
-	outputBytes, err := RunCmdOnImc(commands)
+	cliCmd := `set -o pipefail && cli_client -cq `
+	subCmd := ` | awk '{if(($2 == "0x4") && ($4 == "0x4")) {print $17}}'`
+	outputBytes, err := RunCliCmdOnImc(cliCmd, subCmd)
 
 	var outputStr []string
 	//Handle case where command ran without error, but empty output, due to config issue.
@@ -196,8 +256,9 @@ func GetAccApfMacList() ([]string, error) {
 
 func GetVfMacList() ([]string, error) {
 	// reach out to the IMC to get the mac addresses of the VFs
-	commands := `set -o pipefail && cli_client -cq | awk '{if(($4 == "0x0") && ($6 == "yes")) {print $17}}'`
-	outputBytes, err := RunCmdOnImc(commands)
+	cliCmd := `set -o pipefail && cli_client -cq `
+	subCmd := ` | awk '{if(($4 == "0x0") && ($6 == "yes")) {print $17}}'`
+	outputBytes, err := RunCliCmdOnImc(cliCmd, subCmd)
 
 	var outputStr []string
 	//Handle case where command ran without error, but empty output, due to config issue.
@@ -249,4 +310,156 @@ func VerifiedFilePath(fileName string, allowedDir string) (string, error) {
 		return "", fmt.Errorf("Unsafe or invalid path specified. %s", err.Error())
 	}
 	return path, nil
+}
+
+// compares(using md5sum) binary on IMC, with equivalent binary built-into ipu-plugin(VSP) image.
+// returns true, if binary checksum matches, false otherwise.
+func CompareBinary(imcPath string, vspPath string, client *ssh.Client) (bool, string) {
+	session, err := client.NewSession()
+	if err != nil {
+		log.Errorf("failed to create session: %v", err)
+		return false, fmt.Sprintf("failed to create session: %v", err)
+	}
+	defer session.Close()
+
+	//compute md5sum of pkg file on IMC
+	commands := "set -o pipefail && " + "md5sum " + imcPath + " |  awk '{print $1}'"
+	imcOutput, err := session.CombinedOutput(commands)
+	if err != nil {
+		log.Errorf("Error->%v, running command->%s:", err, commands)
+		return false, fmt.Sprintf("Error->%v, running command->%s:", err, commands)
+	}
+
+	//compute md5sum of pkg file in ipu-plugin container
+	commands = "set -o pipefail && " + "md5sum /" + vspPath + " |  awk '{print $1}'"
+	pluginOutput, err := ExecuteScript(commands)
+	if err != nil {
+		log.Errorf("Error->%v, for md5sum command->%v", err, commands)
+		return false, fmt.Sprintf("Error->%v, for md5sum command->%v", err, commands)
+	}
+
+	if pluginOutput == string(imcOutput) {
+		log.Infof("md5sum match, imcPath-%s, in ipu-plugin->%v, on IMC->%v", imcPath, pluginOutput, string(imcOutput))
+	} else {
+		log.Infof("md5sum mismatch, imcPath-%s, in ipu-plugin->%v, on IMC->%v", imcPath, pluginOutput, string(imcOutput))
+		return false, fmt.Sprintf("md5sum mismatch, imcPath-%s, in ipu-plugin->%v, on IMC->%v", imcPath, pluginOutput, string(imcOutput))
+	}
+
+	return true, ""
+}
+
+// compares(using md5sum) file on IMC, with equivalent file-content(in string format) as expected by ipu-plugin(VSP).
+// returns true, if file checksum matches, false otherwise.
+func CompareFile(inputFile string, remoteFilePath string, client *ssh.Client) (bool, string) {
+	log.Infof("inputFile->%v", inputFile)
+	inputFileHash := md5.Sum([]byte(inputFile))
+	inputFileHashStr := hex.EncodeToString(inputFileHash[:])
+
+	// Create an SFTP client.
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		log.Errorf("failed to create SFTP client: %s", err)
+		return false, fmt.Sprintf("failed to create SFTP client: %s", err)
+	}
+	defer sftpClient.Close()
+
+	// destination file on IMC.
+	dstFile, err := sftpClient.Open(remoteFilePath)
+	if err != nil {
+		log.Errorf("failed to create remote file(%s): %s", remoteFilePath, err)
+		return false, fmt.Sprintf("failed to create remote file(%s): %s", remoteFilePath, err)
+	}
+	defer dstFile.Close()
+
+	imcFileBytes, err := io.ReadAll(dstFile)
+	if err != nil {
+		log.Errorf("failed to read %s: %s", remoteFilePath, err)
+		return false, fmt.Sprintf("failed to read %s: %s", remoteFilePath, err)
+	}
+
+	imcFileHash := md5.Sum(imcFileBytes)
+	imcFileHashStr := hex.EncodeToString(imcFileHash[:])
+
+	if inputFileHashStr == imcFileHashStr {
+		log.Infof("File->%s md5 match, generated->%v, on IMC->%v", remoteFilePath, inputFileHashStr, imcFileHashStr)
+	} else {
+		log.Infof("File->%s, md5 mismatch, generated->%v, on IMC->%v", remoteFilePath, inputFileHashStr, imcFileHashStr)
+		return false, fmt.Sprintf("File->%s, md5 mismatch, generated->%v, on IMC->%v", remoteFilePath, inputFileHashStr, imcFileHashStr)
+	}
+
+	return true, ""
+}
+
+// copies file content(in string) onto IMC(to the path provided)
+func CopyFile(inputFile string, remoteFilePath string, sftpClient *sftp.Client) error {
+	log.Infof("copyFile: remoteFilePath->%v", remoteFilePath)
+
+	remoteFile, err := sftpClient.Create(remoteFilePath)
+	if err != nil {
+		log.Errorf("failed to create remote file->%v: %v", remoteFilePath, err)
+		return fmt.Errorf("failed to create remote file->%v: %v", remoteFilePath, err)
+	}
+	defer remoteFile.Close()
+
+	_, err = remoteFile.Write([]byte(inputFile))
+	if err != nil {
+		log.Errorf("failed to write %v: %v", remoteFilePath, err)
+		return fmt.Errorf("failed to write %v: %v", remoteFilePath, err)
+	}
+
+	err = remoteFile.Sync()
+	if err != nil {
+		log.Errorf("failed to sync %v: %v", remoteFilePath, err)
+		return fmt.Errorf("failed to sync %v: %v", remoteFilePath, err)
+	}
+
+	err = sftpClient.Chmod(remoteFilePath, 0755)
+	if err != nil {
+		log.Errorf("failed to chmod %v : %v", remoteFilePath, err)
+		return fmt.Errorf("failed to chmod %v : %v", remoteFilePath, err)
+	}
+	return nil
+}
+
+// copies binary part of ipu-plugin(VSP) image onto IMC(to the path provided)
+func CopyBinary(imcPath string, vspPath string, sftpClient *sftp.Client) error {
+
+	// Open the source file.
+	srcFile, err := os.Open(vspPath)
+	if err != nil {
+		log.Errorf("failed to open local file-%v: %v", vspPath, err)
+		return fmt.Errorf("failed to open local file-%v: %v", vspPath, err)
+	}
+	defer srcFile.Close()
+
+	dirPath := filepath.Dir(imcPath)
+	// create any missing directories along the path to file in IMC.
+	err = sftpClient.MkdirAll(dirPath)
+	if err != nil {
+		log.Errorf("error-%v from MkdirAll-for dirPath: %v", err, dirPath)
+		return fmt.Errorf("error-%v from MkdirAll-for dirPath: %v", err, dirPath)
+	}
+
+	// Create the destination file on the remote server.
+	dstFile, err := sftpClient.Create(imcPath)
+	if err != nil {
+		log.Errorf("failed to create remote file-%v: %v", imcPath, err)
+		return fmt.Errorf("failed to create remote file-%v: %v", imcPath, err)
+	}
+	defer dstFile.Close()
+
+	// Copy the file contents to the destination file.
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		log.Errorf("failed to copy file, vspPath-%v: %v", vspPath, err)
+		return fmt.Errorf("failed to copy file, vspPath-%v: %v", vspPath, err)
+	}
+
+	// Ensure that the file is written to the remote filesystem.
+	err = dstFile.Sync()
+	if err != nil {
+		log.Errorf("failed to sync file, imcPath-%v: %v", imcPath, err)
+		return fmt.Errorf("failed to sync file, imcPath-%v: %v", imcPath, err)
+	}
+	return nil
 }
