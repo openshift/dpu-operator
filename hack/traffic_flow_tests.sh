@@ -27,4 +27,5 @@ temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
+TFT_MANIFESTS_OVERRIDE=/root/dpu-operator/hack/cluster-configs/ocp_traffic_flow_manifests
 ./tft.py -v debug "$temp_file"
