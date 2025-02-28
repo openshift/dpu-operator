@@ -15,13 +15,9 @@
 package ipuplugin
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"io"
 	math_rand "math/rand"
 	"net"
 	"os"
@@ -527,47 +523,14 @@ func (s *SSHHandlerImpl) sshFunc() error {
 	}
 	defer sftpClient.Close()
 
-	// Open the source file.
+	//copy P4 package file.
 	p4PkgName := os.Getenv("P4_NAME") + ".pkg"
-	localFilePath := "/" + p4PkgName
-	srcFile, err := os.Open(localFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open local file: %s", err)
-	}
-	defer srcFile.Close()
+	imcPath := "/work/scripts/" + p4PkgName
+	vspPath := "/" + p4PkgName
+	err = utils.CopyBinary(imcPath, vspPath, sftpClient)
 
-	// Create the destination file on the remote server.
-	remoteFilePath := "/work/scripts/" + p4PkgName
-	dstFile, err := sftpClient.Create(remoteFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to create remote file: %s", err)
-	}
-	defer dstFile.Close()
-
-	// Copy the file contents to the destination file.
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy file: %s", err)
-	}
-
-	// Ensure that the file is written to the remote filesystem.
-	err = dstFile.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync file: %s", err)
-	}
-
-	// Start a session.
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("failed to create session: %s", err)
-	}
-	defer session.Close()
-
-	// Append python script to configure the ACC
-	commands := `echo "python /usr/bin/scripts/cfg_acc_apf_x2.py" >> /work/scripts/pre_init_app.sh`
-	err = session.Run(commands)
-	if err != nil {
-		return fmt.Errorf("failed to run commands: %s", err)
+		return fmt.Errorf("sshFunc:copyBinary-error: %v", err)
 	}
 
 	macAddress, err := setBaseMacAddr()
@@ -575,91 +538,35 @@ func (s *SSHHandlerImpl) sshFunc() error {
 		return fmt.Errorf("error from setBaseMacAddr()->%v", err)
 	}
 
-	shellScript := genLoadCustomPkgFile(macAddress)
+	inputFile := genLoadCustomPkgFile(macAddress)
+	remoteFilePath := "/work/scripts/load_custom_pkg.sh"
 
-	loadCustomPkgFilePath := "/work/scripts/load_custom_pkg.sh"
-	loadCustomPkgFile, err := sftpClient.Create(loadCustomPkgFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create remote load_custom_pkg.sh: %s", err)
-	}
-	defer loadCustomPkgFile.Close()
+	err = utils.CopyFile(inputFile, remoteFilePath, sftpClient)
 
-	_, err = loadCustomPkgFile.Write([]byte(shellScript))
 	if err != nil {
-		return fmt.Errorf("failed to write to load_custom_pkg.sh: %s", err)
+		return fmt.Errorf("sshFunc:CopyFile-error: %v", err)
 	}
 
-	err = loadCustomPkgFile.Sync()
+	//post_init_app.sh
+	inputFile = postInitAppScript()
+	remoteFilePath = "/work/scripts/post_init_app.sh"
+
+	err = utils.CopyFile(inputFile, remoteFilePath, sftpClient)
+
 	if err != nil {
-		return fmt.Errorf("failed to sync load_custom_pkg.sh: %s", err)
+		return fmt.Errorf("sshFunc:CopyFile-error: %v", err)
 	}
 
-	err = sftpClient.Chmod(loadCustomPkgFilePath, 0755)
+	inputFile = macAddress + "\n"
+	remoteFilePath = "/work/uuid"
+
+	err = utils.CopyFile(inputFile, remoteFilePath, sftpClient)
+
 	if err != nil {
-		log.Errorf("failed to chmod load_custom_pkg.sh file: %s", err)
-		return fmt.Errorf("failed to chmod load_custom_pkg.sh file: %s", err)
+		return fmt.Errorf("sshFunc:CopyFile-error: %v", err)
 	}
 
-	//Create post_init_app.sh
-	postInitAppFileStr := postInitAppScript()
-	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
-	postInitFile, err := sftpClient.Create(postInitRemoteFilePath)
-	if err != nil {
-		log.Errorf("failed to create post_init_app.sh file: %s", err)
-		return fmt.Errorf("failed to create post_init_app.sh file: %s", err)
-	}
-	defer postInitFile.Close()
-
-	_, err = postInitFile.Write([]byte(postInitAppFileStr))
-	if err != nil {
-		return fmt.Errorf("failed to write to post_init_app.sh file: %s", err)
-	}
-
-	err = postInitFile.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync post_init_app.sh file: %s", err)
-	}
-
-	err = sftpClient.Chmod(postInitRemoteFilePath, 0755)
-	if err != nil {
-		log.Errorf("failed to chmod post_init_app.sh file: %s", err)
-		return fmt.Errorf("failed to chmod post_init_app.sh file: %s", err)
-	}
-
-	uuidFilePath := "/work/uuid"
-	uuidFile, err := sftpClient.Create(uuidFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create remote uuid file: %s", err)
-	}
-	defer uuidFile.Close()
-
-	// Write the new MAC address to the uuid file.
-	_, err = uuidFile.Write([]byte(macAddress + "\n"))
-	if err != nil {
-		return fmt.Errorf("failed to write to uuid file: %s", err)
-	}
-
-	// Ensure that the uuid file is written to the remote filesystem.
-	err = uuidFile.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync uuid file: %s", err)
-	}
-
-	session, err = client.NewSession()
-	if err != nil {
-		return fmt.Errorf("failed to create session: %s", err)
-	}
-	defer session.Close()
-
-	// Run a command on the remote server and capture the output.
-	var stdoutBuf bytes.Buffer
-	session.Stdout = &stdoutBuf
-	err = session.Run(commands)
-	if err != nil {
-		return fmt.Errorf("failed to run commands: %s", err)
-	}
-
-	session, err = client.NewSession()
+	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %s", err)
 	}
@@ -985,119 +892,36 @@ func skipIMCReboot() (bool, string) {
 		return false, "UUID File does not exist"
 	}
 
-	session, err = client.NewSession()
-	if err != nil {
-		log.Errorf("failed to create session: %v", err)
-		return false, fmt.Sprintf("failed to create session: %v", err)
-	}
-	defer session.Close()
-
-	//compute md5sum of pkg file on IMC
 	p4PkgName := os.Getenv("P4_NAME") + ".pkg"
-	commands = "cd /work/scripts; md5sum " + p4PkgName + " |  awk '{print $1}'"
-	imcOutput, err := session.CombinedOutput(commands)
-	if err != nil {
-		log.Errorf("Error->%v, running command->%s:", err, commands)
-		return false, fmt.Sprintf("Error->%v, running command->%s:", err, commands)
-	}
-
-	//compute md5sum of pkg file in ipu-plugin container
-	commands = "md5sum /" + p4PkgName + " |  awk '{print $1}'"
-	pluginOutput, err := utils.ExecuteScript(commands)
-	if err != nil {
-		log.Errorf("Error->%v, for md5sum command->%v", err, commands)
-		return false, fmt.Sprintf("Error->%v, for md5sum command->%v", err, commands)
-	}
-
-	if pluginOutput != string(imcOutput) {
-		log.Infof("md5sum mismatch, in ipu-plugin->%v, on IMC->%v", pluginOutput, string(imcOutput))
-	} else {
-		log.Infof("md5sum match, in ipu-plugin->%v, on IMC->%v", pluginOutput, string(imcOutput))
-		p4pkgMatch = true
-	}
+	imcPath := "/work/scripts/" + p4PkgName
+	vspPath := "/" + p4PkgName
+	p4pkgMatch, errStr := utils.CompareBinary(imcPath, vspPath, client)
 
 	if !p4pkgMatch {
-		return false, "md5sum mismatch"
+		return false, errStr
 	}
 
 	genLcpkgFileStr := genLoadCustomPkgFile(outputStr)
 	log.Infof("loadCustomPkgFileStr->%v", genLcpkgFileStr)
-	genLcpkgFileHash := md5.Sum([]byte(genLcpkgFileStr))
-	genLcpkgFileHashStr := hex.EncodeToString(genLcpkgFileHash[:])
-
-	// Create an SFTP client.
-	sftpClient, err := sftp.NewClient(client)
-	if err != nil {
-		log.Errorf("failed to create SFTP client: %s", err)
-		return false, fmt.Sprintf("failed to create SFTP client: %s", err)
-	}
-	defer sftpClient.Close()
-
 	// destination file on IMC.
 	remoteFilePath := "/work/scripts/load_custom_pkg.sh"
-	dstFile, err := sftpClient.Open(remoteFilePath)
-	if err != nil {
-		log.Errorf("failed to create remote file: %s", err)
-		return false, fmt.Sprintf("failed to create remote file: %s", err)
-	}
-	defer dstFile.Close()
-
-	imcLcpkgFileBytes, err := io.ReadAll(dstFile)
-	if err != nil {
-		log.Errorf("failed to read load_custom_pkg.sh: %s", err)
-		return false, fmt.Sprintf("failed to read load_custom_pkg.sh: %s", err)
-	}
-
-	imcLcpkgFileHash := md5.Sum(imcLcpkgFileBytes)
-	imcLcpkgFileHashStr := hex.EncodeToString(imcLcpkgFileHash[:])
-
-	if genLcpkgFileHashStr != imcLcpkgFileHashStr {
-		log.Infof("load_custom md5 mismatch, generated->%v, on IMC->%v", genLcpkgFileHashStr, imcLcpkgFileHashStr)
-	} else {
-		log.Infof("load_custom md5 match, generated->%v, on IMC->%v", genLcpkgFileHashStr, imcLcpkgFileHashStr)
-		lcpkgFileMatch = true
-	}
+	lcpkgFileMatch, errStr = utils.CompareFile(genLcpkgFileStr, remoteFilePath, client)
 
 	if !lcpkgFileMatch {
-		return false, "lcpkgFileMatch mismatch"
+		return false, errStr
 	}
 
 	postInitAppFile := postInitAppScript()
-	postInitAppFileHash := md5.Sum([]byte(postInitAppFile))
-	postInitAppFileHashStr := hex.EncodeToString(postInitAppFileHash[:])
-
 	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
-	imcPostInitFile, err := sftpClient.Open(postInitRemoteFilePath)
-	if err != nil {
-		log.Errorf("failed to open post_init_app.sh file: %s", err)
-		return false, fmt.Sprintf("failed to open post_init_app.sh file: %s", err)
-	}
-	log.Infof("post_init_app.sh file exists")
-	defer imcPostInitFile.Close()
-
-	imcPostInitFileBytes, err := io.ReadAll(imcPostInitFile)
-	if err != nil {
-		log.Errorf("failed to read post_init_app.sh: %s", err)
-		return false, fmt.Sprintf("failed to read post_init_app.sh: %s", err)
-	}
-
-	imcPostInitFileHash := md5.Sum(imcPostInitFileBytes)
-	imcPostInitFileHashStr := hex.EncodeToString(imcPostInitFileHash[:])
-
-	if postInitAppFileHashStr != imcPostInitFileHashStr {
-		log.Infof("post_init_app.sh md5 mismatch, generated->%v, on IMC->%v", postInitAppFileHashStr, imcPostInitFileHashStr)
-	} else {
-		log.Infof("post_init_app.sh md5 match, generated->%v, on IMC->%v", postInitAppFileHashStr, imcPostInitFileHashStr)
-		piaFileMatch = true
-	}
+	piaFileMatch, errStr = utils.CompareFile(postInitAppFile, postInitRemoteFilePath, client)
 
 	if !piaFileMatch {
-		return false, "piaFileMatch mismatch"
+		return false, errStr
 	}
 
 	log.Infof("uuidFileExists->%v, p4pkgMatch->%v, lcpkgFileMatch->%v, piaFileMatch->%v",
 		uuidFileExists, p4pkgMatch, lcpkgFileMatch, piaFileMatch)
-	return true, fmt.Sprintf("checks pass, imc reboot not required")
+	return true, "checks pass, imc reboot not required"
 
 }
 
