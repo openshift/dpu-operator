@@ -12,6 +12,7 @@ clusters:
       bmc:
         url: "{{bmc_hostname(0)}}"
       host_side_bmc: "{{bmc(0)}}"
+      dpu_host: "{{worker_name(0)}}"
       ip: "172.16.3.16"
       mac: "{{DPU_mac_address(0)}}"
     postconfig:
