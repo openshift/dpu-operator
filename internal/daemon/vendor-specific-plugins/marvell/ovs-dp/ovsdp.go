@@ -39,6 +39,9 @@ func createDbParam(ovsDbPath string) string {
 // ovs-vsctl command to add dpdk port to bridge
 func (ovsdp *OvsDP) AddPortToDataPlane(bridgeName string, portName string, vfPCIAddres string, isDPDK bool) error {
 	var cmd *exec.Cmd
+
+	exec.Command("ip", "link", "set", portName, "up").Run()
+
 	if isDPDK {
 		ovsdp.log.Info("Adding DPDK Port to Bridge", "PortName", portName, "VFPCIAddress", vfPCIAddres)
 		cmd = exec.Command("ovs-vsctl", "--may-exist", "add-port", bridgeName, portName, "--", "set", "Interface", portName, "type=dpdk", fmt.Sprintf("options:dpdk-devargs=%s", vfPCIAddres))
