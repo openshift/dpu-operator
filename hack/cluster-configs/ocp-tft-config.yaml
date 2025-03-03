@@ -17,8 +17,6 @@ tft:
         client:
           - name: "$worker"
             sriov: "true"
-        plugins:
-          - name: validate_offload
         secondary_network_nad: "default-sriov-net"
         resource_name: "openshift.io/dpu"
 kubeconfig: "/root/kubeconfig.ocpcluster"
