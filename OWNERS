@@ -3,10 +3,12 @@ reviewers:
   - wizhaoredhat
   - SalDaniele
   - vrindle
+  - thom311
 approvers:
   - bn222
   - wizhaoredhat
   - SalDaniele
   - vrindle
+  - thom311
 component: "Networking"
 subcomponent: "DPU"
