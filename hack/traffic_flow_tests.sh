@@ -27,6 +27,8 @@ temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 
-./tft.py -v debug "$temp_file"
+OUTPUT_BASE="./ft-logs/result-$(date '+%Y%m%d-%H%M%S.%4N-')"
 
-./print_results.py ft-logs/*.json
+./tft.py -v debug --output-base "$OUTPUT_BASE" "$temp_file"
+
+./print_results.py "$OUTPUT_BASE"*.json
