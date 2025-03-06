@@ -41,15 +41,17 @@ type DpuOperatorConfigReconciler struct {
 	Scheme          *runtime.Scheme
 	dpuDaemonImage  string
 	vspImages       map[string]string
+	vspExtraData    map[string]string
 	imagePullPolicy string
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string, vspExtraData map[string]string) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
 		Client:          client,
 		Scheme:          scheme,
 		dpuDaemonImage:  dpuDaemonImage,
 		vspImages:       vspImages,
+		vspExtraData:    vspExtraData,
 		imagePullPolicy: "IfNotPresent",
 	}
 }
@@ -67,6 +69,7 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=roles,resources=*,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=anyuid;hostnetwork;privileged,verbs=use
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch;create;update;patch;delete
@@ -122,6 +125,9 @@ func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperator
 	}
 
 	for key, value := range r.vspImages {
+		data[key] = value
+	}
+	for key, value := range r.vspExtraData {
 		data[key] = value
 	}
 

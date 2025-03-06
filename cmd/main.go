@@ -87,6 +87,7 @@ func main() {
 	}
 
 	vspImages := plugin.CreateVspImagesMap(true, setupLog)
+	vspExtraData := plugin.CreateVspExtraDataMap(true, setupLog)
 
 	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
 	if dpuDaemonImage == "" {
@@ -94,7 +95,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages)
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, vspExtraData)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)

@@ -42,6 +42,8 @@ spec:
               fieldPath: metadata.namespace
         - name: IntelVspImage
           value: {{.IntelVspImage}}
+        - name: IntelVspP4Image
+          value: {{.IntelVspP4Image}}
         - name: MarvellVspImage
           value: {{.MarvellVspImage}}
         volumeMounts:

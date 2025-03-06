@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vsp-p4
+  namespace: {{.Namespace}}
+spec:
+  selector:
+    matchLabels:
+      app: vsp-p4
+  template:
+    metadata:
+      labels:
+        app: vsp-p4
+    spec:
+      nodeSelector:
+        dpu: "true"
+      serviceAccountName: vsp-p4-sa
+      containers:
+      - name: p4-container
+        image: {{.ImageName}}
+        securityContext:
+          privileged: true
+        ports:
+        - containerPort: 9559
+          hostPort: 9559
+        resources:
+          requests:
+            cpu: 500m
+            memory: 4Gi
+            hugepages-2Mi: 256Mi
+          limits:
+            cpu: 1
+            memory: 4Gi
+            hugepages-2Mi: 256Mi
+        volumeMounts:
+        - name: lib-modules
+          mountPath: /lib/modules/
+        - name: var-run
+          mountPath: /opt/p4/p4-cp-nws/var/run
+        - name: sys
+          mountPath: /sys
+        - name: dev
+          mountPath: /dev
+        - name: hugepages
+          mountPath: /dev/hugepages
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules/
+      - name: var-run
+        hostPath:
+          path: /opt/p4/p4-cp-nws/var/run
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: hugepages
+        hostPath:
+          path: /dev/hugepages

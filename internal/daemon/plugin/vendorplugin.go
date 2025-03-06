@@ -27,28 +27,42 @@ var binData embed.FS
 const VspImageIntel string = "IntelVspImage"
 const VspImageMarvell string = "MarvellVspImage"
 
+const VspImageP4Intel string = "IntelVspP4Image"
+
 var VspImages = []string{
 	VspImageIntel,
 	VspImageMarvell,
 	// TODO: Add future supported vendor plugins here
 }
 
-func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
-	vspImages := make(map[string]string)
+var VspExtraData = []string{
+	VspImageP4Intel,
+}
 
-	for _, vspImageName := range VspImages {
+func CreateVspMap(fromEnv bool, logger logr.Logger, VspInfoList []string) map[string]string {
+	vspInfoMap := make(map[string]string)
+
+	for _, vspInfoMapName := range VspInfoList {
 		var value string
 
 		if fromEnv {
-			value = os.Getenv(vspImageName)
+			value = os.Getenv(vspInfoMapName)
 			if value == "" {
-				logger.Info("VspImage env var not set", "VspImage", vspImageName)
+				logger.Info("VspInfoMap env var not set", "VspInfoMap", vspInfoMapName)
 			}
 		}
-		vspImages[vspImageName] = value
+		vspInfoMap[vspInfoMapName] = value
 	}
 
-	return vspImages
+	return vspInfoMap
+}
+
+func CreateVspExtraDataMap(fromEnv bool, logger logr.Logger) map[string]string {
+	return CreateVspMap(fromEnv, logger, VspExtraData)
+}
+
+func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
+	return CreateVspMap(fromEnv, logger, VspImages)
 }
 
 type VendorPlugin interface {
