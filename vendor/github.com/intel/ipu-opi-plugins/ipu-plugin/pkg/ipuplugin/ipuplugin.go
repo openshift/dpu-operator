@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
@@ -33,6 +34,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+)
+
+const (
+	dpuNamespace = "openshift-dpu-operator"
 )
 
 type server struct {
@@ -49,6 +54,7 @@ type server struct {
 	Ports           map[string]*types.BridgePortInfo
 	bridgeCtlr      types.BridgeController
 	p4rtClient      types.P4RTClient
+	p4Image         string
 	mode            string
 	daemonHostIp    string
 	daemonIpuIp     string
@@ -56,7 +62,7 @@ type server struct {
 }
 
 func NewIpuPlugin(port int, brCtlr types.BridgeController,
-	p4Client types.P4RTClient, servingAddr, servingProto, bridge, intf, p4cpInstall, mode, daemonHostIp, daemonIpuIp string, daemonPort int) types.Runnable {
+	p4Client types.P4RTClient, p4Image string, servingAddr, servingProto, bridge, intf, p4cpInstall, mode, daemonHostIp, daemonIpuIp string, daemonPort int) types.Runnable {
 	return &server{
 		servingAddr:     servingAddr,
 		servingPort:     port,
@@ -69,6 +75,7 @@ func NewIpuPlugin(port int, brCtlr types.BridgeController,
 		Ports:           make(map[string]*types.BridgePortInfo),
 		bridgeCtlr:      brCtlr,
 		p4rtClient:      p4Client,
+		p4Image:         p4Image,
 		mode:            mode,
 		daemonHostIp:    daemonHostIp,
 		daemonIpuIp:     daemonIpuIp,
@@ -132,8 +139,19 @@ func (s *server) Run() error {
 	}
 
 	if s.mode == types.IpuMode {
+		log.Info("Starting infrapod")
+		if s.p4Image != "" {
+			log.Infof("Using P4 image as : %s\n", s.p4Image)
+			if err := infrapod.CreateInfrapod(s.p4Image, dpuNamespace); err != nil {
+				log.Error(err, "unable to create Infrapod : %v", err)
+				return err
+			}
+		} else {
+			log.Infof("Waiting for P4 pod to be started manually\n")
+		}
 		// Wait for the infrap4d connection to come up
 		if _, err := waitForInfraP4d(s.p4rtClient); err != nil {
+			log.Error(err, "unable to connect to infrap4d, %v; Exiting", err)
 			return err
 		}
 		// Create bridge if it doesn't exist

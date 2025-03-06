@@ -8,9 +8,14 @@ import (
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
+
+// The below is present in config/dev/local-images-template.yaml
+const VspP4ImageIntelEnv string = "IntelVspP4Image"
+const VspP4ServiceName string = "vsp-p4-service"
 
 type IntelDetector struct {
 	Name string
@@ -58,10 +63,16 @@ func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+	p4Image := os.Getenv(VspP4ImageIntelEnv)
+	if p4Image == "" {
+		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4")
+	}
+	args := fmt.Sprintf(`[ "-v=debug", "--p4rtName=%s.%s.svc.cluster.local", "--p4Image=%s" ]`,
+		VspP4ServiceName, vars.Namespace, p4Image)
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
 	template_vars.Command = `[ "/usr/bin/ipuplugin" ]`
-	template_vars.Args = `[ "-v=debug", "--p4rtName=vsp-p4-service.default.svc.cluster.local" ]`
+	template_vars.Args = args
 	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
 }
 

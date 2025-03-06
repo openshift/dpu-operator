@@ -30,6 +30,7 @@ rules:
   resources:
   - serviceaccounts
   - pods
+  - services
   verbs:
   - get
   - list

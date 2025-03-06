@@ -38,7 +38,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-02-25T12:29:34Z"
+    createdAt: "2025-03-06T00:10:18Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -95,6 +95,18 @@ spec:
           - ""
           resources:
           - serviceaccounts
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
           verbs:
           - create
           - delete

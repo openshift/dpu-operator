@@ -125,7 +125,7 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), "mock-image", plugin.CreateVspImagesMap(false, setupLog))
+	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), "mock-image", plugin.CreateVspImagesMap(false, setupLog), plugin.CreateVspExtraDataMap(false, setupLog))
 	err = b.SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
