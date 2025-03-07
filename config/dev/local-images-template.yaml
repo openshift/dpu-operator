@@ -28,5 +28,7 @@ spec:
           value: {{ .RegistryURL }}:5000/mrvl-vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
+        - name: NETWORK_RESOURCES_INJECTOR_IMAGE
+          value: {{ .RegistryURL }}:5000/network-resources-injector-image:dev
         image: {{ .RegistryURL }}:5000/dpu-operator:dev
         imagePullPolicy: Always
