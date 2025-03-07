@@ -88,23 +88,35 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 	//dpInterfaceName is the name of the interface on the Data Plane side
 	secInterfaceName := fmt.Sprintf("nf_interface%d", index)
 	dpInterfaceName := fmt.Sprintf("dp_interface%d", index)
-	vethLink := &netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{Name: secInterfaceName},
-		PeerName:  dpInterfaceName,
-	}
-	if err := netlink.LinkAdd(vethLink); err != nil {
-		return err
+
+	var nfLink netlink.Link
+	var peerLink netlink.Link
+	var err error
+
+	nfLink, _ = netlink.LinkByName(secInterfaceName)
+	if nfLink != nil {
+		peerLink, _ = netlink.LinkByName(dpInterfaceName)
 	}
 
-	nfLink, err := netlink.LinkByName(secInterfaceName)
-	if err != nil {
-		return err
+	if nfLink == nil || peerLink == nil {
+		vethLink := &netlink.Veth{
+			LinkAttrs: netlink.LinkAttrs{Name: secInterfaceName},
+			PeerName:  dpInterfaceName,
+		}
+		if err := netlink.LinkAdd(vethLink); err != nil {
+			return err
+		}
+		nfLink, err = netlink.LinkByName(secInterfaceName)
+		if err != nil {
+			return err
+		}
+		peerLink, err = netlink.LinkByName(dpInterfaceName)
+		if err != nil {
+			return err
+		}
 	}
+
 	if err := netlink.LinkSetUp(nfLink); err != nil {
-		return err
-	}
-	peerLink, err := netlink.LinkByName(dpInterfaceName)
-	if err != nil {
 		return err
 	}
 
