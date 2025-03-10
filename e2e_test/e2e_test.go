@@ -33,12 +33,23 @@ var (
 	// TODO: reduce to 2 seconds
 	timeout  = 2 * time.Minute
 	interval = 1 * time.Second
+	nfImage  = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
+	nfName   = "test-nf"
+	sfcName  = "sfc-test"
 )
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(g.Fail)
 
 	g.RunSpecs(t, "e2e tests")
+}
+
+func testPodIsRunning(c client.Client, podName string, podNamespace string) bool {
+	pod := testutils.GetPod(c, podName, podNamespace)
+	if pod != nil {
+		return pod.Status.Phase == corev1.PodRunning
+	}
+	return false
 }
 
 var _ = g.BeforeSuite(func() {
@@ -51,7 +62,8 @@ var _ = g.AfterSuite(func() {
 
 var _ = g.Describe("Dpu side", g.Ordered, func() {
 	var (
-		dpuSideClient                      client.Client
+		dpuSideClient client.Client
+		// hostSideClient                     client.Client
 		restoreDpuOperatorConfigInAfterAll func()
 	)
 
@@ -70,6 +82,9 @@ var _ = g.Describe("Dpu side", g.Ordered, func() {
 		}
 		_, dpuConfig, err := cluster.EnsureExists()
 		Expect(err).NotTo(HaveOccurred())
+
+		// hostSideClient, err = client.New(hostConfig, client.Options{Scheme: scheme.Scheme})
+		// Expect(err).NotTo(HaveOccurred())
 
 		dpuSideClient, err = client.New(dpuConfig, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
@@ -223,50 +238,48 @@ var _ = g.Describe("Dpu side", g.Ordered, func() {
 	})
 
 	g.Context("ServiceFunctionChain", func() {
-		g.It("Should create a pod when creating an SFC", func() {
-			nfName := "example-nf"
-			nfImage := "example-nf-image-url"
-			ns := vars.Namespace
-
-			Eventually(func() bool {
-				return testutils.GetPod(dpuSideClient, nfName, ns) == nil
-			}, timeout, interval).Should(BeTrue())
-
-			sfc := &configv1.ServiceFunctionChain{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "sfc-test",
-					Namespace: ns,
-				},
-				Spec: configv1.ServiceFunctionChainSpec{
-					NetworkFunctions: []configv1.NetworkFunction{
-						{
-							Name:  nfName,
-							Image: nfImage,
-						},
+		sfc := &configv1.ServiceFunctionChain{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      sfcName,
+				Namespace: vars.Namespace,
+			},
+			Spec: configv1.ServiceFunctionChainSpec{
+				NetworkFunctions: []configv1.NetworkFunction{
+					{
+						Name:  nfName,
+						Image: nfImage,
 					},
 				},
-			}
+			},
+		}
+		g.It("Should create a pod when creating an SFC", func() {
+			// TODO: This test has a race condition, it may pass if the pod is being created
+			Eventually(func() bool {
+				return testutils.GetPod(dpuSideClient, nfName, vars.Namespace) == nil
+			}, timeout, interval).Should(BeTrue())
+
 			err := dpuSideClient.Create(context.TODO(), sfc)
 			Expect(err).NotTo(HaveOccurred())
 
 			podList := &corev1.PodList{}
-			err = dpuSideClient.List(context.TODO(), podList, client.InNamespace(ns))
+			err = dpuSideClient.List(context.TODO(), podList, client.InNamespace(vars.Namespace))
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
-				pod := testutils.GetPod(dpuSideClient, nfName, ns)
+				pod := testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
 				if pod != nil {
-					return pod.Spec.Containers[0].Image == nfImage
+					return pod.Spec.Containers[0].Image == nfImage && pod.Status.Phase == corev1.PodRunning
 				}
 				return false
 			}, timeout, interval).Should(BeTrue())
-
-			err = dpuSideClient.Delete(context.TODO(), sfc)
+		})
+		g.It("Should delete the network function pod when deleting an SFC", func() {
+			err := dpuSideClient.Delete(context.TODO(), sfc)
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("Finishing up")
 
 			Eventually(func() bool {
-				return testutils.GetPod(dpuSideClient, nfName, ns) == nil
+				return testutils.GetPod(dpuSideClient, nfName, vars.Namespace) == nil
 			}, timeout, interval).Should(BeTrue())
 		})
 	})
