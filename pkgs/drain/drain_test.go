@@ -75,7 +75,7 @@ func ensureTestPodDeleted(c client.Client) {
 func testPodIsRunning() bool {
 	pod := testutils.GetPod(k8sClient, podName, podNamespace)
 	if pod != nil {
-		return pod.Status.Phase != corev1.PodRunning
+		return pod.Status.Phase == corev1.PodRunning
 	}
 	return false
 }
