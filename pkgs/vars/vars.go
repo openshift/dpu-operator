@@ -5,3 +5,7 @@ var (
 
 	DpuOperatorConfigName = "dpu-operator-config"
 )
+
+const (
+	MetricsServiceName = "dpu-operator-controller-manager-metrics-service"
+)
