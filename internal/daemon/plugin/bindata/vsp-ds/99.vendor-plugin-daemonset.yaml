@@ -26,6 +26,13 @@ spec:
           runAsUser: 0
         command: {{.Command}}
         args: {{.Args}}
+        resources:
+          requests:
+            memory: 100Mi
+            hugepages-2Mi: 100Mi
+          limits:
+            memory: 100Mi
+            hugepages-2Mi: 100Mi
         volumeMounts:
         - mountPath: /var/run/
           name: vendor-plugin-sock
@@ -35,6 +42,17 @@ spec:
         - mountPath: /proc
           mountPropagation: Bidirectional
           name: host-proc
+        - mountPath: /lib/modules/
+          mountPropagation: HostToContainer
+          name: host-libmodules
+        - mountPath: /dev/
+          mountPropagation: Bidirectional
+          name: host-dev
+        - mountPath: /sys/bus/pci/
+          mountPropagation: Bidirectional
+          name: host-sysbuspci
+        - mountPath: /hugepages
+          name: hugepage
       dnsPolicy: ClusterFirstWithHostNet
       volumes:
       - hostPath:
@@ -46,10 +64,21 @@ spec:
           type: ""
         name: host-opt
       - hostPath:
-          path: /lib/modules
-          type: DirectoryOrCreate
+          path: /lib/modules/
+          type: Directory
         name: host-libmodules
       - hostPath:
           path: /var/run/
           type: ""
         name: vendor-plugin-sock
+      - hostPath:
+          path: /dev/
+          type: ""
+        name: host-dev
+      - hostPath:
+          path: /sys/bus/pci/
+          type: DirectoryOrCreate
+        name: host-sysbuspci
+      - name: hugepage
+        emptyDir:
+          medium: HugePages
