@@ -3,6 +3,8 @@ package e2e_test
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -33,13 +35,62 @@ var (
 	cfg     *rest.Config
 	testEnv *envtest.Environment
 	// TODO: reduce to 2 seconds
-	timeout         = 2 * time.Minute
-	interval        = 1 * time.Second
-	nfImage         = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
-	nfName          = "test-nf"
-	sfcName         = "sfc-test"
-	secondaryNetDev = "net1"
+	timeout  = 2 * time.Minute
+	interval = 1 * time.Second
+	nfImage  = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
+	nfName   = "test-nf"
+	sfcName  = "sfc-test"
 )
+
+func pingTest(srcClientSet kubernetes.Interface, srcRestConfig *rest.Config, srcPod *corev1.Pod, destIP, srcName, destName string) {
+	Eventually(func() bool {
+		out, err := testutils.ExecInPod(srcClientSet, srcRestConfig, srcPod, fmt.Sprintf("ping -c 4 %s", destIP))
+		if err != nil {
+			fmt.Printf("Ping failed: %v\n%s\n", err, out)
+		}
+		fmt.Printf("%s -> %s ping: %s\n", srcName, destName, out)
+		return err == nil
+	}, testutils.TestAPITimeout*15, testutils.TestRetryInterval).Should(BeTrue(), "%s failed to reach %s via ping", srcName, destName)
+}
+
+func getEnv(key string) (string, error) {
+	value, exists := os.LookupEnv(key)
+	if !exists || value == "" {
+		return "", fmt.Errorf("missing required environment variable: %s", key)
+	}
+	return value, nil
+}
+
+// Configure external client and defer clean up to maintain idempotency
+func setupExternalClient(externalClientIp, externalClientDev, workloadSubnet string) {
+	fmt.Printf("Assigning external client device %s IP address %s\n", externalClientDev, externalClientIp)
+	cmd := exec.Command("sudo", "ip", "addr", "replace", externalClientIp+"/24", "dev", externalClientDev)
+	_, err := cmd.CombinedOutput()
+	Expect(err).NotTo(HaveOccurred())
+
+	g.DeferCleanup(func() {
+		fmt.Printf("Removing device %s IP address %s\n", externalClientDev, externalClientIp)
+		cmd := exec.Command("sudo", "ip", "addr", "del", externalClientIp+"/24", "dev", externalClientDev)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Warning: Failed to remove IP from external client: %v\n", err)
+		}
+	})
+
+	fmt.Printf("Setting route on external client to reach pod network %s over device %s\n", workloadSubnet, externalClientDev)
+	cmd = exec.Command("sudo", "ip", "route", "replace", workloadSubnet, "dev", externalClientDev)
+	_, err = cmd.CombinedOutput()
+	Expect(err).NotTo(HaveOccurred())
+
+	g.DeferCleanup(func() {
+		fmt.Printf("Removing route on external client for device %s\n", externalClientDev)
+		cmd := exec.Command("sudo", "ip", "route", "del", workloadSubnet, "dev", externalClientDev)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Warning: Failed to remove route: %v, output: %s\n", err, output)
+		}
+	})
+}
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(g.Fail)
@@ -62,6 +113,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 		hostRestConfig                     *rest.Config
 		dpuRestConfig                      *rest.Config
 		hostClientSet                      *kubernetes.Clientset
+		dpuClientSet                       *kubernetes.Clientset
 		restoreDpuOperatorConfigInAfterAll func()
 	)
 
@@ -89,6 +141,9 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		hostClientSet, err = kubernetes.NewForConfig(hostRestConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		dpuClientSet, err = kubernetes.NewForConfig(dpuRestConfig)
 		Expect(err).NotTo(HaveOccurred())
 
 	})
@@ -242,12 +297,20 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 	g.Context("When Dpu Operator components are deployed and configured", g.Ordered, func() {
 		var (
-			testPodName  = "test-pod-1"
-			testPod2Name = "test-pod-2"
-			pod1         *corev1.Pod
-			pod2         *corev1.Pod
-			pod1_ip      string
-			pod2_ip      string
+			testPodName       = "test-pod-1"
+			testPod2Name      = "test-pod-2"
+			secondaryNetDev   = "net1"
+			pod1              *corev1.Pod
+			pod2              *corev1.Pod
+			nfPod             *corev1.Pod
+			pod1_ip           string
+			pod2_ip           string
+			workloadSubnet    string
+			nfIngressIp       string
+			nfEgressIp        string
+			externalClientIp  string
+			externalClientDev string
+			externalSubnet    string
 		)
 
 		sfc := &configv1.ServiceFunctionChain{
@@ -275,6 +338,29 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = hostSideClient.Create(context.TODO(), pod2)
 			Expect(err).NotTo(HaveOccurred())
+
+			// We do not know anything about the topology where these tests run. Therefore in order to test external connectivity we
+			// should allow to user to provide this information via environment variables. This script will configure the routes / networks
+			// necessary to validate connectivity to the external client in an idempotent fashion
+
+			// TODO: We currently make the assumption that the external client is also the host where we are running these tests. This
+			// is not necessarily true in all cases, we should update this test to handle an arbitrary external client (i.e. another Node)
+
+			// This should be the IP we expect to be able to reach from the DPU's secondary network
+			externalClientIp, err = getEnv("EXTERNAL_CLIENT_IP")
+			Expect(err).NotTo(HaveOccurred())
+			// This should be the dev on the external client that is connected to the DPU's secondary network
+			externalClientDev, err = getEnv("EXTERNAL_CLIENT_DEV")
+			Expect(err).NotTo(HaveOccurred())
+			// This should be the IP we want to have assigned to the ingress of the NF and reachable from the external client
+			nfIngressIp, err = getEnv("NF_INGRESS_IP")
+			Expect(err).NotTo(HaveOccurred())
+
+			externalSubnet = testutils.GetSubnet(externalClientIp)
+			nfSubnet := testutils.GetSubnet(nfIngressIp)
+			Expect(externalSubnet).To(Equal(nfSubnet),
+				fmt.Sprintf("External client IP %s (subnet: %s) and NF ingress IP %s (subnet: %s) are not in the same subnet",
+					externalClientIp, externalSubnet, nfIngressIp, nfSubnet))
 		})
 
 		g.It("Should be able to start host workload pods", func() {
@@ -293,7 +379,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			pod1 = testutils.GetPod(hostSideClient, testPodName, "default")
 			Expect(pod1).NotTo(BeNil(), "Unable to retrieve pod1")
 			pod2 = testutils.GetPod(hostSideClient, testPod2Name, "default")
-			Expect(pod2).NotTo(BeNil(), "Unable to retrieve pod1")
+			Expect(pod2).NotTo(BeNil(), "Unable to retrieve pod2")
 
 			pod1_ip, err = testutils.GetSecondaryNetworkIP(pod1, secondaryNetDev)
 			Expect(err).NotTo(HaveOccurred())
@@ -301,28 +387,12 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Printf("pod1 ip: %s\n pod2 ip: %s\n", pod1_ip, pod2_ip)
 
-			// Ping workload pod 2 from pod 1
+			// Test pod-to-pod connectivity
 			fmt.Println("Testing pod-to-pod connectivity")
-			Eventually(func() bool {
-				out, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod1, fmt.Sprintf("ping -c 4 %s", pod2_ip))
-				if err != nil {
-					fmt.Printf("Ping failed: %v\n%s\n", err, out)
-				}
-				fmt.Printf("pod1 -> pod2 ping: %s\n", out)
-				return err == nil
-			}, testutils.TestAPITimeout*15, testutils.TestRetryInterval).Should(BeTrue(), "%s failed to reach %s via ping", pod1.Name, pod2.Name)
-
-			// Ping workload pod 1 from pod 2
-			Eventually(func() bool {
-				out, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod2, fmt.Sprintf("ping -c 4 %s", pod1_ip))
-				if err != nil {
-					fmt.Printf("Ping failed: %v\n%s\n", err, out)
-				}
-				fmt.Printf("pod2 -> pod1 ping: %s\n", out)
-				return err == nil
-			}, testutils.TestAPITimeout*15, testutils.TestRetryInterval).Should(BeTrue(), "%s failed to reach %s via ping", pod1.Name, pod2.Name)
+			pingTest(hostClientSet, hostRestConfig, pod1, pod2_ip, pod1.Name, pod2.Name)
+			pingTest(hostClientSet, hostRestConfig, pod2, pod1_ip, pod2.Name, pod1.Name)
 		})
-		g.Context("ServiceFunctionChain", func() {
+		g.Context("ServiceFunctionChain", g.Ordered, func() {
 			g.It("Should create a pod when creating an SFC", func() {
 				// TODO: This test has a race condition, it may pass if the pod is being created
 				Eventually(func() bool {
@@ -338,34 +408,66 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func() bool {
-					pod := testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
-					if pod != nil {
-						return pod.Spec.Containers[0].Image == nfImage && pod.Status.Phase == corev1.PodRunning
+					nfPod = testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
+					if nfPod != nil {
+						return nfPod.Spec.Containers[0].Image == nfImage && nfPod.Status.Phase == corev1.PodRunning
 					}
 					return false
 				}, timeout, interval).Should(BeTrue())
 				fmt.Println("Nf pod successfully created")
 			})
-			g.It("Should support pod-to-pod with Network Function deployed", func() {
+			g.It("Should support pod -> pod with Network-Function deployed", func() {
 				fmt.Println("Testing pod-to-pod connectivity w/ Network Function Deployed")
-				Eventually(func() bool {
-					out, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod1, fmt.Sprintf("ping -c 4 %s", pod2_ip))
-					if err != nil {
-						fmt.Printf("Ping failed: %v\n%s\n", err, out)
-					}
-					fmt.Printf("pod1 -> pod2 ping: %s\n", out)
-					return err == nil
-				}, testutils.TestAPITimeout*15, testutils.TestRetryInterval).Should(BeTrue(), "%s failed to reach %s via ping", pod1.Name, pod2.Name)
+				pingTest(hostClientSet, hostRestConfig, pod1, pod2_ip, pod1.Name, pod2.Name)
+				pingTest(hostClientSet, hostRestConfig, pod2, pod1_ip, pod2.Name, pod1.Name)
+			})
+			g.It("Should support pod -> Network-Function", func() {
+				// We are assuming that net2 will always be ingress and net1 will always be egress, need to verify this assumption is reasonable
+				// In this context, egress refers to traffic between the network function and the host and ingress refers to traffic between an
+				// external client and the network function
+				usedIPs := map[string]bool{
+					pod1_ip: true,
+					pod2_ip: true,
+				}
+				workloadSubnet = testutils.GetSubnet(pod1_ip)
+				nfEgressIp = testutils.GenerateAvailableIP(workloadSubnet, usedIPs)
+				fmt.Printf("Assigning NF egress port IP %s\n", nfEgressIp)
+				_, err := testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip addr add %s dev net1", nfEgressIp+"/24"))
+				Expect(err).NotTo(HaveOccurred())
+				// Explicitly set the route just incase
+				_, err = testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip route add %s dev net1", workloadSubnet))
 
-				// Ping workload pod 1 from pod 2
-				Eventually(func() bool {
-					out, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod2, fmt.Sprintf("ping -c 4 %s", pod1_ip))
-					if err != nil {
-						fmt.Printf("Ping failed: %v\n%s\n", err, out)
-					}
-					fmt.Printf("pod2 -> pod1 ping: %s\n", out)
-					return err == nil
-				}, testutils.TestAPITimeout*15, testutils.TestRetryInterval).Should(BeTrue(), "%s failed to reach %s via ping", pod1.Name, pod2.Name)
+				fmt.Println("Testing pod-to-NF connectivity")
+				pingTest(hostClientSet, hostRestConfig, pod1, nfEgressIp, pod1.Name, nfPod.Name)
+				pingTest(hostClientSet, hostRestConfig, pod2, nfEgressIp, pod2.Name, nfPod.Name)
+				pingTest(dpuClientSet, dpuRestConfig, nfPod, pod1_ip, nfPod.Name, pod1.Name)
+				pingTest(dpuClientSet, dpuRestConfig, nfPod, pod2_ip, nfPod.Name, pod2.Name)
+			})
+			g.It("Should support Network-function -> external", func() {
+				fmt.Printf("Assigning NF ingress port IP %s\n", nfIngressIp)
+				_, err := testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip addr add %s dev net2", nfIngressIp+"/24"))
+				Expect(err).NotTo(HaveOccurred())
+				// Explicitly set the route just incase
+				_, err = testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip route replace %s dev net2", externalSubnet))
+
+				setupExternalClient(externalClientIp, externalClientDev, workloadSubnet)
+
+				fmt.Println("Testing NF-to-external connectivity")
+				pingTest(dpuClientSet, dpuRestConfig, nfPod, externalClientIp, nfPod.Name, "external")
+			})
+			g.It("Should support pod -> external", func() {
+				fmt.Printf("Setting route to %s in workload pods\n", externalSubnet)
+				_, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod1, fmt.Sprintf("ip route add %s dev net1", externalSubnet))
+				Expect(err).NotTo(HaveOccurred())
+				_, err = testutils.ExecInPod(hostClientSet, hostRestConfig, pod2, fmt.Sprintf("ip route add %s dev net1", externalSubnet))
+				Expect(err).NotTo(HaveOccurred())
+
+				setupExternalClient(externalClientIp, externalClientDev, workloadSubnet)
+
+				fmt.Println("Testing pod-to-external connectivity")
+				pingTest(hostClientSet, hostRestConfig, pod1, externalClientIp, pod1.Name, "external")
+				pingTest(hostClientSet, hostRestConfig, pod2, externalClientIp, pod2.Name, "external")
+
 			})
 			g.It("Should delete the network function pod when deleting an SFC", func() {
 				err := dpuSideClient.Delete(context.TODO(), sfc)
@@ -391,7 +493,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 						Namespace: "default",
 					},
 				})
-				if err != nil {
+				if err != nil && !errors.IsNotFound(err) {
 					fmt.Printf("Failed to delete pod %s\n", podName)
 					continue
 				}

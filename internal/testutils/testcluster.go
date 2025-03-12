@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/openshift/dpu-operator/pkgs/vars"
@@ -87,6 +89,8 @@ func GetDPUNodes(c client.Client) ([]corev1.Node, error) {
 }
 
 func NewTestPod(podName string, nodeHostname string) *corev1.Pod {
+	privileged := true
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -105,12 +109,7 @@ func NewTestPod(podName string, nodeHostname string) *corev1.Pod {
 					Image:           "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest",
 					ImagePullPolicy: corev1.PullAlways,
 					SecurityContext: &corev1.SecurityContext{
-						Privileged:   new(bool),
-						RunAsNonRoot: new(bool),
-						RunAsUser:    new(int64),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
+						Privileged: &privileged,
 					},
 				},
 			},
@@ -148,4 +147,51 @@ func GetSecondaryNetworkIP(pod *corev1.Pod, netdevName string) (string, error) {
 	}
 
 	return "", fmt.Errorf("secondary network IP not found")
+}
+
+func GetSubnet(ip string) string {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		panic(fmt.Sprintf("Invalid IP address: %s", ip))
+	}
+
+	// Assume a standard /24 subnet for simplicity
+	return parsedIP.Mask(net.CIDRMask(24, 32)).String() + "/24"
+}
+
+func GenerateAvailableIP(subnet string, usedIPs map[string]bool) string {
+	ip, _, err := net.ParseCIDR(subnet)
+	if err != nil {
+		panic(fmt.Sprintf("Invalid subnet: %s", subnet))
+	}
+
+	// Avoid IPs in low range to reduce likelihood of a conflict
+	for i := 10; i < 250; i++ {
+		newIP := fmt.Sprintf("%s.%d", strings.Join(strings.Split(ip.String(), ".")[:3], "."), i)
+		if !usedIPs[newIP] {
+			return newIP
+		}
+	}
+
+	panic("No available IPs found in subnet")
+}
+
+// Assume a standard /24 subnet for simplicity
+func GetGatewayFromSubnet(subnet string) string {
+	ip, _, err := net.ParseCIDR(subnet)
+	if err != nil {
+		panic(fmt.Sprintf("Invalid subnet: %s", subnet))
+	}
+
+	gatewayIP := fmt.Sprintf("%s.1", strings.Join(strings.Split(ip.String(), ".")[:3], "."))
+	return gatewayIP
+}
+
+func AreIPsInSameSubnet(ip1, ip2, subnet string) bool {
+	_, ipNet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		panic(fmt.Sprintf("Invalid subnet: %s", subnet))
+	}
+
+	return ipNet.Contains(net.ParseIP(ip1)) && ipNet.Contains(net.ParseIP(ip2))
 }
