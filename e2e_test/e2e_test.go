@@ -35,12 +35,11 @@ var (
 	cfg     *rest.Config
 	testEnv *envtest.Environment
 	// TODO: reduce to 2 seconds
-	timeout         = 2 * time.Minute
-	interval        = 1 * time.Second
-	nfImage         = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
-	nfName          = "test-nf"
-	sfcName         = "sfc-test"
-	secondaryNetDev = "net1"
+	timeout  = 2 * time.Minute
+	interval = 1 * time.Second
+	nfImage  = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
+	nfName   = "test-nf"
+	sfcName  = "sfc-test"
 )
 
 func pingTest(srcClientSet kubernetes.Interface, srcRestConfig *rest.Config, srcPod *corev1.Pod, destIP, srcName, destName string) {
