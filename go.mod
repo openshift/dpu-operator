@@ -1,6 +1,6 @@
 module github.com/openshift/dpu-operator
 
-go 1.23.4
+go 1.23.6
 
 require (
 	github.com/containernetworking/cni v1.2.3
@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/glog v1.2.4
 	github.com/gorilla/mux v1.8.1
-	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250304160257-7495d7a9cee8
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250307231544-b32d7d6588f4
 	github.com/jaypipes/ghw v0.13.1-0.20241024164530-c1bfc6e6cd6a
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0

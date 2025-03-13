@@ -230,7 +230,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.p4pkg, "p4pkg", defaulP4Pkg, "The P4 package plugin is running with")
 	rootCmd.PersistentFlags().StringVar(&config.p4rtbin, "p4rtbin", defaultP4rtBin, "The directory where the p4rt-ctl binary is located")
 	rootCmd.PersistentFlags().StringVar(&config.p4rtName, "p4rtName", defaultP4rtIpPort, "p4rt server full name to DNS lookup. Eg: vsp-p4-service.openshift-dpu-operator.svc.cluster.local")
-	rootCmd.PersistentFlags().StringVar(&config.p4Image, "p4Image", defaultP4rtIpPort, "P4Image that needs to be pulled. If none is given, then P4IMAGE env is used")
+	rootCmd.PersistentFlags().StringVar(&config.p4Image, "p4Image", defaultP4Image, "P4Image that needs to be pulled. If none is given, then P4IMAGE env is used")
 	rootCmd.PersistentFlags().IntVar(&config.portMuxVsi, "portMuxVsi", defaultPortMuxVsi,
 		"The port mux VSI number. This must be for the same interface from --interface flags")
 	//Default Log level value is the warn level

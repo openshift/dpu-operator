@@ -42,6 +42,13 @@ const (
 	imcAddress       = "192.168.0.1:22"
 )
 
+const (
+        maxRetryCnt   = 5
+        errStr        = "Process failure, err: -105"
+        outputPath    = "/work/cli_output"
+        retryDelay    = 500 * time.Millisecond
+)
+
 var execCommand = exec.Command
 
 func ExecOsCommand(cmdBin string, params ...string) error {
@@ -154,86 +161,79 @@ func ImcQueryfindVsiGivenMacAddr(mode string, mac string) (string, error) {
 // WARNING: Even if ipumgmtd throws error, cli_client tool still
 // returns success. Also this code(for retry) can break, if error string
 // or error code gets changed.
-func RunCliCmdOnImc(cliCmd string, subCmd string) ([]byte, error) {
-
-	maxRetryCnt := 5
+func RunCliCmdOnImc(cliCmd, subCmd string) ([]byte, error) {
 	config := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
-			ssh.Password(""),
+			ssh.Password(""), // Consider using SSH keys for security
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         5 * time.Second,
 	}
-	// Connect to the remote server.
+
+	// Establish SSH connection
 	client, err := ssh.Dial("tcp", imcAddress, config)
 	if err != nil {
-		log.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-		return nil, fmt.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
+		return nil, fmt.Errorf("failed to connect to %s: %w", imcAddress, err)
 	}
 	defer client.Close()
 
+	// Create SFTP client
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SFTP client: %w", err)
+	}
+	defer sftpClient.Close()
+
 	var outputBytes []byte
-	i := 0
-retry:
-	for i < maxRetryCnt {
-		log.Infof("Loop cnt: %v", i)
-		// Start a session.
+
+	for retry := 0;  retry < maxRetryCnt; retry++ {
+		log.Printf("Attempt %d/%d: Executing command", retry+1, maxRetryCnt)
+
 		session, err := client.NewSession()
 		if err != nil {
-			log.Errorf("failed to create ssh session: %s", err)
-			return nil, fmt.Errorf("failed to create ssh session: %s", err)
+			return nil, fmt.Errorf("failed to create SSH session: %w", err)
 		}
-		defer session.Close()
 
-		// Create an SFTP client.
-		sftpClient, err := sftp.NewClient(client)
-		if err != nil {
-			log.Errorf("failed to create SFTP client: %s", err)
-			return nil, fmt.Errorf("failed to create SFTP client: %s", err)
-		}
-		defer sftpClient.Close()
-
-		// Run a command on the remote server and capture the output.
+		// Run the CLI command
 		outputBytes, err = session.CombinedOutput(cliCmd)
+		session.Close() // Close session explicitly
 		outputStr := string(outputBytes)
+
 		if err != nil {
-			log.Errorf("cmd->%v error: %v", cliCmd, err)
-			return nil, fmt.Errorf("cmd->%v error: %v", cliCmd, err)
+			log.Printf("Command failed: %v", err)
+			return nil, fmt.Errorf("command execution failed: %w", err)
 		}
-		errStr := "Process failure, err: -105"
+
 		if strings.Contains(outputStr, errStr) {
-			log.Infof("retry: '%s' contains '%s'\n", outputStr, errStr)
-			time.Sleep(500 * time.Millisecond)
-			i++
-			session.Close()
-			goto retry
-		} else {
-			CopyFile(outputStr, "/work/cli_output", sftpClient)
-			session.Close()
-			// Start a session.
-			session, err := client.NewSession()
-			if err != nil {
-				log.Errorf("failed to create ssh session: %s", err)
-				return nil, fmt.Errorf("failed to create ssh session: %s", err)
-			}
-			defer session.Close()
-			fullCmd := `set -o pipefail && cat /work/cli_output ` + subCmd
-			// Run a command on the remote server and capture the output.
-			outputBytes, err = session.CombinedOutput(fullCmd)
-			if err != nil {
-				log.Errorf("cmd->%v error: %v", fullCmd, err)
-				return nil, fmt.Errorf("cmd->%v error: %v", fullCmd, err)
-			}
-			break
+			log.Printf("Retrying due to detected error: %s", errStr)
+			time.Sleep(retryDelay)
+			continue
 		}
+
+		// Copy output to file
+		if err := CopyFile(outputStr, "/work/cli_output", sftpClient); err != nil {
+			return nil, fmt.Errorf("failed to copy file: %w", err)
+		}
+
+		if subCmd != "" {
+		     // Execute the sub-command
+		     session, err = client.NewSession()
+		     if err != nil {
+			     return nil, fmt.Errorf("failed to create SSH session: %w", err)
+		     }
+		     defer session.Close() // Ensure closure of session
+
+		     fullCmd := fmt.Sprintf("set -o pipefail && cat /work/cli_output %s", subCmd)
+		     outputBytes, err = session.CombinedOutput(fullCmd)
+		     if err != nil {
+			     return nil, fmt.Errorf("sub-command execution failed: %w", err)
+		     }
+	        }
+		return outputBytes, nil
 	}
 
-	if i == maxRetryCnt {
-		log.Errorf("RunCliCmdOnImc: Max retryCnt->%v reached", maxRetryCnt)
-		return nil, fmt.Errorf("RunCliCmdOnImc: Max retryCnt->%v reached", maxRetryCnt)
-	}
-	//success case
-	return outputBytes, nil
+	return nil, fmt.Errorf("max retry count (%d) reached", maxRetryCnt)
 }
 
 func GetAccApfMacList() ([]string, error) {

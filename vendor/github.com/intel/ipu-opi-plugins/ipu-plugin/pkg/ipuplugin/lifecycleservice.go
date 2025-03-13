@@ -161,6 +161,46 @@ func InitHandlers() {
 	}
 }
 
+func removeFXPDefaultOpcode() error {
+        config := &ssh.ClientConfig{
+                User: "root",
+                Auth: []ssh.AuthMethod{
+                        ssh.Password(""),
+                },
+                HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+        }
+        // Connect to the remote server.
+        client, err := ssh.Dial("tcp", imcAddress, config)
+        if err != nil {
+                log.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
+                return fmt.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
+        }
+        defer client.Close()
+
+        // Create an SFTP client.
+        sftpClient, err := sftp.NewClient(client)
+        if err != nil {
+                log.Info("AddRHPrimaryNetworkVportP4Rules: Warning!. Unable to create sftpClient")
+        }
+        defer sftpClient.Close()
+
+        opcodeStr := "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00"
+        remoteFilePath := "/tmp/del_opcode.txt"
+
+        err = utils.CopyFile(opcodeStr, remoteFilePath, sftpClient)
+        if err != nil {
+                log.Info("CopyFile: Warning!. Copy opcode file to IMC failed. Unable to delete default FXP opcode")
+        }
+
+        remoteCliCmd := "set -o pipefail && cli_client -x -f /tmp/del_opcode.txt"
+        _, err = utils.RunCliCmdOnImc(remoteCliCmd, "")
+        if err != nil {
+                log.Info("RunCliCmdOnImc: Warning!. Unable to delete default FXP opcode")
+        }
+
+	return nil
+}
+
 func isPF(iface string) (bool, error) {
 	device, err := fileSystemHandler.GetDevice(iface)
 	if err != nil {
@@ -1002,6 +1042,14 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 
 	log.Infof("AddLAGP4Rules, path->%v", p.GetBin())
 	p4rtclient.AddLAGP4Rules(p)
+
+	//Before adding primiary network P4 rules, remove opcode programmed to handle default network reach for primiary network (as part of IMC's post_init_app.sh script)
+	err := removeFXPDefaultOpcode()
+	if err != nil {
+		log.Infof("WARNING: FXP's default opcode entry cleanup failed. This could potentially impact secondary network reach from external world")
+        }
+	//Wait for 2 seconds to ensure cli_client command execution to delete the default opcode is successful.
+	time.Sleep(2 * time.Second)
 
 	//Add P4 rules to handle Primary network traffic via phy port0
 	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])

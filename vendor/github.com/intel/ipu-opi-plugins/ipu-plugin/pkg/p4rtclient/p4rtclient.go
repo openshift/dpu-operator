@@ -30,6 +30,7 @@ const (
         mirror_profile_id = 3
         bridgeId = 0
         phyPort = 0
+	imcAddress = "192.168.0.1:22"
 )
 
 type fxpRuleParams []string
@@ -935,13 +936,13 @@ func DeleteLAGP4Rules(p4rtClient types.P4RTClient) error {
 func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, d5Mac string) error {
         d4Vsi, _, err := getStrippedMacAndVsi(d4Mac)
         if err != nil {
-                log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d4Mac)
+                log.Info("AddRHPrimaryNetworkVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d4Mac)
                 return err
         }
 
         d5Vsi, d5MacAddr, err := getStrippedMacAndVsi(d5Mac)
         if err != nil {
-                log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d5Mac)
+                log.Info("AddRHPrimaryNetworkVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d5Mac)
                 return err
         }
 
