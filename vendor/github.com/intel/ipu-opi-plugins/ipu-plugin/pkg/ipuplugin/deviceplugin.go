@@ -35,6 +35,13 @@ var (
 	maxVfsSupported  = 64
 )
 
+/*
+hostVfDevs uses a map(where key is pci-address(for example-> 0000:cb:00.6))
+accDevs uses a map(where key is ACC netdev interface name(for example-> enp0s1f0d14))
+*/
+var hostVfDevs map[string]*pb.Device
+var accDevs map[string]*pb.Device
+
 func NewDevicePluginService(mode string) *DevicePluginService {
 	return &DevicePluginService{mode: mode}
 }
@@ -233,9 +240,45 @@ func (s *DevicePluginService) SetNumVfs(ctx context.Context, vfCountReq *pb.VfCo
 	return res, err
 }
 
+// GetPciFromNetDev takes in a network device name and returns its PCI address
+// Note: This function(GetPciFromNetDev) is based on similar api in dpu-operator/dpu-cni/pkgs/sriovutils
+func GetPciFromNetDev(ifName string) (string, error) {
+	netDevPath := filepath.Join(sysClassNet, ifName, "device")
+	pciAddr, err := filepath.EvalSymlinks(netDevPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to find PCI address for net device %s: %v", ifName, err)
+	}
+
+	return filepath.Base(pciAddr), nil
+}
+
+/*
+For the first call, we query the devices(on host or ACC) and cache it.
+For subsequent calls, we return cached list of devices. Caching helps in
+addressing the case, wherein, if host-VF is allocated for a pod, it is no
+longer available in host netnamespace, so doesnt show up under /sys/class/net,
+so we were returning 1 less device, but DPU's allocator still expects, the
+overall count of Host-VFs(even if one of them is in allocated state).
+DPU resource allocation, maintains its own list of total vs how-many VFs available.
+*/
 func discoverHostDevices(mode string) (map[string]*pb.Device, error) {
 
-	devices := make(map[string]*pb.Device)
+	if mode != types.IpuMode && mode != types.HostMode {
+		return make(map[string]*pb.Device), fmt.Errorf("Invalid mode->%v", mode)
+	}
+	if mode == types.IpuMode {
+		if accDevs == nil {
+			accDevs = make(map[string]*pb.Device)
+		} else if len(accDevs) > 0 {
+			return accDevs, nil
+		}
+	} else { //mode == types.HostMode
+		if hostVfDevs == nil {
+			hostVfDevs = make(map[string]*pb.Device)
+		} else if len(hostVfDevs) > 0 {
+			return hostVfDevs, nil
+		}
+	}
 
 	files, err := os.ReadDir(sysClassNet)
 	if err != nil {
@@ -254,14 +297,24 @@ func discoverHostDevices(mode string) (map[string]*pb.Device, error) {
 		if mode == types.IpuMode {
 			if device_code == deviceCode {
 				if !slices.Contains(exclude, file.Name()) {
-					devices[file.Name()] = &pb.Device{ID: file.Name(), Health: pluginapi.Healthy}
+					accDevs[file.Name()] = &pb.Device{ID: file.Name(), Health: pluginapi.Healthy}
 				}
 			}
 		} else if mode == types.HostMode {
 			if device_code == deviceCodeVf {
-				devices[file.Name()] = &pb.Device{ID: file.Name(), Health: pluginapi.Healthy}
+				pciAddr, err := GetPciFromNetDev(file.Name())
+				if err != nil {
+					log.Errorf("Error->%v finding pci addr from netinterface->%s", err, file.Name())
+					continue
+				}
+				hostVfDevs[pciAddr] = &pb.Device{ID: pciAddr, Health: pluginapi.Healthy}
 			}
 		}
 	}
-	return devices, nil
+
+	if mode == types.IpuMode {
+		return accDevs, nil
+	}
+
+	return hostVfDevs, nil
 }
