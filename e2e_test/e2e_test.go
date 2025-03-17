@@ -297,20 +297,21 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 	g.Context("When Dpu Operator components are deployed and configured", g.Ordered, func() {
 		var (
-			testPodName       = "test-pod-1"
-			testPod2Name      = "test-pod-2"
-			secondaryNetDev   = "net1"
-			pod1              *corev1.Pod
-			pod2              *corev1.Pod
-			nfPod             *corev1.Pod
-			pod1_ip           string
-			pod2_ip           string
-			workloadSubnet    string
-			nfIngressIp       string
-			nfEgressIp        string
-			externalClientIp  string
-			externalClientDev string
-			externalSubnet    string
+			testPodName                = "test-pod-1"
+			testPod2Name               = "test-pod-2"
+			secondaryNetDev            = "net1"
+			pod1                       *corev1.Pod
+			pod2                       *corev1.Pod
+			nfPod                      *corev1.Pod
+			pod1_ip                    string
+			pod2_ip                    string
+			workloadSubnet             string
+			nfIngressIp                string
+			nfEgressIp                 string
+			externalClientIp           string
+			externalClientDev          string
+			externalSubnet             string
+			skipNetworkFunctionTesting = false
 		)
 
 		sfc := &configv1.ServiceFunctionChain{
@@ -355,6 +356,13 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			// This should be the IP we want to have assigned to the ingress of the NF and reachable from the external client
 			nfIngressIp, err = getEnv("NF_INGRESS_IP")
 			Expect(err).NotTo(HaveOccurred())
+
+			// Currently Marvell does have support for layer 3 network function connectivity, and it is possible future DPU vendors / solutions
+			// may take a similar approach. By default we will run the full test-suite but the user can opt out of the network function connectivity
+			// tests if running on hardware where this does not make sense.
+			if skipNF, exists := os.LookupEnv("SKIP_NF_TESTING"); exists && skipNF != "" {
+				skipNetworkFunctionTesting = true
+			}
 
 			externalSubnet = testutils.GetSubnet(externalClientIp)
 			nfSubnet := testutils.GetSubnet(nfIngressIp)
@@ -422,6 +430,10 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				pingTest(hostClientSet, hostRestConfig, pod2, pod1_ip, pod2.Name, pod1.Name)
 			})
 			g.It("Should support pod -> Network-Function", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function Testing")
+				}
+
 				// We are assuming that net2 will always be ingress and net1 will always be egress, need to verify this assumption is reasonable
 				// In this context, egress refers to traffic between the network function and the host and ingress refers to traffic between an
 				// external client and the network function
@@ -444,6 +456,10 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				pingTest(dpuClientSet, dpuRestConfig, nfPod, pod2_ip, nfPod.Name, pod2.Name)
 			})
 			g.It("Should support Network-function -> external", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function Testing")
+				}
+
 				fmt.Printf("Assigning NF ingress port IP %s\n", nfIngressIp)
 				_, err := testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip addr add %s dev net2", nfIngressIp+"/24"))
 				Expect(err).NotTo(HaveOccurred())
@@ -456,6 +472,10 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				pingTest(dpuClientSet, dpuRestConfig, nfPod, externalClientIp, nfPod.Name, "external")
 			})
 			g.It("Should support pod -> external", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function Testing")
+				}
+
 				fmt.Printf("Setting route to %s in workload pods\n", externalSubnet)
 				_, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod1, fmt.Sprintf("ip route add %s dev net1", externalSubnet))
 				Expect(err).NotTo(HaveOccurred())
