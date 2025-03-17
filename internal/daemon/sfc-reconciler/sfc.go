@@ -62,7 +62,7 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 						AllowPrivilegeEscalation: &falseVar,
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
-							Add:  []corev1.Capability{"NET_RAW"},
+							Add:  []corev1.Capability{"NET_RAW", "NET_ADMIN"},
 						},
 					},
 				},
