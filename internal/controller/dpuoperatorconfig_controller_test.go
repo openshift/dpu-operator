@@ -42,7 +42,7 @@ var (
 	testDpuOperatorConfigKind  = "DpuOperatorConfig"
 	testDpuDaemonName          = "dpu-daemon"
 	testNetworkFunctionNADDpu  = "dpunfcni-conf"
-	testNetworkFunctionNADHost = "default-sriov-net"
+	testNetworkFunctionNADHost = vars.DefaultHostNADName
 	testClusterName            = "dpu-operator-test-cluster"
 	setupLog                   = ctrl.Log.WithName("setup")
 )

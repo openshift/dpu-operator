@@ -207,7 +207,16 @@ test: podman-check manifests generate fmt vet envtest ginkgo
 .PHONY: fast-test
 fast-test: envtest ginkgo
 	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./internal/... ./pkgs/... ./api/v1/... -coverprofile cover.out
-##@ Build
+
+# Set default values for environment variables for the external client in e2e-test-suite
+NF_INGRESS_IP ?= 10.20.30.2
+EXTERNAL_CLIENT_DEV ?= eno12409
+EXTERNAL_CLIENT_IP ?= 10.20.30.100
+
+export NF_INGRESS_IP
+export EXTERNAL_CLIENT_DEV
+export EXTERNAL_CLIENT_IP
+
 .PHONY: e2e-test-suite
 e2e-test-suite: envtest ginkgo
 	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) ./e2e_test/... -coverprofile cover.out

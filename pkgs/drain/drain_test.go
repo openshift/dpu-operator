@@ -75,7 +75,7 @@ func ensureTestPodDeleted(c client.Client) {
 func testPodIsRunning() bool {
 	pod := testutils.GetPod(k8sClient, podName, podNamespace)
 	if pod != nil {
-		return pod.Status.Phase != corev1.PodRunning
+		return pod.Status.Phase == corev1.PodRunning
 	}
 	return false
 }
@@ -157,9 +157,7 @@ var _ = Describe("Drain Interface", Ordered, func() {
 		var err error
 
 		BeforeAll(func() {
-			Eventually(func() bool {
-				return testPodIsRunning()
-			}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
+			Eventually(testPodIsRunning, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
 
 			ctrl.Log.Info("Draining node", "nodeName", node.Name)
 			testDrainer, err = NewDrainer(restConfig)

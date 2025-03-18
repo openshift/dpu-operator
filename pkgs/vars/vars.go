@@ -4,4 +4,6 @@ var (
 	Namespace = "openshift-dpu-operator"
 
 	DpuOperatorConfigName = "dpu-operator-config"
+
+	DefaultHostNADName = "default-sriov-net"
 )
