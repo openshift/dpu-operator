@@ -7,3 +7,7 @@ var (
 
 	DefaultHostNADName = "default-sriov-net"
 )
+
+const (
+	MetricsServiceName = "dpu-operator-controller-manager-metrics-service"
+)

@@ -72,6 +72,8 @@ spec:
       - command:
         - /manager
         args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:10443
         - --leader-elect
         env:
         - name: DPU_DAEMON_IMAGE
@@ -100,6 +102,10 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
+        ports:
+        - containerPort: 10443
+          name: metrics-server
+          protocol: TCP
         # TODO(user): Configure the resources accordingly based on the project requirements.
         # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         resources:

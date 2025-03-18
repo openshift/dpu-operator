@@ -11,7 +11,3 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-dpu-daemon:4.19
-  - name: kube-rbac-proxy
-    from:
-      kind: DockerImage
-      name: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
