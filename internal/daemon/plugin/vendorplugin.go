@@ -74,6 +74,9 @@ type VendorPlugin interface {
 	DeleteNetworkFunction(input string, output string) error
 	GetDevices() (*pb.DeviceListResponse, error)
 	SetNumVfs(vfCount int32) (*pb.VfCount, error)
+	ConnectWithIpPort(ip string, port int32) error
+	RebootDpu(nodeName, pciAddress string) (*pb.ManualOperationResponse, error)
+	UpgradeSdk(nodeName, pciAddress string) (*pb.ManualOperationResponse, error)
 }
 
 type GrpcPlugin struct {
@@ -87,6 +90,7 @@ type GrpcPlugin struct {
 	vsp         VspTemplateVars
 	conn        *grpc.ClientConn
 	pathManager utils.PathManager
+	moclient    pb.ManualOperationServiceClient
 }
 
 func NewVspTemplateVars() VspTemplateVars {
@@ -217,6 +221,35 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.nfclient = pb.NewNetworkFunctionServiceClient(conn)
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	g.dsClient = pb.NewDeviceServiceClient(conn)
+	g.moclient = pb.NewManualOperationServiceClient(conn)
+	return nil
+}
+
+func (g *GrpcPlugin) ConnectWithIpPort(ip string, port int32) error {
+	address := fmt.Sprintf("%s:%d", ip, port)
+	if g.client != nil {
+		return nil
+	}
+	dialOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return net.Dial("unix", addr)
+		}),
+	}
+
+	conn, err := grpc.DialContext(context.Background(), address, dialOptions...)
+
+	if err != nil {
+		g.log.Error(err, "Failed to connect to vendor plugin")
+		return err
+	}
+	g.conn = conn
+
+	g.client = pb.NewLifeCycleServiceClient(conn)
+	g.nfclient = pb.NewNetworkFunctionServiceClient(conn)
+	g.opiClient = opi.NewBridgePortServiceClient(conn)
+	g.dsClient = pb.NewDeviceServiceClient(conn)
+	g.moclient = pb.NewManualOperationServiceClient(conn)
 	return nil
 }
 
@@ -276,4 +309,28 @@ func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {
 		VfCnt: count,
 	}
 	return g.dsClient.SetNumVfs(context.Background(), c)
+}
+
+func (g *GrpcPlugin) RebootDpu(nodeName, pciAddress string) (*pb.ManualOperationResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("SetNumvfs failed to ensure GRPC connection: %v", err)
+	}
+	pciInfo := &pb.ManualOperationRequest{
+		NodeName: nodeName,
+		PciAddress: pciAddress,
+	}
+	return g.moclient.ManualRebootDpuFunction(context.Background(), pciInfo)
+}
+
+func (g *GrpcPlugin) UpgradeSdk(nodeName, pciAddress string) (*pb.ManualOperationResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("SetNumvfs failed to ensure GRPC connection: %v", err)
+	}
+	pciInfo := &pb.ManualOperationRequest{
+		NodeName: nodeName,
+		PciAddress: pciAddress,
+	}
+	return g.moclient.ManualUpgradeSdkFunction(context.Background(), pciInfo)
 }
