@@ -90,9 +90,6 @@ func (pi *IntelDetector) IsDpuPlatform(platform Platform) (*configv1.DataProcess
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
 	p4Image := os.Getenv(VspP4ImageIntelEnv)
-	if p4Image == "" {
-		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4")
-	}
 	args := fmt.Sprintf(`[ "-v=debug", "--p4rtName=%s.%s.svc.cluster.local", "--p4Image=%s" ]`,
 		VspP4ServiceName, vars.Namespace, p4Image)
 	template_vars := plugin.NewVspTemplateVars()
