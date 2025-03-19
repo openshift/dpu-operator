@@ -39,7 +39,7 @@ const (
 	NoOfPortPairs  int    = 2
 	IPv6AddrDpu    string = "fe80::1"
 	IPv6AddrHost   string = "fe80::2"
-	DataPlaneType  string = "debug"
+	DataPlaneType  string = "ovs"
 	NumPFs         int    = 1
 	PFID           int    = 0
 	isDPDK         bool   = false
@@ -273,10 +273,11 @@ func (vsp *mrvlVspServer) getVFDetails(BridgePortName string) (string, string, e
 	if err != nil {
 		return "", "", err
 	}
-	vfId, err := strconv.Atoi(matches[1])
+	vfId, err := strconv.Atoi(matches[2])
 	if err != nil {
 		return "", "", err
 	}
+	vfId = vfId + 1 // VF Id 0 is for PF
 	klog.Infof("Mapped VF for PFID: %d, VFID: %d, NumPFs: %d", pfid, vfId, NumPFs)
 	vfPciAddress, err := mrvlutils.Mapped_VF(NumPFs, PFID, vfId) // TODO: Get PF Count=1 and PF ID=0
 	if err != nil {
@@ -303,7 +304,7 @@ func (vsp *mrvlVspServer) getVFDetails(BridgePortName string) (string, string, e
 // CreateBridgePort function to create a bridge port with the given context and CreateBridgePortRequest
 // It will return the BridgePort and error
 func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
-	klog.Infof("Received CreateBridgePort() request: BridgePortId: %v, BridgePortId: %v", in.BridgePortId, in.BridgePortId)
+	klog.Infof("Received CreateBridgePort() request: BridgePortId: %v, BridgePort: %v", in.BridgePortId, in.BridgePort)
 	portName := in.BridgePort.Name
 	vfName, vfPCIAddress, err := vsp.getVFDetails(portName)
 	if err != nil {
