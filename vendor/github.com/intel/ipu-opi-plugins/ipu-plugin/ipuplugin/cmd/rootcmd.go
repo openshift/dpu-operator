@@ -17,7 +17,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path"
@@ -57,7 +56,6 @@ const (
 	defaultDaemonHostIp = "192.168.1.1"
 	defaultDaemonIpuIp  = "192.168.1.2"
 	defaultDaemonPort   = 50151
-	p4rtPort            = "9559"
 )
 
 var (
@@ -152,15 +150,8 @@ var (
 			}).Info("Configurations")
 
 			brCtlr, brType := getBridgeController(bridgeName, bridgeType, ovsCliDir, ovsDbPath)
-			// In case of failure, revert to using localhost:9559 which works for P4 in container
-			// but not for P4 in pod. In case of P4 in pod in failure case, we will error out in the
-			// waitForInfraP4d()
-			p4rtIpPort, err := convertNameToIpAndPort(p4rtName)
-			if err != nil {
-				log.Warnf("Error %v while converting %s to IP. Using %s instead", err, p4rtName, p4rtIpPort)
-			}
 
-			p4Client := getP4Client(p4pkg, p4rtbin, p4rtIpPort, portMuxVsi, defaultP4BridgeName, brType)
+			p4Client := getP4Client(p4pkg, p4rtbin, p4rtName, portMuxVsi, defaultP4BridgeName, brType)
 
 			mgr := ipuplugin.NewIpuPlugin(port, brCtlr, p4Client, p4Image, servingAddr, servingProto, bridgeName, intf, ovsCliDir, mode, daemonHostIp, daemonIpuIp, daemonPort)
 			if err := mgr.Run(); err != nil {
@@ -375,26 +366,12 @@ func getPluginMode() string {
 	}
 }
 
-func convertNameToIpAndPort(p4rtName string) (string, error) {
-
-	p4rtIp := "127.0.0.1"
-	ip, err := net.LookupIP(p4rtName)
-	if err != nil {
-		log.Errorf("Couldn't resolve Name %s to IP: err->%s", p4rtName, err)
-	} else {
-		p4rtIp = ip[0].String()
-	}
-
-	log.Infof("Setting p4runtime Ip to %s", p4rtIp)
-	return p4rtIp + ":" + p4rtPort, err
-}
-
-func getP4Client(p4pkg string, p4rtbin string, p4rtIpPort string, portMuxVsi int, p4BridgeName string, brType types.BridgeType) types.P4RTClient {
+func getP4Client(p4pkg string, p4rtbin string, p4rtServiceName string, portMuxVsi int, p4BridgeName string, brType types.BridgeType) types.P4RTClient {
 	switch p4pkg {
 	case "linux":
-		return p4rtclient.NewP4RtClient(p4rtbin, p4rtIpPort, portMuxVsi, p4BridgeName, brType)
+		return p4rtclient.NewP4RtClient(p4rtbin, p4rtServiceName, portMuxVsi, p4BridgeName, brType)
 	case "redhat":
-		return p4rtclient.NewRHP4Client(p4rtbin, p4rtIpPort, portMuxVsi, p4BridgeName, brType)
+		return p4rtclient.NewRHP4Client(p4rtbin, p4rtServiceName, portMuxVsi, p4BridgeName, brType)
 	default:
 		return nil
 	}
