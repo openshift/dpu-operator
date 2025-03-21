@@ -92,6 +92,32 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - dataprocessingunits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dataprocessingunits/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dataprocessingunits/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
   - dpuoperatorconfigs
   verbs:
   - create

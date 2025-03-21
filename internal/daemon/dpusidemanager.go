@@ -61,7 +61,7 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func
 	d := &DpuSideManager{
 		vsp:         vsp,
 		pathManager: *utils.NewPathManager("/"),
-		log:         ctrl.Log.WithName("DpuDaemon"),
+		log:         ctrl.Log.WithName("DpuSideManager"),
 		macStore:    make(map[string][]string),
 		config:      config,
 	}
@@ -121,6 +121,7 @@ func (d *DpuSideManager) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.R
 func (d *DpuSideManager) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
 	d.log.Info("Starting DpuDaemon")
+	d.server = grpc.NewServer()
 	d.setupReconcilers()
 
 	addr, port, err := d.vsp.Start()
@@ -128,7 +129,6 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 		return nil, fmt.Errorf("Failed to get addr:port from VendorPlugin: %v", err)
 	}
 
-	d.server = grpc.NewServer()
 	pb.RegisterBridgePortServiceServer(d.server, d)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
@@ -155,19 +155,17 @@ func (d *DpuSideManager) ListenAndServe() error {
 	if err != nil {
 		return fmt.Errorf("ListenAndServe failed with error: %v", err)
 	}
-
 	return d.Serve(listener)
 }
 
 func (d *DpuSideManager) Serve(listener net.Listener) error {
+	d.log.Info("Serve")
 	var wg sync.WaitGroup
 	done := make(chan error, 4)
 
 	wg.Add(1)
 	go func() {
 		d.log.Info("Starting OPI server")
-		d.server = grpc.NewServer()
-		pb.RegisterBridgePortServiceServer(d.server, d)
 		if err := d.server.Serve(listener); err != nil {
 			done <- fmt.Errorf("Error from OPI server: %v", err)
 		} else {
@@ -238,7 +236,7 @@ func (d *DpuSideManager) Stop() {
 }
 
 func (d *DpuSideManager) setupReconcilers() {
-	d.log.Info("DpuSideManager.setupReconcilers()")
+	d.log.Info("DpuSideManager.setupReconcilers() starting")
 	if d.manager == nil {
 		t := time.Duration(0)
 
@@ -272,4 +270,5 @@ func (d *DpuSideManager) setupReconcilers() {
 		}
 		d.manager = mgr
 	}
+	d.log.Info("DpuSideManager.setupReconcilers() Done")
 }

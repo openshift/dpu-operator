@@ -339,6 +339,8 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = hostSideClient.Create(context.TODO(), pod2)
 			Expect(err).NotTo(HaveOccurred())
+			pod := testutils.NewTestPod(testPodName, nodeList[0].Name)
+			pod2 := testutils.NewTestPod(testPod2Name, nodeList[0].Name)
 
 			// We do not know anything about the topology where these tests run. Therefore in order to test external connectivity we
 			// should allow to user to provide this information via environment variables. This script will configure the routes / networks
