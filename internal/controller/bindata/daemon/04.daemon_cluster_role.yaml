@@ -30,3 +30,14 @@ rules:
   - dpuoperatorconfigs/finalizers
   verbs:
   - update
+- apiGroups:
+    - config.openshift.io
+  resources:
+    - dataprocessingunits
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+    - update
+    - patch
