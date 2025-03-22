@@ -162,41 +162,41 @@ func InitHandlers() {
 }
 
 func removeFXPDefaultOpcode() error {
-        config := &ssh.ClientConfig{
-                User: "root",
-                Auth: []ssh.AuthMethod{
-                        ssh.Password(""),
-                },
-                HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-        }
-        // Connect to the remote server.
-        client, err := ssh.Dial("tcp", imcAddress, config)
-        if err != nil {
-                log.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-                return fmt.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-        }
-        defer client.Close()
+	config := &ssh.ClientConfig{
+		User: "root",
+		Auth: []ssh.AuthMethod{
+			ssh.Password(""),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	// Connect to the remote server.
+	client, err := ssh.Dial("tcp", imcAddress, config)
+	if err != nil {
+		log.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
+		return fmt.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
+	}
+	defer client.Close()
 
-        // Create an SFTP client.
-        sftpClient, err := sftp.NewClient(client)
-        if err != nil {
-                log.Info("AddRHPrimaryNetworkVportP4Rules: Warning!. Unable to create sftpClient")
-        }
-        defer sftpClient.Close()
+	// Create an SFTP client.
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		log.Info("AddRHPrimaryNetworkVportP4Rules: Warning!. Unable to create sftpClient")
+	}
+	defer sftpClient.Close()
 
-        opcodeStr := "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00"
-        remoteFilePath := "/tmp/del_opcode.txt"
+	opcodeStr := "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00"
+	remoteFilePath := "/tmp/del_opcode.txt"
 
-        err = utils.CopyFile(opcodeStr, remoteFilePath, sftpClient)
-        if err != nil {
-                log.Info("CopyFile: Warning!. Copy opcode file to IMC failed. Unable to delete default FXP opcode")
-        }
+	err = utils.CopyFile(opcodeStr, remoteFilePath, sftpClient)
+	if err != nil {
+		log.Info("CopyFile: Warning!. Copy opcode file to IMC failed. Unable to delete default FXP opcode")
+	}
 
-        remoteCliCmd := "set -o pipefail && cli_client -x -f /tmp/del_opcode.txt"
-        _, err = utils.RunCliCmdOnImc(remoteCliCmd, "")
-        if err != nil {
-                log.Info("RunCliCmdOnImc: Warning!. Unable to delete default FXP opcode")
-        }
+	remoteCliCmd := "set -o pipefail && cli_client -x -f /tmp/del_opcode.txt"
+	_, err = utils.RunCliCmdOnImc(remoteCliCmd, "")
+	if err != nil {
+		log.Info("RunCliCmdOnImc: Warning!. Unable to delete default FXP opcode")
+	}
 
 	return nil
 }
@@ -1047,7 +1047,7 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 	err := removeFXPDefaultOpcode()
 	if err != nil {
 		log.Infof("WARNING: FXP's default opcode entry cleanup failed. This could potentially impact secondary network reach from external world")
-        }
+	}
 	//Wait for 2 seconds to ensure cli_client command execution to delete the default opcode is successful.
 	time.Sleep(2 * time.Second)
 
