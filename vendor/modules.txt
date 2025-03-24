@@ -356,7 +356,7 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250314004734-6ecf80f8d0e1
+# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250320155026-9dbc4661ab1f
 ## explicit; go 1.23.6
 github.com/intel/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd
 github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod
@@ -937,8 +937,8 @@ go.uber.org/zap/zapcore
 # go4.org v0.0.0-20200104003542-c7e774b10ea0
 ## explicit
 go4.org/errorutil
-# golang.org/x/crypto v0.33.0
-## explicit; go 1.20
+# golang.org/x/crypto v0.35.0
+## explicit; go 1.23.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -956,8 +956,8 @@ golang.org/x/exp/slices
 golang.org/x/exp/slog
 golang.org/x/exp/slog/internal
 golang.org/x/exp/slog/internal/buffer
-# golang.org/x/net v0.35.0
-## explicit; go 1.18
+# golang.org/x/net v0.36.0
+## explicit; go 1.23.0
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
