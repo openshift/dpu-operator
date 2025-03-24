@@ -15,6 +15,8 @@
 package types
 
 import (
+	"time"
+
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 )
 
@@ -73,4 +75,14 @@ type P4RTClient interface {
 	ProgramFXPP4Rules(ruleSets []FxpRuleBuilder) error
 	GetBin() string
 	GetIpPort() string
+	ResolveServiceIp() error
+}
+
+type InfrapodMgr interface {
+	StartMgr() error
+	CreateCrs() error
+	CreatePvCrs() error
+	DeleteCrs() error
+	WaitForPodDelete(timeout time.Duration) error
+	WaitForPodReady(timeout time.Duration) error
 }

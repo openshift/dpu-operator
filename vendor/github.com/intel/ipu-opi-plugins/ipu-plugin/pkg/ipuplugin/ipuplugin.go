@@ -59,6 +59,7 @@ type server struct {
 	daemonHostIp    string
 	daemonIpuIp     string
 	daemonPort      int
+	infrapodMgr     types.InfrapodMgr
 }
 
 func NewIpuPlugin(port int, brCtlr types.BridgeController,
@@ -80,12 +81,16 @@ func NewIpuPlugin(port int, brCtlr types.BridgeController,
 		daemonHostIp:    daemonHostIp,
 		daemonIpuIp:     daemonIpuIp,
 		daemonPort:      daemonPort,
+		infrapodMgr:     nil, // Created in Run()
 	}
 }
 
 func waitForInfraP4d(p4rtClient types.P4RTClient) (string, error) {
 	ctx := context.Background()
-	maxRetries := 10
+	// Higher retries because ipu-plugin itself starts infrapod
+	// and if it doesn't wait the minimum, then there is a chance that it
+	// will keep restarting and hence restarting infrapod too
+	maxRetries := 50
 	retryInterval := 2 * time.Second
 
 	var err error
@@ -94,6 +99,13 @@ func waitForInfraP4d(p4rtClient types.P4RTClient) (string, error) {
 
 	for count = 0; count < maxRetries; count++ {
 		time.Sleep(retryInterval)
+		// Infrapod was created successfully. Since the service must have been
+		// restarted, the IP would be new. Resolve again and reassign
+		err = p4rtClient.ResolveServiceIp()
+		if err != nil {
+			log.Warnf("Error %v while trying to resolve IP", err)
+			continue
+		}
 		conn, err = grpc.Dial(p4rtClient.GetIpPort(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		log.Infof("Connecting to server %s retry count:%d", p4rtClient.GetIpPort(), count)
 		if err != nil {
@@ -142,8 +154,37 @@ func (s *server) Run() error {
 		log.Info("Starting infrapod")
 		if s.p4Image != "" {
 			log.Infof("Using P4 image as : %s\n", s.p4Image)
-			if err := infrapod.CreateInfrapod(s.p4Image, dpuNamespace); err != nil {
-				log.Error(err, "unable to create Infrapod : %v", err)
+			s.infrapodMgr, err = infrapod.NewInfrapodMgr(s.p4Image, dpuNamespace)
+			if err != nil {
+				log.Error(err, "unable to create InfrapodMgr : %v", err)
+				return err
+			}
+			go func() {
+				if err = s.infrapodMgr.StartMgr(); err != nil {
+					log.Error(err, "unable to Start mgr : %v", err)
+					time.Sleep(2 * time.Second)
+					// Sending Sigterm to the main thread to start cleanup
+					syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+				}
+			}()
+			if err = s.infrapodMgr.DeleteCrs(); err != nil {
+				log.Error(err, "unable to Delete Crs : %v", err)
+				return err
+			}
+			if err = s.infrapodMgr.WaitForPodDelete(60 * time.Second); err != nil {
+				log.Error(err, "unable to Wait for pod deletion : %v", err)
+				return err
+			}
+			if err = s.infrapodMgr.CreatePvCrs(); err != nil {
+				log.Error(err, "unable to Create PV Crs : %v", err)
+				return err
+			}
+			if err = s.infrapodMgr.CreateCrs(); err != nil {
+				log.Error(err, "unable to Create Crs : %v", err)
+				return err
+			}
+			if err = s.infrapodMgr.WaitForPodReady(60 * time.Second); err != nil {
+				log.Error(err, "unable to Wait for pod creation : %v", err)
 				return err
 			}
 		} else {
@@ -156,6 +197,7 @@ func (s *server) Run() error {
 		}
 		// Create bridge if it doesn't exist
 		if err := s.bridgeCtlr.EnsureBridgeExists(); err != nil {
+			log.Infof("error while checking host bridge existence: %v", err)
 			log.Fatalf("error while checking host bridge existence: %v", err)
 			return fmt.Errorf("host bridge error")
 		}
@@ -182,33 +224,43 @@ func (s *server) Run() error {
 	return nil
 }
 
+func cleanUpRulesOnExit(p4rtClient types.P4RTClient) error {
+	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", p4rtClient.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.DeletePhyPortRules(p4rtClient, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+
+	vfMacList, err := utils.GetVfMacList()
+	if err != nil {
+		log.Errorf("Stop: Error->%v", err)
+		return fmt.Errorf("Stop: Error->%v", err)
+	}
+	if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
+		log.Errorf("No VFs initialized on the host")
+	} else {
+		log.Infof("DeletePeerToPeerP4Rules, path->%s, vfMacList->%v", p4rtClient.GetBin(), vfMacList)
+		p4rtclient.DeletePeerToPeerP4Rules(p4rtClient, vfMacList)
+	}
+
+	log.Infof("DeleteLAGP4Rules, path->%s", p4rtClient.GetBin())
+	p4rtclient.DeleteLAGP4Rules(p4rtClient)
+
+	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", p4rtClient, AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(p4rtClient, AccApfMacList[PHY_PORT1_INTF_INDEX])
+	return nil
+}
+
 func (s *server) Stop() {
 	s.log.Info("Stopping IPU plugin")
 	if s.mode == types.IpuMode {
 		//Note: Deletes bridge created in EnsureBridgeExists in  Run api.
 		s.bridgeCtlr.DeleteBridges()
+		// Delete P4 rules on exit
+		cleanUpRulesOnExit(s.p4rtClient)
+		if err := s.infrapodMgr.DeleteCrs(); err != nil {
+			log.Error(err, "unable to Delete Crs : %v", err)
+			// Do not return since we continue on error
+		}
 	}
-
-	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", s.p4rtClient.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
-	p4rtclient.DeletePhyPortRules(s.p4rtClient, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
-
-	vfMacList, err := utils.GetVfMacList()
-	if err != nil {
-		log.Errorf("Stop: Error->%v", err)
-	}
-	if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
-		log.Errorf("No VFs initialized on the host")
-	} else {
-		log.Infof("DeletePeerToPeerP4Rules, path->%s, vfMacList->%v", s.p4rtClient.GetBin(), vfMacList)
-		p4rtclient.DeletePeerToPeerP4Rules(s.p4rtClient, vfMacList)
-	}
-
-	log.Infof("DeleteLAGP4Rules, path->%s", s.p4rtClient.GetBin())
-	p4rtclient.DeleteLAGP4Rules(s.p4rtClient)
-
-	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", s.p4rtClient, AccApfMacList[PHY_PORT1_INTF_INDEX])
-	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(s.p4rtClient, AccApfMacList[PHY_PORT1_INTF_INDEX])
-
+	// Stopping the gRPC server for the DPU daemon
 	s.grpcSrvr.GracefulStop()
 	if s.listener != nil {
 		s.listener.Close()
