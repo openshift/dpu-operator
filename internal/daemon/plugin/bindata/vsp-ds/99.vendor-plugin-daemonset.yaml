@@ -15,7 +15,6 @@ spec:
       nodeSelector:
         dpu: "true"
       hostNetwork: true
-      hostPID: true
       serviceAccountName: vsp-sa
       terminationGracePeriodSeconds: 180
       containers:
