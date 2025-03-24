@@ -38,7 +38,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-03-21T16:47:24Z"
+    createdAt: "2025-03-18T09:22:51Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -84,32 +84,6 @@ spec:
           resources:
           - '*'
           verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims
-          verbs:
-          - '*'
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumes
-          verbs:
-          - '*'
           - create
           - delete
           - get
@@ -279,10 +253,8 @@ spec:
           - create
           - delete
           - get
-          - list
           - patch
           - update
-          - watch
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:

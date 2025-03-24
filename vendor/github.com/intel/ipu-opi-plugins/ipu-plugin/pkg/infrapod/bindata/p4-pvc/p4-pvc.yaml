@@ -1,11 +1,10 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vsp-p4-pvc
-  namespace: {{.Namespace}}
+  name: p4-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   provisioner: kubernetes.io/no-provisioner
   resources:
     requests:
