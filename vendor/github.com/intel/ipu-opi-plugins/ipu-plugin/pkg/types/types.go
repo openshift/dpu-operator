@@ -75,7 +75,7 @@ type P4RTClient interface {
 	ProgramFXPP4Rules(ruleSets []FxpRuleBuilder) error
 	GetBin() string
 	GetIpPort() string
-	ResolveServiceIp() error
+	ResolveServiceIp(inCluster bool) error
 }
 
 type InfrapodMgr interface {

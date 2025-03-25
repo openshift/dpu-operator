@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
@@ -112,9 +113,16 @@ func GetMacIntValueFromBytes(macAddr []byte) uint64 {
 
 var p4rtCtlCommand = exec.Command
 
+var P4rtMutex sync.Mutex
+
 func RunP4rtCtlCommand(p4rtBin string, p4rtIpPort string, params ...string) (string, string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
+	//serialize access to p4rtCtlCommand, when they are concurrent callers to RunP4rtCtlCommand
+	//Note::p4rtctl python client, uses fixed value(1 for election-id). So when they are concurrent
+	//clients invoking it, p4 runtime server(infrap4d) throws error.
+	P4rtMutex.Lock()
+	defer P4rtMutex.Unlock()
 	cmd := p4rtCtlCommand(p4rtBin, append([]string{"-g", p4rtIpPort}, params...)...)
 
 	// Set required env var for python implemented protobuf

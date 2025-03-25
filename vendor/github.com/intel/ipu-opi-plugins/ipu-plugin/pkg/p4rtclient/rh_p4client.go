@@ -58,7 +58,7 @@ func (p *rhP4Client) ProgramFXPP4Rules(ruleSets []types.FxpRuleBuilder) error {
 	return nil
 }
 
-func (p *rhP4Client) ResolveServiceIp() error {
+func (p *rhP4Client) ResolveServiceIp(inCluster bool) error {
 	return nil
 }
 

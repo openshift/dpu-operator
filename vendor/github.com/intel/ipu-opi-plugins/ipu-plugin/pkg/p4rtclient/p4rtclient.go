@@ -56,7 +56,7 @@ func NewP4RtClient(p4rtBin string, p4rtServiceName string, portMuxVsi int, p4Bri
 		p4br:            p4BridgeName,
 		bridgeType:      brType,
 	}
-	p4rtClient.ResolveServiceIp()
+	p4rtClient.ResolveServiceIp(false)
 	return &p4rtClient
 }
 
@@ -92,7 +92,7 @@ func (p *p4rtclient) ProgramFXPP4Rules(ruleSets []types.FxpRuleBuilder) error {
 				// Sleep for a second and attempt only once to reprogram.
 				time.Sleep(1)
 				utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, p4rule...)
-			}else {
+			} else {
 				log.Info("WARNING!: p4rule add or a delete operation failed for an unhandled error scenario")
 			}
 
@@ -480,17 +480,21 @@ func deleteVsiToVsiP4Rules(p4rtClient types.P4RTClient, mac1, mac2 string) error
 // In case of failure, revert to using 127.0.0.1:9559 which works for P4 in container
 // but not for P4 in pod. In case of P4 in pod in failure case, we will error out in the
 // waitForInfraP4d()
-func (p *p4rtclient) ResolveServiceIp() error {
+func (p *p4rtclient) ResolveServiceIp(inCluster bool) error {
+	var err error
 	p4rtIp := defaultP4rtIp
-	ip, err := net.LookupIP(p.p4rtServiceName)
-	if err != nil {
-		log.Errorf("Couldn't resolve Name %s to IP: err->%s", p.p4rtServiceName, err)
-	} else {
-		p4rtIp = ip[0].String()
+	if inCluster {
+		ip, err := net.LookupIP(p.p4rtServiceName)
+		if err != nil {
+			log.Errorf("Couldn't resolve Name %s to IP: err->%s", p.p4rtServiceName, err)
+		} else {
+			p4rtIp = ip[0].String()
+		}
 	}
-
-	log.Infof("Setting p4runtime Ip to %s", p4rtIp)
-	p.p4rtIpPort = p4rtIp + ":" + p4rtPort
+	if err == nil {
+		log.Infof("Setting p4runtime Ip to %s", p4rtIp)
+		p.p4rtIpPort = p4rtIp + ":" + p4rtPort
+	}
 	return err
 }
 

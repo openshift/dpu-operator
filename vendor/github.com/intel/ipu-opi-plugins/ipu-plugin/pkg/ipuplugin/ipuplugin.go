@@ -85,7 +85,7 @@ func NewIpuPlugin(port int, brCtlr types.BridgeController,
 	}
 }
 
-func waitForInfraP4d(p4rtClient types.P4RTClient) (string, error) {
+func waitForInfraP4d(p4rtClient types.P4RTClient, inCluster bool) (string, error) {
 	ctx := context.Background()
 	// Higher retries because ipu-plugin itself starts infrapod
 	// and if it doesn't wait the minimum, then there is a chance that it
@@ -97,11 +97,12 @@ func waitForInfraP4d(p4rtClient types.P4RTClient) (string, error) {
 	var count int
 	var conn *grpc.ClientConn
 
+	log.Infof("waitForInfraP4d: inCluster: %v", inCluster)
 	for count = 0; count < maxRetries; count++ {
 		time.Sleep(retryInterval)
 		// Infrapod was created successfully. Since the service must have been
 		// restarted, the IP would be new. Resolve again and reassign
-		err = p4rtClient.ResolveServiceIp()
+		err = p4rtClient.ResolveServiceIp(inCluster)
 		if err != nil {
 			log.Warnf("Error %v while trying to resolve IP", err)
 			continue
@@ -144,6 +145,7 @@ func (s *server) Run() error {
 	var err error
 	signalChannel := make(chan os.Signal, 2)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
+	inCluster := true
 
 	listen, err := s.getListener()
 	if err != nil {
@@ -188,10 +190,11 @@ func (s *server) Run() error {
 				return err
 			}
 		} else {
+			inCluster = false
 			log.Infof("Waiting for P4 pod to be started manually\n")
 		}
 		// Wait for the infrap4d connection to come up
-		if _, err := waitForInfraP4d(s.p4rtClient); err != nil {
+		if _, err := waitForInfraP4d(s.p4rtClient, inCluster); err != nil {
 			log.Error(err, "unable to connect to infrap4d, %v; Exiting", err)
 			return err
 		}
