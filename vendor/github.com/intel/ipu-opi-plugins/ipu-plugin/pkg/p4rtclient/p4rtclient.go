@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
 	"strings"
 	"strconv"
 
@@ -69,22 +68,20 @@ func checkMacAddresses(macAddresses ...string) ([]byte, error) {
 func (p *p4rtclient) ProgramFXPP4Rules(ruleSets []types.FxpRuleBuilder) error {
 	for _, r := range ruleSets {
 		p4rule := []string{r.Action, r.P4br, r.Control, r.Metadata}
-		stdout, err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, p4rule...)
+		err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, p4rule...)
 		if err != nil {
-                       if strings.Contains(stdout, "ALREADY_EXISTS") {
-			       log.Info("p4rule already exists. Delete and reprogram: ", p4rule)
-			       metaPrefix := strings.Index(r.Metadata, ",action")
-			       p4DelR := types.FxpRuleBuilder{Action:"del-entry", P4br:r.P4br, Control:r.Control, Metadata:r.Metadata[:metaPrefix]}
-			       p4DelRuleStr := []string{p4DelR.Action,p4DelR.P4br, p4DelR.Control, p4DelR.Metadata}
-			       // Delete the existing rule first
-			       utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, p4DelRuleStr...)
-			       time.Sleep(1)
-			       // Now program the new rule
-			       utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, p4rule...)
-		       }
-                }
+			log.Info("WARNING: Failed to program p4rule: ", p4rule)
+		}
 	}
 	return nil
+}
+
+// TODO: Move this under utils pkg
+func getVsiVportInfo(macAddr string) (int, int) {
+	macAddrByte, _ := utils.GetMacAsByteArray(macAddr)
+	vfVsi := int(macAddrByte[1])
+	vfVport := utils.GetVportForVsi(vfVsi)
+	return vfVsi, vfVport
 }
 
 func getStrippedMacAndVsi(macAddr string)  (int, string, error) {
@@ -256,14 +253,8 @@ func deletePhyVportBridgeId(p4rtClient types.P4RTClient, phyPort, bridgeId int) 
 }
 
 func programNfPrVportP4Rules(p4rtClient types.P4RTClient, ingressMac, egressMac string) error {
-	ingressVsi, ingressVport, err := utils.GetVsiVportInfo(ingressMac)
-	if err != nil {
-                  return fmt.Errorf("programNfPrVportP4Rules failed. Unable to find Vsi and Vport for NF ingress mac: %v", ingressMac)
-	}
-	egressVsi, egressVport, err := utils.GetVsiVportInfo(egressMac)
-        if err != nil {
-                  return fmt.Errorf("programNfPrVportP4Rules failed. Unable to find Vsi and Vport for NF egress mac: %v", egressMac)
-        }
+	ingressVsi, ingressVport := getVsiVportInfo(ingressMac)
+	egressVsi, egressVport := getVsiVportInfo(egressMac)
 
 	nfPrVportP4RuleSets := []types.FxpRuleBuilder{
 		{
@@ -326,14 +317,8 @@ func programNfPrVportP4Rules(p4rtClient types.P4RTClient, ingressMac, egressMac 
 }
 
 func deleteNfPrVportP4Rules(p4rtClient types.P4RTClient, ingressMac, egressMac string) error {
-	ingressVsi, ingressVport, err := utils.GetVsiVportInfo(ingressMac)
-        if err != nil {
-                  return fmt.Errorf("deleteNfPrVportP4Rules failed. Unable to find Vsi and Vport for NF ingress mac: %v", ingressMac)
-        }
-	egressVsi, _, err := utils.GetVsiVportInfo(egressMac)
-        if err != nil {
-                  return fmt.Errorf("deleteNfPrVportP4Rules failed. Unable to find Vsi and Vport for NF ingress mac: %v", egressMac)
-        }
+	ingressVsi, ingressVport := getVsiVportInfo(ingressMac)
+	egressVsi, _ := getVsiVportInfo(egressMac)
 
 	nfPrVportP4RuleSets := []types.FxpRuleBuilder{
 		{
@@ -396,15 +381,8 @@ func deleteNfPrVportP4Rules(p4rtClient types.P4RTClient, ingressMac, egressMac s
 }
 
 func programVsiToVsiP4Rules(p4rtClient types.P4RTClient, mac1, mac2 string) error {
-	mac1Vsi, mac1Vport, err := utils.GetVsiVportInfo(mac1)
-        if err != nil {
-                  return fmt.Errorf("programVsiToVsiP4Rules failed. Unable to find Vsi and Vport for mac: %v", mac1)
-        }
-
-	mac2Vsi, mac2Vport, err := utils.GetVsiVportInfo(mac2)
-        if err != nil {
-                  return fmt.Errorf("programVsiToVsiP4Rules failed. Unable to find Vsi and Vport for mac: %v", mac2)
-        }
+	mac1Vsi, mac1Vport := getVsiVportInfo(mac1)
+	mac2Vsi, mac2Vport := getVsiVportInfo(mac2)
 
 	VsiToVsip4RuleSets := []types.FxpRuleBuilder{
 		{
@@ -430,15 +408,8 @@ func programVsiToVsiP4Rules(p4rtClient types.P4RTClient, mac1, mac2 string) erro
 }
 
 func deleteVsiToVsiP4Rules(p4rtClient types.P4RTClient, mac1, mac2 string) error {
-	mac1Vsi, _, err := utils.GetVsiVportInfo(mac1)
-        if err != nil {
-                  return fmt.Errorf("deleteVsiToVsiP4Rules failed. Unable to find Vsi and Vport for mac: %v", mac1)
-        }
-
-	mac2Vsi, _, err := utils.GetVsiVportInfo(mac2)
-        if err != nil {
-                  return fmt.Errorf("deleteVsiToVsiP4Rules failed. Unable to find Vsi and Vport for mac: %v", mac2)
-        }
+	mac1Vsi, _ := getVsiVportInfo(mac1)
+	mac2Vsi, _ := getVsiVportInfo(mac2)
 
 	VsiToVsip4RuleSets := []types.FxpRuleBuilder{
 		{
@@ -478,8 +449,7 @@ func (p *p4rtclient) AddRules(macAddr []byte, vlan int) {
 	log.WithField("number of rules", len(ruleSets)).Debug("adding FXP rules")
 
 	for _, r := range ruleSets {
-		_, err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...)
-		if err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing add rule command")
 		}
 	}
@@ -494,8 +464,7 @@ func (p *p4rtclient) DeleteRules(macAddr []byte, vlan int) {
 	log.WithField("number of rules", len(ruleSets)).Debug("deleting FXP rules")
 
 	for _, r := range ruleSets {
-                _, err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...)
-		if err != nil {
+		if err := utils.RunP4rtCtlCommand(p.p4rtBin, p.p4rtIpPort, r...); err != nil {
 			log.WithField("error", err).Errorf("error executing del rule command")
 		}
 	}
@@ -623,15 +592,8 @@ func AddHostVfP4Rules(p4rtClient types.P4RTClient, hostVfMac []byte, accMac stri
 		return errors.New("Invalid Mac Address")
 	}
 
-	hostVfVsi, hostVfVport, err := utils.GetVsiVportInfo(hostMacAddr.String())
-        if err != nil {
-                  return fmt.Errorf("AddHostVfP4Rules failed. Unable to find Vsi and Vport for mac: %v", hostMacAddr.String())
-        }
-
-	apfPrVsi, apfPrVport, err := utils.GetVsiVportInfo(accMac)
-        if err != nil {
-                  return fmt.Errorf("AddHostVfP4Rules failed. Unable to find Vsi and Vport for mac: %v", accMac)
-        }
+	hostVfVsi, hostVfVport := getVsiVportInfo(hostMacAddr.String())
+	apfPrVsi, apfPrVport := getVsiVportInfo(accMac)
 
 	hostVfP4ruleSets := []types.FxpRuleBuilder{
 		{
@@ -683,7 +645,7 @@ func AddHostVfP4Rules(p4rtClient types.P4RTClient, hostVfMac []byte, accMac stri
 
 	log.WithField("number of rules", len(hostVfP4ruleSets)).Debug("adding FXP rules")
 
-	err = p4rtClient.ProgramFXPP4Rules(hostVfP4ruleSets)
+	err := p4rtClient.ProgramFXPP4Rules(hostVfP4ruleSets)
 	if err != nil {
 		log.Info("Host VF FXP P4 rules add failed")
 		return err
@@ -709,15 +671,8 @@ func DeleteHostVfP4Rules(p4rtClient types.P4RTClient, hostVfMac []byte, accMac s
 		return errors.New("Invalid Mac Address")
 	}
 
-	hostVfVsi, hostVfVport, err := utils.GetVsiVportInfo(hostMacAddr.String())
-        if err != nil {
-                  return fmt.Errorf("DeleteHostVfP4Rules failed. Unable to find Vsi and Vport for mac: %v", hostMacAddr.String())
-        }
-
-	apfPrVsi, _, err := utils.GetVsiVportInfo(accMac)
-        if err != nil {
-                  return fmt.Errorf("DeleteHostVfP4Rules failed. Unable to find Vsi and Vport for mac: %v", accMac)
-        }
+	hostVfVsi, hostVfVport := getVsiVportInfo(hostMacAddr.String())
+	apfPrVsi, _ := getVsiVportInfo(accMac)
 
 	hostVfP4ruleSets := []types.FxpRuleBuilder{
 		{
@@ -769,7 +724,7 @@ func DeleteHostVfP4Rules(p4rtClient types.P4RTClient, hostVfMac []byte, accMac s
 
 	log.WithField("number of rules", len(hostVfP4ruleSets)).Debug("Deleting FXP rules")
 
-	err = p4rtClient.ProgramFXPP4Rules(hostVfP4ruleSets)
+	err := p4rtClient.ProgramFXPP4Rules(hostVfP4ruleSets)
 	if err != nil {
 		log.Info("Host VF FXP P4 rules delete failed")
 		return err

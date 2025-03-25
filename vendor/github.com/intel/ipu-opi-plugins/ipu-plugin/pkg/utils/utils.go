@@ -72,24 +72,6 @@ func ExecOsCommand(cmdBin string, params ...string) error {
 	return nil
 }
 
-func GetVsiVportInfo(macAddr string) (int, int, error) {
-        vsi, err := ImcQueryfindVsiGivenMacAddr(types.IpuMode, macAddr)
-        if err != nil {
-                log.Info("GetVsiVportInfo failed. Unable to find Vsi and Vport for mac: ", macAddr)
-                return 0, 0, err
-        }
-        //skip 0x in front of vsi
-        vsi = vsi[2:]
-        vsiInt64, err := strconv.ParseInt(vsi, 16, 32)
-        if err != nil {
-                log.Info("error from ParseInt ", err)
-                return 0, 0, err
-        }
-        vfVsi := int(vsiInt64)
-        vfVport := GetVportForVsi(vfVsi)
-        return vfVsi, vfVport, nil
-}
-
 func GetVportForVsi(vsi int) int {
 	return vsi + vsiToVportOffset
 }
@@ -112,7 +94,7 @@ func GetMacIntValueFromBytes(macAddr []byte) uint64 {
 
 var p4rtCtlCommand = exec.Command
 
-func RunP4rtCtlCommand(p4rtBin string, p4rtIpPort string, params ...string) (string, error) {
+func RunP4rtCtlCommand(p4rtBin string, p4rtIpPort string, params ...string) error {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd := p4rtCtlCommand(p4rtBin, append([]string{"-g", p4rtIpPort}, params...)...)
@@ -129,11 +111,11 @@ func RunP4rtCtlCommand(p4rtBin string, p4rtIpPort string, params ...string) (str
 			"stdout": stdout.String(),
 			"stderr": stderr.String(),
 		}).Errorf("error while executing %s", p4rtBin)
-		return stdout.String(), err
+		return err
 	}
 
 	log.WithField("params", params).Debugf("successfully executed %s", p4rtBin)
-	return "", nil
+	return nil
 }
 
 func ExecuteScript(script string) (string, error) {
