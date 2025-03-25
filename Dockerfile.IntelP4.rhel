@@ -1,0 +1,10 @@
+FROM registry.access.redhat.com/ubi9/ubi:9.5
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /
+
+COPY cmd/intelvsp/p4sdk/entrypoint.sh /
+
+ENTRYPOINT ["/entrypoint.sh"]
+
