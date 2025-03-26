@@ -50,10 +50,6 @@ spec:
           type: ""
         name: host-opt
       - hostPath:
-          path: /lib/modules
-          type: DirectoryOrCreate
-        name: host-libmodules
-      - hostPath:
           path: /var/run/
           type: ""
         name: vendor-plugin-sock
