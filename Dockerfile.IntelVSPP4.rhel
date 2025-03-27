@@ -1,0 +1,61 @@
+FROM registry.access.redhat.com/ubi9/ubi:9.5
+
+ARG P4_NAME=fxp-net_linux-networking
+ENV P4_NAME $P4_NAME
+
+ARG TARGETOS
+ARG TARGETARCH
+ENV ARCHSUFFIX="aarch64"
+
+COPY . /src
+WORKDIR /src
+RUN dnf install -y \
+   kmod-28-10.el9 \
+   gettext-0.21-8.el9 \
+   python3-pip-21.3.1-1.el9 \
+   pciutils-3.7.0-5.el9 \
+   libnl3-3.9.0-1.el9 \
+   libedit-3.1-38.20210216cvs.el9 \
+   net-tools-2.0-0.64.20160912git.el9 \
+   libatomic-0:11.5.0-5.el9_5 \
+   gcc gcc-c++ \
+   && dnf clean all
+
+RUN mkdir -p /opt/${P4_NAME}
+COPY cmd/intelvsp/$P4_NAME/* /opt/${P4_NAME}/
+COPY cmd/intelvsp/p4sdk/entrypoint.sh /
+COPY cmd/intelvsp/p4sdk/es2k_skip_p4.conf.template /
+
+RUN if [ "$TARGETARCH" = "amd64" ]; then export ARCHSUFFIX="x86_64"; \
+    else export ARCHSUFFIX="aarch64"; fi; \
+    curl -L -o libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm \
+     https://mirror.stream.centos.org/9-stream/BaseOS/$ARCHSUFFIX/os/Packages/libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm \
+    && dnf -y install libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm && rm -f libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm && dnf clean all
+
+RUN python3 -m pip install --no-cache-dir \
+    netaddr==1.2.1
+
+WORKDIR /
+
+# Add steps for cachito
+ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
+ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
+COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+COPY openshift/install-dpu.sh .
+RUN chmod +x install-dpu.sh \
+    && ./install-dpu.sh
+
+# Remove packages which are only needed for cachito
+RUN dnf remove -y gcc gcc-c++ \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+#TODO: Update to newer package, according to release.
+
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/p4 /opt/p4rt_proto
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4rt_proto/
+RUN chmod a+x /opt/p4rt_proto/copy_p4rt_python_deps.sh
+RUN /opt/p4rt_proto/copy_p4rt_python_deps.sh
+
+
+ENTRYPOINT ["/entrypoint.sh"]
