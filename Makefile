@@ -73,6 +73,9 @@ CONTAINER_TOOL ?= podman
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+%/.dirstamp:
+	mkdir -p "$*" && touch "$@"
+
 .PHONY: default
 default: build
 
@@ -305,14 +308,47 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	done
 	@echo "Namespace 'openshift-dpu-operator' has been removed."
 
+DOCKERFILES = \
+    Dockerfile.rhel \
+    Dockerfile.daemon.rhel \
+    Dockerfile.mrvlVSP.rhel \
+    Dockerfile.IntelVSP.rhel \
+    Dockerfile.networkResourcesInjector.rhel \
+    $(NULL)
+
+REBUILD_PATCH_DOCKERFILES_LASTSTATE = $(shell if [ ! -f .tmp/patch-dockerfiles.laststate ] || [ "$$(cat .tmp/patch-dockerfiles.laststate)" != "$$BUILD_PATCH_DOCKERFILES" ] ; then echo 1; fi)
+
+ifeq ($(REBUILD_PATCH_DOCKERFILES_LASTSTATE), 1)
+.PHONY: .tmp/patch-dockerfiles.laststate
+endif
+.tmp/patch-dockerfiles.laststate: .tmp/.dirstamp
+	printf "%s\n" "$$BUILD_PATCH_DOCKERFILES" > ".tmp/patch-dockerfiles.laststate"
+
+.tmp/patch-dockerfile.prepareimage: scripts/patch-dockerfiles.sh .tmp/patch-dockerfiles.laststate
+	if [ "$$BUILD_PATCH_DOCKERFILES" = 1 ] ; then \
+		scripts/patch-dockerfiles.sh build-force ; \
+	fi
+	touch "$@"
+
+.tmp/Dockerfile.%: Dockerfile.% .tmp/patch-dockerfile.prepareimage
+	if [ "$$BUILD_PATCH_DOCKERFILES" = 1 ] ; then \
+		scripts/patch-dockerfiles.sh patch "$<" "$@" ; \
+	else \
+		cp "$<" "$@" ; \
+	fi
+
+DOCKERFILES_TMP = $(patsubst Dockerfile.%,.tmp/Dockerfile.%,$(DOCKERFILES))
+
+.PHONY: Dockerfiles
+Dockerfiles: $(DOCKERFILES_TMP)
 
 .PHONY: local-build
-local-build: go-cache
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
+local-build: Dockerfiles go-cache
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
 
 .PHONE: prepare-multi-arch
 prepare-multi-arch:
@@ -334,24 +370,24 @@ define build_image
 endef
 
 .PHONY: local-buildx-manager
-local-buildx-manager: prepare-multi-arch go-cache
-	$(call build_image,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+local-buildx-manager: .tmp/Dockerfile.rhel prepare-multi-arch go-cache
+	$(call build_image,DPU_OPERATOR_IMAGE,$<)
 
 .PHONY: local-buildx-daemon
-local-buildx-daemon: prepare-multi-arch go-cache
-	$(call build_image,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+local-buildx-daemon: .tmp/Dockerfile.daemon.rhel prepare-multi-arch go-cache
+	$(call build_image,DPU_DAEMON_IMAGE,$<)
 
 .PHONY: local-buildx-marvell-vsp
-local-buildx-marvell-vsp: prepare-multi-arch go-cache
-	$(call build_image,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+local-buildx-marvell-vsp: .tmp/Dockerfile.mrvlVSP.rhel prepare-multi-arch go-cache
+	$(call build_image,MARVELL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-intel-vsp
-local-buildx-intel-vsp: prepare-multi-arch go-cache
-	$(call build_image,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+local-buildx-intel-vsp: .tmp/Dockerfile.IntelVSP.rhel prepare-multi-arch go-cache
+	$(call build_image,INTEL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-network-resources-injector
-local-buildx-network-resources-injector: prepare-multi-arch go-cache
-	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
+local-buildx-network-resources-injector: .tmp/Dockerfile.networkResourcesInjector.rhel prepare-multi-arch go-cache
+	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,$<)
 
 TMP_FILE=/tmp/dpu-operator-incremental-build
 define build_image_incremental
@@ -363,34 +399,34 @@ endef
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: tools prepare-multi-arch go-cache
+local-buildx-incremental-manager: tmp/Dockerfile.rhel tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
-	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+	$(call build_image_incremental,DPU_OPERATOR_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: tools prepare-multi-arch go-cache
+local-buildx-incremental-daemon: .tmp/Dockerfile.daemon.rhel tools prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
-	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+	$(call build_image_incremental,DPU_DAEMON_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: tools prepare-multi-arch go-cache
+local-buildx-incremental-marvell-vsp: .tmp/Dockerfile.mrvlVSP.rhel tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
-	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+	$(call build_image_incremental,MARVELL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-intel-vsp
-local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
+local-buildx-incremental-intel-vsp: .tmp/Dockerfile.IntelVSP.rhel prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-intel-vsp
 	GOARCH=amd64 $(MAKE) build-intel-vsp
-	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+	$(call build_image_incremental,INTEL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-network-resources-injector
-local-buildx-incremental-network-resources-injector: prepare-multi-arch go-cache
+local-buildx-incremental-network-resources-injector: .tmp/Dockerfile.networkResourcesInjector.rhel prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-network-resources-injector
 	GOARCH=amd64 $(MAKE) build-network-resources-injector
-	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
+	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,$<)
 
 .PHONY: incremental-local-buildx
 incremental-local-buildx: incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-network-resources-injector
