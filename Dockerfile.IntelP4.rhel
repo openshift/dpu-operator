@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi:9.5
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETOS
 ARG TARGETARCH
 
