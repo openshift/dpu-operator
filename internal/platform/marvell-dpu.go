@@ -11,6 +11,8 @@ const (
 	MrvlVendorID     string = "177d"
 	MrvlDPUdeviceID  string = "a0f7"
 	MrvlHostDeviceID string = "b900"
+	MrvlHugepages    string = "hugepages-32Mi"
+	MrvlMemory       string = "256Mi"
 )
 
 type MarvellDetector struct {
@@ -54,7 +56,10 @@ func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
 func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageMarvell]
-	template_vars.Command = `[ "/vsp-mrvl" ]`
+	if dpuMode {
+		template_vars.WithHugepages = MrvlHugepages
+		template_vars.WithMemory = MrvlMemory
+	}
 	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
 }
 
