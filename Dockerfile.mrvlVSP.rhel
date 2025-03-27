@@ -2,6 +2,10 @@ FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS 
 ARG TARGETOS
 ARG TARGETARCH
 
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+        dnf update -y && dnf install tar gawk gcc g++ git -y ; \
+    fi
+
 WORKDIR /workspace
 COPY . .
 # Build
@@ -15,12 +19,39 @@ COPY . .
 RUN mkdir -p /bin && \
     GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-marvell-vsp
 
+WORKDIR /workspace
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+        curl -OL -k https://hyperrealm.github.io/libconfig/dist/libconfig-1.7.2.tar.gz && \
+        tar -xvf libconfig-1.7.2.tar.gz && cd libconfig-1.7.2 && ./configure --prefix=/workspace/bin/ && \
+        make && make install && cd - && \
+        rm -fr /workspace/libconfig-1.7.2* ; \
+    fi
+
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+        git clone https://github.com/MarvellEmbeddedProcessors/pcie_ep_octeon_target.git && \
+        cd /workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib && \
+        export CFLAGS="$CFLAGS -Wno-error=unused-result -DUSE_PEM_AND_DPI_PF=1" && make ; \
+    fi
+
+WORKDIR "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent"
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+        export OCTEP_PATH="/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        export CFLAGS="$CFLAGS -I/workspace/bin/include -I$OCTEP_PATH/include" && \
+        export LDFLAGS="-L/workspace/bin/lib -L$OCTEP_PATH" && \
+        make && \
+        cp bin/bin/octep_cp_agent /usr/bin/ && \
+        cp cn106xx.cfg /usr/bin/ && \
+        cp /workspace/bin/lib/libconfig* /usr/lib64/; \
+    fi
+
 # Use distroless as minimal base image to package the Marvell VSP binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETARCH
+
+COPY internal/daemon/vendor-specific-plugins/marvell/vsp-mrvl-run.sh /
 COPY --from=builder /workspace/bin/vsp-mrvl.${TARGETARCH} vsp-mrvl
-ENV DEBIAN_FRONTEND=noninteractive
+
 RUN yum update -y \
     && yum install -y \
        net-tools \
@@ -29,5 +60,9 @@ RUN yum update -y \
        make \
        iputils \
        iproute
-USER 65532:65532
-ENTRYPOINT ["/vsp-mrvl"]
+
+WORKDIR /workspace
+
+USER 0
+
+ENTRYPOINT ["/vsp-mrvl-run.sh"]

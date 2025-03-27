@@ -27,6 +27,15 @@ spec:
           runAsUser: 0
         command: {{.Command}}
         args: {{.Args}}
+        resources:
+          {{- if not (eq .WithHugepages "") }}
+          requests:
+            memory: {{.WithMemory}}
+            {{.WithHugepages}}: {{.WithMemory}}
+          limits:
+            memory: {{.WithMemory}}
+            {{.WithHugepages}}: {{.WithMemory}}
+          {{- end }}
         volumeMounts:
         - mountPath: /host
           mountPropagation: Bidirectional
@@ -39,6 +48,9 @@ spec:
         - mountPath: /proc
           mountPropagation: Bidirectional
           name: host-proc
+        - mountPath: /dev/
+          mountPropagation: Bidirectional
+          name: host-dev
       dnsPolicy: ClusterFirstWithHostNet
       volumes:
       - hostPath:
@@ -57,3 +69,7 @@ spec:
           path: /
           type: ""
         name: host-root
+      - hostPath:
+          path: /dev/
+          type: ""
+        name: host-dev
