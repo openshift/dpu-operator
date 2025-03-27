@@ -276,6 +276,7 @@ DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
 DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
 MARVELL_VSP_IMAGE := $(REGISTRY):5000/mrvl-vsp:dev
 INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
+INTEL_VSP_P4_IMAGE := $(REGISTRY):5000/intel-vsp-p4:dev
 NETWORK_RESOURCES_INJECTOR_IMAGE:= $(REGISTRY):5000/network-resources-injector-image:dev
 
 .PHONY: local-deploy-prep
@@ -311,6 +312,7 @@ local-build: ## Build all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSPP4.rhel -t $(INTEL_VSP_P4_IMAGE)
 	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
 
 .PHONE: prepare-multi-arch
@@ -324,40 +326,44 @@ go-cache: ## Build all container images necessary to run the whole operator
 
 ## Build all container images necessary to run the whole operator
 .PHONY: local-buildx
-local-buildx: prepare-multi-arch go-cache local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-network-resources-injector
+local-buildx: prepare-multi-arch go-cache local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-intel-vsp-p4 local-buildx-network-resources-injector
 	@echo "local-buildx completed"
 
 define build_image
 	buildah manifest rm $($(1))-manifest || true
 	buildah manifest create $($(1))-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f $(2) -t $($(1))
+	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform $(3) -v $(GO_CONTAINER_CACHE):/go:z -f $(2) -t $($(1))
 endef
 
 .PHONY: local-buildx-manager
 local-buildx-manager: prepare-multi-arch go-cache
-	$(call build_image,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+	$(call build_image,DPU_OPERATOR_IMAGE,Dockerfile.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: local-buildx-daemon
 local-buildx-daemon: prepare-multi-arch go-cache
-	$(call build_image,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+	$(call build_image,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: local-buildx-marvell-vsp
 local-buildx-marvell-vsp: prepare-multi-arch go-cache
-	$(call build_image,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+	$(call build_image,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: local-buildx-intel-vsp
 local-buildx-intel-vsp: prepare-multi-arch go-cache
-	$(call build_image,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+	$(call build_image,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel,linux/amd64\,linux/arm64)
+
+.PHONY: local-buildx-intel-vsp-p4
+local-buildx-intel-vsp-p4: prepare-multi-arch go-cache
+	$(call build_image,INTEL_VSP_P4_IMAGE,Dockerfile.IntelVSPP4.rhel,linux/arm64)
 
 .PHONY: local-buildx-network-resources-injector
 local-buildx-network-resources-injector: prepare-multi-arch go-cache
-	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
+	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel,linux/amd64\,linux/arm64)
 
 TMP_FILE=/tmp/dpu-operator-incremental-build
 define build_image_incremental
     bin/incremental -dockerfile $(2) -base-uri $($(1))-base -output-file $(TMP_FILE)
     # Pass the newly generated Dockerfile to build_image
-    $(call build_image,$(1),$(TMP_FILE))
+    $(call build_image,$(1),$(TMP_FILE),$(3))
 endef
 
 ## Build all container images necessary to run the whole operator incrementally.
@@ -367,34 +373,39 @@ endef
 local-buildx-incremental-manager: tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
-	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: local-buildx-incremental-daemon
 local-buildx-incremental-daemon: tools prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
-	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: local-buildx-incremental-marvell-vsp
 local-buildx-incremental-marvell-vsp: tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
-	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: local-buildx-incremental-intel-vsp
 local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-intel-vsp
 	GOARCH=amd64 $(MAKE) build-intel-vsp
-	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel,linux/amd64\,linux/arm64)
+
+.PHONY: local-buildx-incremental-intel-vsp-p4
+local-buildx-incremental-intel-vsp-p4: prepare-multi-arch go-cache
+	# No go build target exists for vsp-p4
+	$(call build_image_incremental,INTEL_VSP_P4_IMAGE,Dockerfile.IntelVSPP4.rhel,linux/arm64)
 
 .PHONY: local-buildx-incremental-network-resources-injector
 local-buildx-incremental-network-resources-injector: prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-network-resources-injector
 	GOARCH=amd64 $(MAKE) build-network-resources-injector
-	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
+	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel,linux/amd64\,linux/arm64)
 
 .PHONY: incremental-local-buildx
-incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-network-resources-injector
+incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-intel-vsp-p4 local-buildx-incremental-network-resources-injector
 	@echo "local-buildx-incremental completed"
 
 .PHONY: local-pushx-incremental
@@ -403,7 +414,8 @@ local-pushx-incremental: ## Push all container images necessary to run the whole
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
 	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
-	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
+	buildah manifest push --all $(INTEL_VSP_P4_IMAGE)-manifest docker://$(INTEL_VSP_P4_IMAGE)
+	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(NETWORK_RESOURCES_INJECTOR_IMAGE)
 
 .PHONY: local-pushx
 local-pushx: ## Push all container images necessary to run the whole operator
@@ -411,11 +423,13 @@ local-pushx: ## Push all container images necessary to run the whole operator
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
 	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
 	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
+	buildah manifest push --all $(INTEL_VSP_P4_IMAGE)-manifest docker://$(INTEL_VSP_P4_IMAGE)
 	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(NETWORK_RESOURCES_INJECTOR_IMAGE)
 	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)-base
 	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)-base
 	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)-base
 	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)-base
+	buildah manifest push --all $(INTEL_VSP_P4_IMAGE)-manifest docker://$(INTEL_VSP_P4_IMAGE)-base
 	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(NETWORK_RESOURCES_INJECTOR_IMAGE)-base
 
 .PHONY: local-push
@@ -424,6 +438,7 @@ local-push: ## Push all container images necessary to run the whole operator
 	$(CONTAINER_TOOL) push $(DPU_DAEMON_IMAGE)
 	$(CONTAINER_TOOL) push $(MARVELL_VSP_IMAGE)
 	$(CONTAINER_TOOL) push $(INTEL_VSP_IMAGE)
+	$(CONTAINER_TOOL) push $(INTEL_VSP_P4_IMAGE)
 	$(CONTAINER_TOOL) push $(NETWORK_RESOURCES_INJECTOR_IMAGE)
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:

@@ -1,0 +1,5644 @@
+{
+  "schema_version" : "1.0.0",
+  "tables" : [
+    {
+      "name" : "main.MainControlDecrypt.lem_exception",
+      "id" : 48773578,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.MainControlDecrypt.lem_clear",
+      "id" : 38116127,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.MainControlDecrypt.ipsec_rx_sa_classification_table",
+      "id" : 45068641,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.ipv4[vmeta.common.depth].src_ip",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hdrs.ipv4[vmeta.common.depth].dst_ip",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 3,
+          "name" : "hdrs.esp.spi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 33177492,
+          "name" : "MainControlDecrypt.ipsec_decrypt",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "saidx",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 30285547,
+          "name" : "MainControlDecrypt.ipsec_bypass",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rif_mod_table_start",
+      "id" : 42605135,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "rif_mod_map_id0",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 23093409,
+          "name" : "linux_networking_control.set_src_mac_start",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "arg",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rif_mod_table_mid",
+      "id" : 43970557,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "rif_mod_map_id1",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 30315892,
+          "name" : "linux_networking_control.set_src_mac_mid",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "arg",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rif_mod_table_last",
+      "id" : 47499906,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "rif_mod_map_id2",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 32740970,
+          "name" : "linux_networking_control.set_src_mac_last",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "arg",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.always_trap_arp_table",
+      "id" : 48081556,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.inval.data",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hdrs.inval.data",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 19361592,
+          "name" : "linux_networking_control.do_trap_enable",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.always_recirculate_table",
+      "id" : 47372228,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.inval.data",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hdrs.inval.data",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 33275382,
+          "name" : "linux_networking_control.do_recirculate",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vlan_push_mod_table",
+      "id" : 40312237,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 24137163,
+          "name" : "linux_networking_control.vlan_push",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "pcp",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dei",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "vlan_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vlan_pop_mod_table",
+      "id" : 38884256,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 25667542,
+          "name" : "linux_networking_control.vlan_pop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vxlan_encap_mod_table",
+      "id" : 40763773,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 20733968,
+          "name" : "linux_networking_control.vxlan_encap",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vxlan_encap_vlan_pop_mod_table",
+      "id" : 39675860,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26114242,
+          "name" : "linux_networking_control.vxlan_encap_vlan_pop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vxlan_encap_v6_mod_table",
+      "id" : 46225003,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 30345128,
+          "name" : "linux_networking_control.vxlan_encap_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "ds",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 6
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "ecn",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 2
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "flow_label",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            },
+            {
+              "id" : 6,
+              "name" : "hop_limit",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            },
+            {
+              "id" : 7,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 8,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 9,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vxlan_encap_v6_vlan_pop_mod_table",
+      "id" : 34318005,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 28284062,
+          "name" : "linux_networking_control.vxlan_encap_v6_vlan_pop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "ds",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 6
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "ecn",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 2
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "flow_label",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            },
+            {
+              "id" : 6,
+              "name" : "hop_limit",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            },
+            {
+              "id" : 7,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 8,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 9,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vxlan_decap_mod_table",
+      "id" : 40980035,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 28308555,
+          "name" : "linux_networking_control.vxlan_decap_outer_hdr",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vxlan_decap_and_push_vlan_mod_table",
+      "id" : 37624107,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 31953264,
+          "name" : "linux_networking_control.vxlan_decap_and_push_vlan",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "pcp",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dei",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "vlan_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.geneve_encap_mod_table",
+      "id" : 41319073,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 25818889,
+          "name" : "linux_networking_control.geneve_encap",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.geneve_encap_vlan_pop_mod_table",
+      "id" : 47977422,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26665268,
+          "name" : "linux_networking_control.geneve_encap_vlan_pop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.geneve_encap_v6_mod_table",
+      "id" : 42283616,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 29610186,
+          "name" : "linux_networking_control.geneve_encap_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "ds",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 6
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "ecn",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 2
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "flow_label",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            },
+            {
+              "id" : 6,
+              "name" : "hop_limit",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            },
+            {
+              "id" : 7,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 8,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 9,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.geneve_encap_v6_vlan_pop_mod_table",
+      "id" : 47370391,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 27347188,
+          "name" : "linux_networking_control.geneve_encap_v6_vlan_pop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 128
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "ds",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 6
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "ecn",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 2
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "flow_label",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            },
+            {
+              "id" : 6,
+              "name" : "hop_limit",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            },
+            {
+              "id" : 7,
+              "name" : "src_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 8,
+              "name" : "dst_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 9,
+              "name" : "vni",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.geneve_decap_mod_table",
+      "id" : 34173274,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 27842378,
+          "name" : "linux_networking_control.geneve_decap_outer_hdr",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.geneve_decap_and_push_vlan_mod_table",
+      "id" : 34525815,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 25073902,
+          "name" : "linux_networking_control.geneve_decap_and_push_vlan",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "pcp",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dei",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "vlan_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipv4_tunnel_term_table",
+      "id" : 47484925,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_src",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vni",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 31163719,
+          "name" : "linux_networking_control.set_vxlan_decap_outer_hdr",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 25342798,
+          "name" : "linux_networking_control.set_vxlan_decap_outer_and_push_vlan",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 26749366,
+          "name" : "linux_networking_control.set_geneve_decap_outer_hdr",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 31208923,
+          "name" : "linux_networking_control.set_geneve_decap_outer_and_push_vlan",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21790705,
+          "name" : "linux_networking_control.trap_enable",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipv6_tunnel_term_table",
+      "id" : 34601307,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv6_src",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 128
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vni",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 31163719,
+          "name" : "linux_networking_control.set_vxlan_decap_outer_hdr",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 25342798,
+          "name" : "linux_networking_control.set_vxlan_decap_outer_and_push_vlan",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 26749366,
+          "name" : "linux_networking_control.set_geneve_decap_outer_hdr",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 31208923,
+          "name" : "linux_networking_control.set_geneve_decap_outer_and_push_vlan",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.l2_fwd_rx_table",
+      "id" : 44842501,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 2,
+          "name" : "user_meta.pmeta.bridge_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        },
+        {
+          "id" : 1,
+          "name" : "dst_mac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 19169916,
+          "name" : "linux_networking_control.l2_fwd",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21862855,
+          "name" : "linux_networking_control.l2_fwd_lag_and_recirculate",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "lag_group_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21283156,
+          "name" : "linux_networking_control.fwd_to_cp",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.l2_fwd_tx_table",
+      "id" : 40240205,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.pmeta.bridge_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "dst_mac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 19169916,
+          "name" : "linux_networking_control.l2_fwd",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 24440746,
+          "name" : "linux_networking_control.l2_fwd_lag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "lag_group_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            }
+          ]
+        },
+        {
+          "id" : 26412051,
+          "name" : "linux_networking_control.set_vxlan_underlay_v4",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 19193142,
+          "name" : "linux_networking_control.set_vxlan_underlay_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 31983357,
+          "name" : "linux_networking_control.pop_vlan_set_vxlan_underlay_v4",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 23849990,
+          "name" : "linux_networking_control.pop_vlan_set_vxlan_underlay_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 23736116,
+          "name" : "linux_networking_control.set_geneve_underlay_v4",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 17483375,
+          "name" : "linux_networking_control.set_geneve_underlay_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 24842266,
+          "name" : "linux_networking_control.pop_vlan_set_geneve_underlay_v4",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 33478945,
+          "name" : "linux_networking_control.pop_vlan_set_geneve_underlay_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 20
+              }
+            }
+          ]
+        },
+        {
+          "id" : 24108243,
+          "name" : "linux_networking_control.add_vlan_and_fwd",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vlan_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "port_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 25690116,
+          "name" : "linux_networking_control.remove_vlan_and_fwd",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vlan_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "port_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 20441854,
+          "name" : "linux_networking_control.fwd_to_cp_tx",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65553,
+            "name" : "$COUNTER_SPEC_BYTES",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        },
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65554,
+            "name" : "$COUNTER_SPEC_PKTS",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        }
+      ],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.nexthop_table",
+      "id" : 37894008,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.nexthop_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "bit16_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 16795029,
+          "name" : "linux_networking_control.set_nexthop_info_dmac",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "router_interface_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "egress_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "dmac_high",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "dmac_low",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 25951413,
+          "name" : "linux_networking_control.set_nexthop_lag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "lag_group_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dmac_high",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "dmac_low",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65553,
+            "name" : "$COUNTER_SPEC_BYTES",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        },
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65554,
+            "name" : "$COUNTER_SPEC_PKTS",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        }
+      ],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ecmp_nexthop_table",
+      "id" : 47712712,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.nexthop_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 27181644,
+          "name" : "linux_networking_control.ecmp_set_nexthop_info_dmac",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "router_interface_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "egress_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "dmac_high",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "dmac_low",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.tx_lag_table",
+      "id" : 40757978,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.lag_group_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hash",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 3
+          }
+        },
+        {
+          "id" : 3,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 27998997,
+          "name" : "linux_networking_control.set_egress_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "router_interface_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "egress_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 24954025,
+          "name" : "linux_networking_control.bypass",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rx_lag_table",
+      "id" : 44444143,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.port_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 2
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "user_meta.cmeta.lag_group_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26092385,
+          "name" : "linux_networking_control.fwd_to_vsi",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipv4_table",
+      "id" : 37566509,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_table_lpm_root",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "ipv4_dst_match",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@intel_byte_order(\"NETWORK\")"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "LPM",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22009623,
+          "name" : "linux_networking_control.ipv4_set_nexthop_id",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "nexthop_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 16874810,
+          "name" : "linux_networking_control.ecmp_hash_action",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "ecmp_group_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ecmp_hash_table",
+      "id" : 49661222,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "flex",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hash",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 3
+          }
+        },
+        {
+          "id" : 3,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 29883644,
+          "name" : "linux_networking_control.set_nexthop_id",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "nexthop_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipv6_table",
+      "id" : 46496254,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv6_table_lpm_root",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "ipv6_dst_match",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@intel_byte_order(\"NETWORK\")"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "LPM",
+          "type" : {
+            "type" : "bytes",
+            "width" : 128
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 21321477,
+          "name" : "linux_networking_control.ipv6_set_nexthop_id",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "nexthop_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 27000185,
+          "name" : "linux_networking_control.ecmp_v6_hash_action",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "ecmp_group_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rx_source_port",
+      "id" : 40351839,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.port_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 2
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "zero_padding",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 32890467,
+          "name" : "linux_networking_control.set_source_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "source_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rx_ipv4_tunnel_source_port",
+      "id" : 49097500,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_src",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vni",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 32890467,
+          "name" : "linux_networking_control.set_source_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "source_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rx_ipv6_tunnel_source_port",
+      "id" : 40981078,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv6_src",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 128
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vni",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 32890467,
+          "name" : "linux_networking_control.set_source_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "source_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.source_port_to_bridge_map",
+      "id" : 33606489,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.source_port",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hdrs.vlan_ext[vmeta.common.depth].hdr.vid",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 12
+          }
+        },
+        {
+          "id" : 3,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 31939992,
+          "name" : "linux_networking_control.set_bridge_id",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "bridge_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.l2_fwd_smac_table",
+      "id" : 46342225,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.mac[vmeta.common.depth].sa",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "user_meta.pmeta.bridge_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21283156,
+          "name" : "linux_networking_control.fwd_to_cp",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.tx_acc_vsi",
+      "id" : 42508227,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "zero_padding",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 31624713,
+          "name" : "linux_networking_control.l2_fwd_and_bypass_bridge",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.tx_source_port",
+      "id" : 39041593,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 32890467,
+          "name" : "linux_networking_control.set_source_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "source_port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.l2_to_tunnel_v4",
+      "id" : 43337754,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.mac[vmeta.common.depth].da",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 23805991,
+          "name" : "linux_networking_control.set_tunnel_v4",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 33275382,
+          "name" : "linux_networking_control.do_recirculate",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.l2_to_tunnel_v6",
+      "id" : 36796227,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.mac[vmeta.common.depth].da",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 23953453,
+          "name" : "linux_networking_control.set_tunnel_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "ipv6_1",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "ipv6_2",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "ipv6_3",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "ipv6_4",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 33275382,
+          "name" : "linux_networking_control.do_recirculate",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.rx_phy_port_to_pr_map",
+      "id" : 38721082,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.port_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 2
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "zero_padding",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 20004960,
+          "name" : "linux_networking_control.mirror_and_send",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "mirror_session_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 26092385,
+          "name" : "linux_networking_control.fwd_to_vsi",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.source_port_to_pr_map",
+      "id" : 35934350,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.source_port",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "zero_padding",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26092385,
+          "name" : "linux_networking_control.fwd_to_vsi",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vsi_to_vsi_loopback",
+      "id" : 45509113,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "target_vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26092385,
+          "name" : "linux_networking_control.fwd_to_vsi",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv4_tcp",
+      "id" : 44641644,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv4_udp",
+      "id" : 46678878,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv4",
+      "id" : 45972289,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_l2",
+      "id" : 33896331,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv6_tcp",
+      "id" : 46852435,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv6_udp",
+      "id" : 46359163,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv6",
+      "id" : 34506208,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipsec_tunnel_table",
+      "id" : 49349790,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.saidx",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "bit16_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 13
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26423957,
+          "name" : "linux_networking_control.set_ipsec_tunnel",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "tunnel_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipsec_spd",
+      "id" : 47756035,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.ipv4[vmeta.common.depth].dst_ip",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hdrs.ipv4[vmeta.common.depth].protocol",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 20682322,
+          "name" : "linux_networking_control.ipsec_protect_set_metadata",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "saidx",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            }
+          ]
+        },
+        {
+          "id" : 19192368,
+          "name" : "linux_networking_control.ipsec_bypass",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65553,
+            "name" : "$COUNTER_SPEC_BYTES",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        },
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65554,
+            "name" : "$COUNTER_SPEC_PKTS",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        }
+      ],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipsec_tx_sa_classification_table",
+      "id" : 45022218,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "hdrs.ipv4[vmeta.common.depth].dst_ip",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "hdrs.ipv4[vmeta.common.depth].protocol",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        },
+        {
+          "id" : 3,
+          "name" : "user_meta.cmeta.is_tunnel",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 24935652,
+          "name" : "linux_networking_control.tx_ipsec_transport",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 17885953,
+          "name" : "linux_networking_control.tx_ipsec_transport_with_underlay",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30154712,
+          "name" : "linux_networking_control.tx_ipsec_tunnel",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29527637,
+          "name" : "linux_networking_control.tx_ipsec_tunnel_v6",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "dst_addr_1",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dst_addr_2",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "dst_addr_3",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 29238102,
+          "name" : "linux_networking_control.drop",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65553,
+            "name" : "$COUNTER_SPEC_BYTES",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        },
+        {
+          "mandatory" : false,
+          "read_only" : true,
+          "singleton" : {
+            "id" : 65554,
+            "name" : "$COUNTER_SPEC_PKTS",
+            "repeated" : false,
+            "annotations" : [],
+            "type" : {
+              "type" : "uint64",
+              "default_value" : 0
+            }
+          }
+        }
+      ],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipsec_tunnel_encap_mod_table",
+      "id" : 37326952,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vmeta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 30081157,
+          "name" : "linux_networking_control.ipsec_tunnel_encap_mod",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "ipsec_src_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "ipsec_dst_addr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "proto",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 8
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipv4_ipsec_tunnel_term_table",
+      "id" : 43475471,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_src",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "ipv4_dst",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 25138331,
+          "name" : "linux_networking_control.decap_ipsec_tunnel_hdr",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : []
+        },
+        {
+          "id" : 33275382,
+          "name" : "linux_networking_control.do_recirculate",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vm_src_ip4_mac_map_table",
+      "id" : 37403444,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_src",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 28718673,
+          "name" : "linux_networking_control.vm_src_ip4_mac_map_action",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "smac_high",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "smac_mid",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "smac_low",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.vm_dst_ip4_mac_map_table",
+      "id" : 50085764,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_dst",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 25018769,
+          "name" : "linux_networking_control.vm_dst_ip4_mac_map_action",
+          "action_scope" : "TableOnly",
+          "annotations" : [
+            {
+              "name" : "@tableonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "dmac_high",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dmac_mid",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "dmac_low",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 16
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.ipv4_lpm_root_lut",
+      "id" : 41667918,
+      "table_type" : "MatchValueLookupTable",
+      "size" : 1,
+      "annotations" : [
+        {
+          "name" : "@intel_lut_type(\"lpm_table\")"
+        }
+      ],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.bit16_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "data" : [
+        {
+          "id" : 1,
+          "name" : "ipv4_table_lpm_root",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        }
+      ]
+    },
+    {
+      "name" : "main.linux_networking_control.ipv6_lpm_root_lut",
+      "id" : 43524029,
+      "table_type" : "MatchValueLookupTable",
+      "size" : 1,
+      "annotations" : [
+        {
+          "name" : "@intel_lut_type(\"lpm_table\")"
+        }
+      ],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "user_meta.cmeta.bit16_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Ternary",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "$MATCH_PRIORITY",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "uint32"
+          }
+        }
+      ],
+      "data" : [
+        {
+          "id" : 1,
+          "name" : "ipv6_table_lpm_root",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        }
+      ]
+    },
+    {
+      "name" : "main.linux_networking_control.mir_prof",
+      "id" : 40941464,
+      "table_type" : "MatchValueLookupTable",
+      "size" : 256,
+      "annotations" : [
+        {
+          "name" : "@intel_lut_type(\"mirror_profile\")"
+        }
+      ],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "mirror_prof_key",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          }
+        }
+      ],
+      "data" : [
+        {
+          "id" : 1,
+          "name" : "hash_val",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 64
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 2,
+          "name" : "hash_mask",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 64
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 3,
+          "name" : "port_dest_type",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 4,
+          "name" : "vport_id",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 5,
+          "name" : "mode",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 6,
+          "name" : "op",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 7,
+          "name" : "exp",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 8,
+          "name" : "mod_addr",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 9,
+          "name" : "mod_profile",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 10,
+          "name" : "dest_id",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 11,
+          "name" : "trunc_size",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 12,
+          "name" : "mod_content_size",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 13,
+          "name" : "dst_q",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 14,
+          "name" : "defer_drop_en",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 15,
+          "name" : "trunc_mode_en",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 16,
+          "name" : "recirculate",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 17,
+          "name" : "store_port",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 18,
+          "name" : "func_valid",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 19,
+          "name" : "store_vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 20,
+          "name" : "drop_en",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 21,
+          "name" : "trunc",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 22,
+          "name" : "mod_profile_valid",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 23,
+          "name" : "mod_content_size_en",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 24,
+          "name" : "mod_ptype_tras_index",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 25,
+          "name" : "mod_common_en",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 26,
+          "name" : "mod_append_action_bus_en",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 27,
+          "name" : "is_md_gen0",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 28,
+          "name" : "is_md_gen1",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 29,
+          "name" : "is_md_local",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 30,
+          "name" : "is_md_remote",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 1
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 31,
+          "name" : "md_gen0_type",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 32,
+          "name" : "md_gen0_off",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 33,
+          "name" : "md_gen0_val",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 34,
+          "name" : "md_gen0_mask",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 35,
+          "name" : "md_gen1_type",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 36,
+          "name" : "md_gen1_off",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 37,
+          "name" : "md_gen1_val",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 38,
+          "name" : "md_gen1_mask",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 39,
+          "name" : "md_local_type",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 40,
+          "name" : "md_local_off",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 41,
+          "name" : "md_local_val",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 42,
+          "name" : "md_local_mask",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 43,
+          "name" : "md_remote_type",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 44,
+          "name" : "md_remote_off",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 45,
+          "name" : "md_remote_val",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        },
+        {
+          "id" : 46,
+          "name" : "md_remote_mask",
+          "repeated" : false,
+          "annotations" : [],
+          "type" : {
+            "type" : "bytes",
+            "width" : 8
+          },
+          "mandatory" : false,
+          "read_only" : false
+        }
+      ]
+    }
+  ],
+  "learn_filters" : []
+}

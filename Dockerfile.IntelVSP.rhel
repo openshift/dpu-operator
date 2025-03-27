@@ -25,7 +25,7 @@ WORKDIR /opt/p4/p4-cp-nws/bin/
 
 RUN mkdir -p /opt/p4/p4-cp-nws/bin/p4
 
-COPY ./cmd/intelvsp/fxp-net_linux-networking.pkg /
+COPY ./cmd/intelvsp/fxp-net_linux-networking/fxp-net_linux-networking.pkg /
 COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
 
 # Add steps for cachito
@@ -43,11 +43,10 @@ RUN dnf remove -y gcc gcc-c++ \
 
 #TODO: Update to newer package, according to release.
 
-COPY ./cmd/intelvsp/p4runtime-2023.11.0/p4 /opt/p4/p4-cp-nws/bin/p4
-COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4/p4-cp-nws/bin/p4
-
-RUN chmod a+x /opt/p4/p4-cp-nws/bin/p4/copy_p4rt_python_deps.sh
-RUN /opt/p4/p4-cp-nws/bin/p4/copy_p4rt_python_deps.sh
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/p4 /opt/p4rt_proto
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4rt_proto
+RUN chmod a+x /opt/p4rt_proto/copy_p4rt_python_deps.sh
+RUN /opt/p4rt_proto/copy_p4rt_python_deps.sh
 
 COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /usr/bin/ipuplugin
 WORKDIR /
