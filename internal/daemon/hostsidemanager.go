@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
+	moreconciler "github.com/openshift/dpu-operator/internal/daemon/mo-reconciler"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	sfcreconciler "github.com/openshift/dpu-operator/internal/daemon/sfc-reconciler"
 	"github.com/openshift/dpu-operator/internal/scheme"
@@ -321,7 +322,8 @@ func (d *HostSideManager) setupReconcilers() {
 		if err != nil {
 			d.log.Error(err, "unable to start manager")
 		}
-
+        
+		//setup sfc reconciler
 		sfcReconciler := &sfcreconciler.SfcReconciler{
 			Client: mgr.GetClient(),
 			Scheme: mgr.GetScheme(),
@@ -330,6 +332,18 @@ func (d *HostSideManager) setupReconcilers() {
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
 			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
 		}
+
+        //setup manual operation reconciler
+		moReconciler := &moreconciler.MoReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}
+
+		if err = moReconciler.SetupWithManager(mgr, d.vsp); err != nil {
+			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
+		}
+
 		d.manager = mgr
 	}
 }
+

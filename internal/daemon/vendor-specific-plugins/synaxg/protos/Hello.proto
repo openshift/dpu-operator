@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "./gen;gen";
+
+import "Common.proto";
+
+service HelloService {
+	//Send from vDU-OAM to server-OAM when vDU-OAM startup, it is used to register vDU to Server. 
+	//The hello message includes serial number of vDU
+  rpc SayHello (HelloRequest) returns (HelloResponse);
+}
+
+
+message HelloRequest {
+  string serial_number = 1;
+  string card_ip = 2;
+}
+
+message HelloResponse {
+	ResultStatus result = 1;
+	string error_message = 2; //empty when result is SUCCESS
+	optional int32 hb_interval = 3;
+	optional int32 l1hb_interval = 4;
+}
