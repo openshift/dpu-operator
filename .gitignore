@@ -26,4 +26,6 @@ doc/*.png
 *.swo
 *~
 
+/.tmp/
+
 /ocp-traffic-flow-tests/
