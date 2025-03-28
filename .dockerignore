@@ -7,3 +7,4 @@ examples/
 Dockerfile.*
 *.Dockerfile
 .dockerignore
+/.tmp/
