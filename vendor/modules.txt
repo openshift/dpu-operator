@@ -356,7 +356,7 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250325152643-f4b38d462f87
+# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250403171125-222ca733c6a6
 ## explicit; go 1.23.6
 github.com/intel/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd
 github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod
@@ -949,6 +949,7 @@ golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 ## explicit; go 1.22.0
 golang.org/x/exp/constraints
