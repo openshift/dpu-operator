@@ -293,6 +293,7 @@ incremental-prep-local-deploy: tools
 local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
 	-$(MAKE) undeploy
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
+	$(KUBECTL) -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=120s
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
