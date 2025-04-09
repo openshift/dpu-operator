@@ -63,8 +63,7 @@ func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string)
 				Ptype:      1,
 				MacAddress: m,
 				LogicalBridges: []string{
-					// TODO: Remove +2
-					fmt.Sprintf("%d", vf+2),
+					fmt.Sprintf("%d", vf),
 				},
 			},
 		},
