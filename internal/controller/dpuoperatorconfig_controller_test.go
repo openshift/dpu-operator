@@ -147,30 +147,6 @@ func stopDPUControllerManager(cancel context.CancelFunc, wg *sync.WaitGroup) {
 	wg.Wait()
 }
 
-func waitAllNodesReady(client client.Client) {
-	var nodes corev1.NodeList
-	Eventually(func() error {
-		return client.List(context.Background(), &nodes)
-	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
-
-	Eventually(func() bool {
-		var latestNodes corev1.NodeList
-		if err := client.List(context.Background(), &latestNodes); err != nil {
-			return false
-		}
-		readyNodes := 0
-		for _, node := range latestNodes.Items {
-			for _, cond := range node.Status.Conditions {
-				if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
-					readyNodes++
-					break
-				}
-			}
-		}
-		return readyNodes == len(latestNodes.Items)
-	}, testutils.TestInitialSetupTimeout, testutils.TestRetryInterval).Should(BeTrue())
-}
-
 var _ = Describe("Main Controller", Ordered, func() {
 	var cancel context.CancelFunc
 	var ctx context.Context
@@ -188,7 +164,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 		ctx, cancel = context.WithCancel(context.Background())
 		wg = sync.WaitGroup{}
 		mgr = startDPUControllerManager(ctx, client, &wg)
-		waitAllNodesReady(mgr.GetClient())
+		testutils.WaitAllNodesReady(mgr.GetClient())
 
 		found := configv1.DpuOperatorConfig{}
 		Eventually(func() error {

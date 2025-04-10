@@ -195,3 +195,15 @@ func AreIPsInSameSubnet(ip1, ip2, subnet string) bool {
 
 	return ipNet.Contains(net.ParseIP(ip1)) && ipNet.Contains(net.ParseIP(ip2))
 }
+
+func GetFirstNode(c client.Client) (corev1.Node, error) {
+	nodes := &corev1.NodeList{}
+	err := c.List(context.Background(), nodes)
+	if err != nil {
+		return corev1.Node{}, fmt.Errorf("Failed to get nodes: %v", err)
+	}
+	if len(nodes.Items) == 0 {
+		return corev1.Node{}, fmt.Errorf("No nodes found in cluster")
+	}
+	return nodes.Items[0], nil
+}
