@@ -2,7 +2,6 @@ package drain
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -60,7 +59,7 @@ func ensureTestPodCreated(c client.Client, node corev1.Node) {
 
 	Eventually(func() bool {
 		return testPodIsRunning(c, node)
-	}, testutils.TestAPITimeout*4, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
+	}, testutils.TestAPITimeout*8, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
 }
 
 func ensureTestPodDeleted(c client.Client, node corev1.Node) {
@@ -73,7 +72,7 @@ func ensureTestPodDeleted(c client.Client, node corev1.Node) {
 		exists, err := testPodExists(c, node)
 		Expect(err).NotTo(HaveOccurred())
 		return !exists
-	}, testutils.TestAPITimeout*4, testutils.TestRetryInterval).Should(BeTrue(), "Pod still exists after deletion")
+	}, testutils.TestAPITimeout*8, testutils.TestRetryInterval).Should(BeTrue(), "Pod still exists after deletion")
 }
 
 func testPodExists(c client.Client, node corev1.Node) (bool, error) {
@@ -149,6 +148,7 @@ var _ = Describe("Drain Interface", Ordered, func() {
 		restConfig = testCluster.EnsureExists()
 		k8sClient, err = client.New(restConfig, client.Options{})
 		Expect(err).NotTo(HaveOccurred())
+		testutils.WaitAllNodesReady(k8sClient)
 		node, err = testutils.GetFirstNode(k8sClient)
 		testDrainer, err = NewDrainer(restConfig)
 		Expect(err).NotTo(HaveOccurred())
@@ -160,7 +160,6 @@ var _ = Describe("Drain Interface", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		fmt.Println("AFter all runinng trop level")
 		// Make sure we leave the cluster in a clean state: no draining and no test pod
 		ensureTestPodDeleted(k8sClient, node)
 		testDrainer.CompleteDrainNode(context.TODO(), &node)
