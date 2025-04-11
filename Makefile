@@ -73,6 +73,9 @@ CONTAINER_TOOL ?= podman
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+%/.dirstamp:
+	mkdir -p "$*" && touch "$@"
+
 .PHONY: default
 default: build
 
@@ -155,14 +158,18 @@ prow-ci-manifests-check: manifests
 		exit 1; \
 	fi
 
+.tmp/go-vendored: .tmp/.dirstamp
+	touch .tmp/go-vendored
+
 .PHONY: vendor
-vendor:
+vendor: .tmp/.dirstamp
 	for d in . dpu-api api tools ; do \
 		if [ "$$d" = . ] ; then \
 			(cd $$d && go mod vendor) || exit $$? ; \
 		fi ; \
 		(cd $$d && go mod tidy) || exit $$? ; \
 	done
+	touch .tmp/go-vendored
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -269,7 +276,8 @@ docker-build: test ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-GO_CONTAINER_CACHE = /tmp/dpu-operator-cache
+GO_CACHE_DIR = /tmp/dpu-operator-cache
+
 REGISTRY ?= $(shell hostname)
 # Use the image urls from the yaml that is used with Kustomize for local
 # development.
@@ -280,17 +288,17 @@ INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
 NETWORK_RESOURCES_INJECTOR_IMAGE:= $(REGISTRY):5000/network-resources-injector-image:dev
 
 .PHONY: local-deploy-prep
-prep-local-deploy: tools
+prep-local-deploy: bin/config
 	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: incremental-prep-local-deploy
-incremental-prep-local-deploy: tools
+incremental-prep-local-deploy: bin/config
 	./bin/config -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: local-deploy
-local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
+local-deploy: prep-local-deploy manifests kustomize ## Deploy controller with images hosted on local registry
 	-$(MAKE) undeploy
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
 	$(KUBECTL) -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=120s
@@ -305,15 +313,47 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	done
 	@echo "Namespace 'openshift-dpu-operator' has been removed."
 
+DOCKERFILES = \
+    Dockerfile.rhel \
+    Dockerfile.daemon.rhel \
+    Dockerfile.mrvlVSP.rhel \
+    Dockerfile.IntelVSP.rhel \
+    Dockerfile.networkResourcesInjector.rhel \
+    $(NULL)
+
+REBUILD_PATCH_DOCKERFILES_LASTSTATE = $(shell if [ ! -f .tmp/patch-dockerfiles.laststate ] || [ "$$(cat .tmp/patch-dockerfiles.laststate)" != "$$BUILD_PATCH_DOCKERFILES" ] ; then echo 1; fi)
+
+ifeq ($(REBUILD_PATCH_DOCKERFILES_LASTSTATE), 1)
+.PHONY: .tmp/patch-dockerfiles.laststate
+endif
+.tmp/patch-dockerfiles.laststate: .tmp/.dirstamp
+	printf "%s\n" "$$BUILD_PATCH_DOCKERFILES" > ".tmp/patch-dockerfiles.laststate"
+
+.tmp/patch-dockerfile.prepareimage: scripts/patch-dockerfiles.sh .tmp/patch-dockerfiles.laststate
+	if [ "$$BUILD_PATCH_DOCKERFILES" = 1 ] ; then \
+		scripts/patch-dockerfiles.sh build-force ; \
+	fi
+	touch "$@"
+
+.tmp/Dockerfile.%: Dockerfile.% .tmp/patch-dockerfile.prepareimage
+	if [ "$$BUILD_PATCH_DOCKERFILES" = 1 ] ; then \
+		scripts/patch-dockerfiles.sh patch "$<" "$@" ; \
+	else \
+		cp "$<" "$@" ; \
+	fi
+
+DOCKERFILES_TMP = $(patsubst Dockerfile.%,.tmp/Dockerfile.%,$(DOCKERFILES))
+
+.PHONY: Dockerfiles
+Dockerfiles: $(DOCKERFILES_TMP)
 
 .PHONY: local-build
-local-build: ## Build all container images necessary to run the whole operator
-	mkdir -p $(GO_CONTAINER_CACHE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
+local-build: Dockerfiles go-cache
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f .tmp/Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
 
 .PHONE: prepare-multi-arch
 prepare-multi-arch:
@@ -321,39 +361,38 @@ prepare-multi-arch:
 	setenforce 0
 
 .PHONY: go-cache
-go-cache: ## Build all container images necessary to run the whole operator
-	mkdir -p $(GO_CONTAINER_CACHE)
+go-cache:
+	mkdir -p $(GO_CACHE_DIR)
 
-## Build all container images necessary to run the whole operator
 .PHONY: local-buildx
-local-buildx: prepare-multi-arch go-cache local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-network-resources-injector
+local-buildx: local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-network-resources-injector
 	@echo "local-buildx completed"
 
 define build_image
 	buildah manifest rm $($(1))-manifest || true
 	buildah manifest create $($(1))-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f $(2) -t $($(1))
+	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform linux/amd64,linux/arm64 -v $(GO_CACHE_DIR):/go:z -f $(2) -t $($(1))
 endef
 
 .PHONY: local-buildx-manager
-local-buildx-manager: prepare-multi-arch go-cache
-	$(call build_image,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+local-buildx-manager: .tmp/Dockerfile.rhel prepare-multi-arch go-cache
+	$(call build_image,DPU_OPERATOR_IMAGE,$<)
 
 .PHONY: local-buildx-daemon
-local-buildx-daemon: prepare-multi-arch go-cache
-	$(call build_image,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+local-buildx-daemon: .tmp/Dockerfile.daemon.rhel prepare-multi-arch go-cache
+	$(call build_image,DPU_DAEMON_IMAGE,$<)
 
 .PHONY: local-buildx-marvell-vsp
-local-buildx-marvell-vsp: prepare-multi-arch go-cache
-	$(call build_image,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+local-buildx-marvell-vsp: .tmp/Dockerfile.mrvlVSP.rhel prepare-multi-arch go-cache
+	$(call build_image,MARVELL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-intel-vsp
-local-buildx-intel-vsp: prepare-multi-arch go-cache
-	$(call build_image,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+local-buildx-intel-vsp: .tmp/Dockerfile.IntelVSP.rhel prepare-multi-arch go-cache
+	$(call build_image,INTEL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-network-resources-injector
-local-buildx-network-resources-injector: prepare-multi-arch go-cache
-	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
+local-buildx-network-resources-injector: .tmp/Dockerfile.networkResourcesInjector.rhel prepare-multi-arch go-cache
+	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,$<)
 
 TMP_FILE=/tmp/dpu-operator-incremental-build
 define build_image_incremental
@@ -362,41 +401,40 @@ define build_image_incremental
     $(call build_image,$(1),$(TMP_FILE))
 endef
 
-## Build all container images necessary to run the whole operator incrementally.
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: tools prepare-multi-arch go-cache
+local-buildx-incremental-manager: tmp/Dockerfile.rhel bin/incremental prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
-	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
+	$(call build_image_incremental,DPU_OPERATOR_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: tools prepare-multi-arch go-cache
+local-buildx-incremental-daemon: .tmp/Dockerfile.daemon.rhel bin/incremental prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
-	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
+	$(call build_image_incremental,DPU_DAEMON_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: tools prepare-multi-arch go-cache
+local-buildx-incremental-marvell-vsp: .tmp/Dockerfile.mrvlVSP.rhel bin/incremental prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
-	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
+	$(call build_image_incremental,MARVELL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-intel-vsp
-local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
+local-buildx-incremental-intel-vsp: .tmp/Dockerfile.IntelVSP.rhel bin/incremental prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-intel-vsp
 	GOARCH=amd64 $(MAKE) build-intel-vsp
-	$(call build_image_incremental,INTEL_VSP_IMAGE,Dockerfile.IntelVSP.rhel)
+	$(call build_image_incremental,INTEL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-network-resources-injector
-local-buildx-incremental-network-resources-injector: prepare-multi-arch go-cache
+local-buildx-incremental-network-resources-injector: .tmp/Dockerfile.networkResourcesInjector.rhel bin/incremental prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-network-resources-injector
 	GOARCH=amd64 $(MAKE) build-network-resources-injector
-	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
+	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,$<)
 
 .PHONY: incremental-local-buildx
-incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-network-resources-injector
+incremental-local-buildx: incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-network-resources-injector
 	@echo "local-buildx-incremental completed"
 
 .PHONY: local-pushx-incremental
@@ -463,10 +501,14 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
-.PHONY: tools
-tools:
+bin/config: tools/config/config.go tools/config/go.mod .tmp/go-vendored bin/.dirstamp
 	cd tools/config && go build -o ../../bin/config config.go
+
+bin/incremental: tools/incremental/incremental.go tools/incremental/go.mod .tmp/go-vendored bin/.dirstamp
 	cd tools/incremental && go build -o ../../bin/incremental incremental.go
+
+.PHONY: tools
+tools: bin/config bin/incremental
 
 ##@ Build Dependencies
 
