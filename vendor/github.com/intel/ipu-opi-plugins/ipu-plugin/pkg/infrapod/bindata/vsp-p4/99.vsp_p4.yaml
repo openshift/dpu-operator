@@ -43,6 +43,8 @@ spec:
           mountPath: /dev
         - name: hugepages
           mountPath: /dev/hugepages
+        - name: opt-p4
+          mountPath: /opt/p4
       dnsPolicy: ClusterFirstWithHostNet
       volumes:
       - name: lib-modules
@@ -60,3 +62,6 @@ spec:
       - name: hugepages
         hostPath:
           path: /dev/hugepages
+      - name: opt-p4
+        persistentVolumeClaim:
+          claimName: vsp-p4-pvc
