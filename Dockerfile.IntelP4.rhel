@@ -1,0 +1,10 @@
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /
+
+COPY cmd/intelvsp/p4sdk/entrypoint.sh /
+
+ENTRYPOINT ["/entrypoint.sh"]
+

@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi:9.5
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 
 ARG P4_NAME=fxp-net_linux-networking
 ENV P4_NAME $P4_NAME
@@ -18,6 +18,7 @@ RUN dnf install -y \
    libedit-3.1-38.20210216cvs.el9 \
    net-tools-2.0-0.64.20160912git.el9 \
    libatomic-0:11.5.0-5.el9_5 \
+   libconfig-1.7.2-9.el9 \
    gcc gcc-c++ \
    && dnf clean all
 
@@ -26,11 +27,6 @@ COPY cmd/intelvsp/$P4_NAME/* /opt/${P4_NAME}/
 COPY cmd/intelvsp/p4sdk/entrypoint.sh /
 COPY cmd/intelvsp/p4sdk/es2k_skip_p4.conf.template /
 
-RUN if [ "$TARGETARCH" = "amd64" ]; then export ARCHSUFFIX="x86_64"; \
-    else export ARCHSUFFIX="aarch64"; fi; \
-    curl -L -o libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm \
-     https://mirror.stream.centos.org/9-stream/BaseOS/$ARCHSUFFIX/os/Packages/libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm \
-    && dnf -y install libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm && rm -f libconfig-1.7.2-9.el9.$ARCHSUFFIX.rpm && dnf clean all
 
 RUN python3 -m pip install --no-cache-dir \
     netaddr==1.2.1

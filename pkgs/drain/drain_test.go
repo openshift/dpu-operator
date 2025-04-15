@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -16,29 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var (
-	restConfig    *rest.Config
-	k8sClient     client.Client
-	testCluster   testutils.KindCluster
-	node          corev1.Node
-	testDrainer   *Drainer
-	podName       = "test-pod"
-	containerName = "test-container"
-	podNamespace  = "default"
-	imageName     = "nginx:latest"
-)
-
-func ensureTestPodCreated(c client.Client) {
-	pod := &corev1.Pod{
+func testPod(node corev1.Node) *corev1.Pod {
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: podNamespace,
+			Name:      "test-pod",
+			Namespace: "default",
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:  containerName,
-					Image: imageName,
+					Name:  "test-container",
+					Image: "nginx:latest",
 					Ports: []corev1.ContainerPort{
 						{
 							ContainerPort: 80,
@@ -49,33 +38,65 @@ func ensureTestPodCreated(c client.Client) {
 			NodeName: node.Name,
 		},
 	}
-	err := c.Create(context.Background(), pod)
-	Expect(err).NotTo(HaveOccurred())
-
-	Eventually(func() bool {
-		return testPodIsRunning()
-	}, testutils.TestAPITimeout*4, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
 }
 
-func ensureTestPodDeleted(c client.Client) {
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: podNamespace,
-		},
+func ensureTestPodCreated(c client.Client, node corev1.Node) {
+	pod := testPod(node)
+	existingPod := &corev1.Pod{}
+	err := c.Get(context.Background(), client.ObjectKey{
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+	}, existingPod)
+
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			err := c.Create(context.Background(), pod)
+			Expect(err).NotTo(HaveOccurred())
+		}
 	}
 
-	err := c.Delete(context.Background(), pod)
-	Expect(err).NotTo(HaveOccurred())
-
-	Eventually(testPodIsRunning, testutils.TestAPITimeout*4, testutils.TestRetryInterval).
-		Should(BeFalse(), "Test pod still exists after deletion")
+	Eventually(func() bool {
+		return testPodIsRunning(c, node)
+	}, testutils.TestAPITimeout*8, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
 }
 
-func testPodIsRunning() bool {
-	pod := testutils.GetPod(k8sClient, podName, podNamespace)
-	if pod != nil {
-		return pod.Status.Phase == corev1.PodRunning
+func ensureTestPodDeleted(c client.Client, node corev1.Node) {
+	if exists, err := testPodExists(c, node); exists {
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.Delete(context.Background(), testPod(node))).NotTo(HaveOccurred())
+	}
+
+	Eventually(func() bool {
+		exists, err := testPodExists(c, node)
+		Expect(err).NotTo(HaveOccurred())
+		return !exists
+	}, testutils.TestAPITimeout*8, testutils.TestRetryInterval).Should(BeTrue(), "Pod still exists after deletion")
+}
+
+func testPodExists(c client.Client, node corev1.Node) (bool, error) {
+	pod := testPod(node)
+	existingPod := &corev1.Pod{}
+	err := c.Get(context.Background(), client.ObjectKey{
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+	}, existingPod)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func testPodIsRunning(c client.Client, node corev1.Node) bool {
+	pod := testPod(node)
+
+	existingPod := testutils.GetPod(c, pod.Name, pod.Namespace)
+	if existingPod != nil {
+		return existingPod.Status.Phase == corev1.PodRunning
 	}
 	return false
 }
@@ -101,20 +122,20 @@ func isNodeSchedulable(n corev1.Node) bool {
 	return true
 }
 
-func getNode(c client.Client) corev1.Node {
-	nodes := &corev1.NodeList{}
-	err := c.List(context.Background(), nodes)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(nodes.Items).NotTo(BeEmpty(), "No nodes found in the cluster")
-	return nodes.Items[0]
-}
-
 func TestKindCluster(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Drain helper suite")
 }
 
 var _ = Describe("Drain Interface", Ordered, func() {
+	var (
+		restConfig  *rest.Config
+		k8sClient   client.Client
+		testCluster testutils.KindCluster
+		node        corev1.Node
+		testDrainer *Drainer
+	)
+
 	BeforeAll(func() {
 		var err error
 
@@ -123,84 +144,83 @@ var _ = Describe("Drain Interface", Ordered, func() {
 		}
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-		// Create a KindCluster
 		testCluster = testutils.KindCluster{Name: "dpu-operator-test-cluster"}
 		restConfig = testCluster.EnsureExists()
-
 		k8sClient, err = client.New(restConfig, client.Options{})
 		Expect(err).NotTo(HaveOccurred())
-		node = getNode(k8sClient)
+		testutils.WaitAllNodesReady(k8sClient)
+		node, err = testutils.GetFirstNode(k8sClient)
+		testDrainer, err = NewDrainer(restConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		// outer block prepares a clean cluster without a pod
+		testDrainer.CompleteDrainNode(context.TODO(), &node)
+		Expect(isNodeSchedulable(node)).To(BeTrue(), "Node is not schedulable: "+node.Name)
+		ensureTestPodDeleted(k8sClient, node)
 	})
+
 	AfterAll(func() {
+		// Make sure we leave the cluster in a clean state: no draining and no test pod
+		ensureTestPodDeleted(k8sClient, node)
+		testDrainer.CompleteDrainNode(context.TODO(), &node)
 		if os.Getenv("FAST_TEST") == "false" {
 			testCluster.EnsureDeleted()
-		} else {
-			ensureTestPodDeleted(k8sClient)
 		}
 	})
-	Context("When node drain has not been requested", func() {
-		It("should have all nodes available", func() {
-			By("checking that all nodes are ready and schedulable")
-			ctrl.Log.Info("Checking node is ready", "nodeName", node.Name)
 
-			Expect(isNodeReady(node)).To(BeTrue(), "Node is not ready: "+node.Name)
-			Expect(isNodeSchedulable(node)).To(BeTrue(), "Node is not schedulable: "+node.Name)
-		})
-		It("should be able to run a workload", func() {
-			By("scheduling a test workload")
-			ctrl.Log.Info("Creating test pod on node", "nodeName", node.Name)
-			ensureTestPodCreated(k8sClient)
+	Context("When the drainer has not been requested", func() {
+		It("should be able to run a workload on the target node", func() {
+			By("Creating a test pod")
+			ensureTestPodCreated(k8sClient, node)
+			By("Cleaning up the test pod")
+			ensureTestPodDeleted(k8sClient, node)
 		})
 	})
-	Context("When node drain and cordon has been requested", func() {
-		var drainSuccess bool
-		var err error
 
+	Context("When there is a pod running and drain is requested", func() {
 		BeforeAll(func() {
-			Eventually(testPodIsRunning, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
+			ensureTestPodCreated(k8sClient, node)
 
-			ctrl.Log.Info("Draining node", "nodeName", node.Name)
-			testDrainer, err = NewDrainer(restConfig)
-			Expect(err).NotTo(HaveOccurred())
-
-			drainSuccess, err = testDrainer.DrainNode(context.TODO(), &node, true)
+			drainSuccess, err := testDrainer.DrainNode(context.TODO(), &node, true)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(drainSuccess).To(BeTrue())
 		})
 
-		It("should drain the node and mark it unschedulable", func() {
-			By("checking that the node is cordoned")
-			Expect(node.Spec.Unschedulable).To(BeTrue(), "Node is still schedulable after drain: "+node.Name)
+		AfterAll(func() {
+			ensureTestPodDeleted(k8sClient, node)
+			testDrainer.CompleteDrainNode(context.TODO(), &node)
+			Eventually(func() bool { return isNodeSchedulable(node) }, testutils.TestAPITimeout*4, testutils.TestRetryInterval).Should(BeTrue(), "Node is not schedulable: "+node.Name)
 		})
 
-		It("should have any workload pods drained", func() {
-			By("verifying the test pod has been removed")
-			ctrl.Log.Info("Ensuring workload has been drained", "nodeName", node.Name)
-			Eventually(testPodIsRunning, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeFalse(), "Test pod still exists after drain")
+		It("should mark the node as unschedulable", func() {
+			Eventually(func() bool { return isNodeSchedulable(node) }).Should(BeFalse(), "Node is still schedulable after drain: "+node.Name)
+		})
+
+		It("Should evict the running pod", func() {
+			Eventually(func() bool { return testPodIsRunning(k8sClient, node) }, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeFalse(), "Test pod still exists after drain")
 		})
 	})
-	Context("When node drain has completed", func() {
-		var drainSuccess bool
-		var err error
 
+	Context("When a node drain has completed", func() {
 		BeforeAll(func() {
-			ctrl.Log.Info("Completing drain on node", "nodeName", node.Name)
-			drainSuccess, err = testDrainer.CompleteDrainNode(context.TODO(), &node)
-			Expect(drainSuccess).To(BeTrue())
+			drainSuccess, err := testDrainer.DrainNode(context.TODO(), &node, true)
 			Expect(err).NotTo(HaveOccurred())
-
-			ctrl.Log.Info("Checking node is ready", "nodeName", node.Name)
+			Expect(drainSuccess).To(BeTrue())
+			testDrainer.CompleteDrainNode(context.TODO(), &node)
 		})
 
-		It("should have all nodes available", func() {
-			By("checking that all nodes are ready and schedulable")
-			Expect(isNodeReady(node)).To(BeTrue(), "Node is not ready: "+node.Name)
-			Expect(isNodeSchedulable(node)).To(BeTrue(), "Node is not schedulable: "+node.Name)
+		AfterAll(func() {
+			ensureTestPodDeleted(k8sClient, node)
 		})
-		It("should be able to run a workload", func() {
-			By("scheduling a test workload")
-			ctrl.Log.Info("Creating test pod on node", "nodeName", node.Name)
-			ensureTestPodCreated(k8sClient)
+
+		It("should mark the node as schedulable again", func() {
+			Eventually(func() bool { return isNodeSchedulable(node) }, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeTrue(), "Node should be schedulable but it isn't")
+		})
+
+		It("should allow a new pod to run on the node", func() {
+			ensureTestPodCreated(k8sClient, node)
+			Eventually(func() bool { return testPodIsRunning(k8sClient, node) }, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeTrue(), "Test pod not running after drain complete")
+			ensureTestPodDeleted(k8sClient, node)
 		})
 	})
 })
