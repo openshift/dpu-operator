@@ -404,7 +404,7 @@ endef
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: .tmp/Dockerfile.rhel bin/incremental prepare-multi-arch go-cache
+local-buildx-incremental-manager: tmp/Dockerfile.rhel bin/incremental prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
 	$(call build_image_incremental,DPU_OPERATOR_IMAGE,$<)
