@@ -158,18 +158,14 @@ prow-ci-manifests-check: manifests
 		exit 1; \
 	fi
 
-.tmp/go-vendored: .tmp/.dirstamp
-	touch .tmp/go-vendored
-
 .PHONY: vendor
-vendor: .tmp/.dirstamp
+vendor:
 	for d in . dpu-api api tools ; do \
 		if [ "$$d" = . ] ; then \
 			(cd $$d && go mod vendor) || exit $$? ; \
 		fi ; \
 		(cd $$d && go mod tidy) || exit $$? ; \
 	done
-	touch .tmp/go-vendored
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -288,17 +284,17 @@ INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
 NETWORK_RESOURCES_INJECTOR_IMAGE:= $(REGISTRY):5000/network-resources-injector-image:dev
 
 .PHONY: local-deploy-prep
-prep-local-deploy: bin/config
+prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: incremental-prep-local-deploy
-incremental-prep-local-deploy: bin/config
+incremental-prep-local-deploy: tools
 	./bin/config -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: local-deploy
-local-deploy: prep-local-deploy manifests kustomize ## Deploy controller with images hosted on local registry
+local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
 	-$(MAKE) undeploy
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
 	$(KUBECTL) -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=120s
@@ -404,31 +400,31 @@ endef
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: tmp/Dockerfile.rhel bin/incremental prepare-multi-arch go-cache
+local-buildx-incremental-manager: tmp/Dockerfile.rhel tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
 	$(call build_image_incremental,DPU_OPERATOR_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: .tmp/Dockerfile.daemon.rhel bin/incremental prepare-multi-arch go-cache
+local-buildx-incremental-daemon: .tmp/Dockerfile.daemon.rhel tools prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
 	$(call build_image_incremental,DPU_DAEMON_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: .tmp/Dockerfile.mrvlVSP.rhel bin/incremental prepare-multi-arch go-cache
+local-buildx-incremental-marvell-vsp: .tmp/Dockerfile.mrvlVSP.rhel tools prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
 	$(call build_image_incremental,MARVELL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-intel-vsp
-local-buildx-incremental-intel-vsp: .tmp/Dockerfile.IntelVSP.rhel bin/incremental prepare-multi-arch go-cache
+local-buildx-incremental-intel-vsp: .tmp/Dockerfile.IntelVSP.rhel prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-intel-vsp
 	GOARCH=amd64 $(MAKE) build-intel-vsp
 	$(call build_image_incremental,INTEL_VSP_IMAGE,$<)
 
 .PHONY: local-buildx-incremental-network-resources-injector
-local-buildx-incremental-network-resources-injector: .tmp/Dockerfile.networkResourcesInjector.rhel bin/incremental prepare-multi-arch go-cache
+local-buildx-incremental-network-resources-injector: .tmp/Dockerfile.networkResourcesInjector.rhel prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-network-resources-injector
 	GOARCH=amd64 $(MAKE) build-network-resources-injector
 	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,$<)
@@ -501,14 +497,10 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
-bin/config: tools/config/config.go tools/config/go.mod .tmp/go-vendored bin/.dirstamp
-	cd tools/config && go build -o ../../bin/config config.go
-
-bin/incremental: tools/incremental/incremental.go tools/incremental/go.mod .tmp/go-vendored bin/.dirstamp
-	cd tools/incremental && go build -o ../../bin/incremental incremental.go
-
 .PHONY: tools
-tools: bin/config bin/incremental
+tools:
+	cd tools/config && go build -o ../../bin/config config.go
+	cd tools/incremental && go build -o ../../bin/incremental incremental.go
 
 ##@ Build Dependencies
 

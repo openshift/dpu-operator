@@ -21,6 +21,6 @@ pushd "$DIR/" 1>/dev/null
 "$@"
 popd 1>/dev/null
 
-diff -r -x .tmp . "$DIR/" || die "There is a difference between \"$PWD\" and \"$DIR\" after calling \`$@\`"
+diff -r . "$DIR/" || die "There is a difference between \"$PWD\" and \"$DIR\" after calling \`$@\`"
 
 rm -rf "$DIR/"
