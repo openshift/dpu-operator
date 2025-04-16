@@ -13,6 +13,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -89,6 +90,35 @@ func setupExternalClient(externalClientIp, externalClientDev, workloadSubnet str
 			fmt.Printf("Warning: Failed to remove route: %v, output: %s\n", err, output)
 		}
 	})
+}
+
+func createAndWaitForNFPod(ctx context.Context, dpuSideClient client.Client, sfc client.Object) (*corev1.Pod, error) {
+	// Ensure no stale NF pod is hanging around
+	staleGone := func() (bool, error) {
+		return testutils.GetPod(dpuSideClient, nfName, vars.Namespace) == nil, nil
+	}
+	if err := wait.PollImmediate(interval, timeout, staleGone); err != nil {
+		return nil, fmt.Errorf("old NF pod %q still present after %s: %w", nfName, timeout, err)
+	}
+	// Create NF Pod using ServiceFunctionChain custom resource
+	if err := dpuSideClient.Create(ctx, sfc); err != nil {
+		return nil, fmt.Errorf("creating NF Pod: %w", err)
+	}
+	// Poll until the NF pod is Running with the expected image
+	var nfPod *corev1.Pod
+	ready := func() (bool, error) {
+		nfPod = testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
+		if nfPod == nil {
+			return false, nil // not created yet
+		}
+		isRightImage := nfPod.Spec.Containers[0].Image == nfImage
+		isRunning := nfPod.Status.Phase == corev1.PodRunning
+		return isRightImage && isRunning, nil
+	}
+	if err := wait.PollImmediate(interval, timeout, ready); err != nil {
+		return nil, fmt.Errorf("NF pod %q failed to reach Running within %s: %w", nfName, timeout, err)
+	}
+	return nfPod, nil
 }
 
 func TestControllers(t *testing.T) {
@@ -308,6 +338,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			nfIngressIp                string
 			nfEgressIp                 string
 			externalClientIp           string
+			externalClientDev          string
 			externalSubnet             string
 			skipNetworkFunctionTesting = false
 			sfc                        *configv1.ServiceFunctionChain
@@ -351,6 +382,8 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			// This should be the IP we expect to be able to reach from the DPU's secondary network
 			externalClientIp, err = getEnv("EXTERNAL_CLIENT_IP")
 			Expect(err).NotTo(HaveOccurred())
+			// This should be the dev on the external client that is connected to the DPU's secondary network
+			externalClientDev, err = getEnv("EXTERNAL_CLIENT_DEV")
 			Expect(err).NotTo(HaveOccurred())
 			// This should be the IP we want to have assigned to the ingress of the NF and reachable from the external client
 			nfIngressIp, err = getEnv("NF_INGRESS_IP")
@@ -450,6 +483,40 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				pingTest(dpuClientSet, dpuRestConfig, nfPod, pod1_ip, nfPod.Name, pod1.Name)
 				pingTest(dpuClientSet, dpuRestConfig, nfPod, pod2_ip, nfPod.Name, pod2.Name)
 			})
+			g.It("Should support Network-function -> external", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function Testing")
+				}
+
+				fmt.Printf("Assigning NF ingress port IP %s\n", nfIngressIp)
+				_, err := testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip addr add %s dev net2", nfIngressIp+"/24"))
+				Expect(err).NotTo(HaveOccurred())
+				// Explicitly set the route just incase
+				_, err = testutils.ExecInPod(dpuClientSet, dpuRestConfig, nfPod, fmt.Sprintf("ip route replace %s dev net2", externalSubnet))
+
+				setupExternalClient(externalClientIp, externalClientDev, workloadSubnet)
+
+				fmt.Println("Testing NF-to-pod on remote node connectivity")
+				pingTest(dpuClientSet, dpuRestConfig, nfPod, externalClientIp, nfPod.Name, "external")
+			})
+			g.It("Should support pod -> external", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function Testing")
+				}
+
+				fmt.Printf("Setting route to %s in workload pods\n", externalSubnet)
+				_, err := testutils.ExecInPod(hostClientSet, hostRestConfig, pod1, fmt.Sprintf("ip route add %s dev net1", externalSubnet))
+				Expect(err).NotTo(HaveOccurred())
+				_, err = testutils.ExecInPod(hostClientSet, hostRestConfig, pod2, fmt.Sprintf("ip route add %s dev net1", externalSubnet))
+				Expect(err).NotTo(HaveOccurred())
+
+				setupExternalClient(externalClientIp, externalClientDev, workloadSubnet)
+
+				fmt.Println("Testing pod-to-pod on remote node connectivity")
+				pingTest(hostClientSet, hostRestConfig, pod1, externalClientIp, pod1.Name, "external")
+				pingTest(hostClientSet, hostRestConfig, pod2, externalClientIp, pod2.Name, "external")
+
+			})
 			g.It("Should delete the network function pod when deleting an SFC", func() {
 				err := dpuSideClient.Delete(context.TODO(), sfc)
 				Expect(err).NotTo(HaveOccurred())
@@ -459,6 +526,51 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 					return testutils.GetPod(dpuSideClient, nfName, vars.Namespace) == nil
 				}, timeout, interval).Should(BeTrue())
 			})
+			g.It("Should keep pod -> external connectivity independent of the NF lifecycle", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function testing")
+				}
+
+				fmt.Println("Should create a pod when creating an SFC")
+				nfPod, err := createAndWaitForNFPod(context.TODO(), dpuSideClient, sfc)
+				Expect(err).NotTo(HaveOccurred(), "NF pod never became Running")
+				fmt.Println("NF pod successfully created:", nfPod.Name)
+
+				// setup workload-pod route so their egress hits the SR-IOV interface.
+				for _, p := range []*corev1.Pod{pod1, pod2} {
+					_, err = testutils.ExecInPod(
+						hostClientSet,
+						hostRestConfig,
+						p,
+						fmt.Sprintf("ip route replace %s dev net1", externalSubnet),
+					)
+					Expect(err).NotTo(HaveOccurred())
+				}
+
+				// External Linux host we ping from the cluster.
+				setupExternalClient(externalClientIp, externalClientDev, workloadSubnet)
+
+				fmt.Println("[NF-up] Verifying pod-to-external connectivity")
+				for _, p := range []*corev1.Pod{pod1, pod2} {
+					pingTest(hostClientSet, hostRestConfig, p, externalClientIp, p.Name, "external-NF-up")
+				}
+
+				// Delete the SFC, wait for NF pod to vanish
+				fmt.Println("Deleting SFC – this should terminate the NF pod")
+				err = dpuSideClient.Delete(context.TODO(), sfc)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() bool {
+					return testutils.GetPod(dpuSideClient, nfName, vars.Namespace) == nil
+				}, timeout, interval).Should(BeTrue(), "NF pod should disappear after SFC deletion")
+
+				// The same ping from Host Pod to external should still work with NF gone
+				fmt.Println("[NF-down] Verifying pod-to-external connectivity")
+				for _, p := range []*corev1.Pod{pod1, pod2} {
+					pingTest(hostClientSet, hostRestConfig, p, externalClientIp, p.Name, "external-NF-down")
+				}
+			})
+
 		})
 		g.AfterAll(func() {
 			// To maintain idempotency, make sure to clean up the SFC we created incase an earlier test failed
