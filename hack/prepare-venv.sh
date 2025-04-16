@@ -27,5 +27,16 @@ setup_venv() {
     cd -
 }
 
-setup_venv cluster-deployment-automation /tmp/cda-venv "sh ./dependencies.sh"
-setup_venv kubernetes-traffic-flow-tests /tmp/tft-venv "pip install -r requirements.txt"
+setup_all_venvs() {
+    setup_venv cluster-deployment-automation /tmp/cda-venv "sh ./dependencies.sh"
+    setup_venv kubernetes-traffic-flow-tests /tmp/tft-venv "pip install -r requirements.txt"
+}
+
+exec 9> "/tmp/dpu-operator-prepare-venv.lock"
+
+while ! flock -n 9 ; do
+  echo "Waiting for lock..."
+  sleep 1
+done
+
+setup_all_venvs
