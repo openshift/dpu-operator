@@ -280,17 +280,17 @@ INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
 NETWORK_RESOURCES_INJECTOR_IMAGE:= $(REGISTRY):5000/network-resources-injector-image:dev
 
 .PHONY: local-deploy-prep
-prep-local-deploy: tools
-	./bin/config -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
+prep-local-deploy:
+	go run ./tools/config/config.go -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: incremental-prep-local-deploy
-incremental-prep-local-deploy: tools
-	./bin/config -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
+incremental-prep-local-deploy:
+	go run ./tools/config/config.go -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
 .PHONY: local-deploy
-local-deploy: prep-local-deploy tools manifests kustomize ## Deploy controller with images hosted on local registry
+local-deploy: prep-local-deploy manifests kustomize ## Deploy controller with images hosted on local registry
 	-$(MAKE) undeploy
 	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
 	$(KUBECTL) -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=120s
@@ -357,7 +357,7 @@ local-buildx-network-resources-injector: prepare-multi-arch go-cache
 
 TMP_FILE=/tmp/dpu-operator-incremental-build
 define build_image_incremental
-    bin/incremental -dockerfile $(2) -base-uri $($(1))-base -output-file $(TMP_FILE)
+    go run ./tools/incremental/incremental.go -dockerfile $(2) -base-uri $($(1))-base -output-file $(TMP_FILE)
     # Pass the newly generated Dockerfile to build_image
     $(call build_image,$(1),$(TMP_FILE))
 endef
@@ -366,19 +366,19 @@ endef
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: tools prepare-multi-arch go-cache
+local-buildx-incremental-manager: prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-manager
 	GOARCH=amd64 $(MAKE) build-manager
 	$(call build_image_incremental,DPU_OPERATOR_IMAGE,Dockerfile.rhel)
 
 .PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: tools prepare-multi-arch go-cache
+local-buildx-incremental-daemon: prepare-multi-arch go-cache
 	GOARCH=amd64 $(MAKE) build-daemon
 	GOARCH=arm64 $(MAKE) build-daemon
 	$(call build_image_incremental,DPU_DAEMON_IMAGE,Dockerfile.daemon.rhel)
 
 .PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: tools prepare-multi-arch go-cache
+local-buildx-incremental-marvell-vsp: prepare-multi-arch go-cache
 	GOARCH=arm64 $(MAKE) build-marvell-vsp
 	GOARCH=amd64 $(MAKE) build-marvell-vsp
 	$(call build_image_incremental,MARVELL_VSP_IMAGE,Dockerfile.mrvlVSP.rhel)
@@ -462,11 +462,6 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-
-.PHONY: tools
-tools:
-	cd tools/config && go build -o ../../bin/config config.go
-	cd tools/incremental && go build -o ../../bin/incremental incremental.go
 
 ##@ Build Dependencies
 
