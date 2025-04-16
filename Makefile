@@ -269,8 +269,7 @@ docker-build: test ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-GO_CACHE_DIR = /tmp/dpu-operator-cache
-
+GO_CONTAINER_CACHE = /tmp/dpu-operator-cache
 REGISTRY ?= $(shell hostname)
 # Use the image urls from the yaml that is used with Kustomize for local
 # development.
@@ -308,12 +307,13 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 
 
 .PHONY: local-build
-local-build: go-cache
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CACHE_DIR):/go:z -f Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
+local-build: ## Build all container images necessary to run the whole operator
+	mkdir -p $(GO_CONTAINER_CACHE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
+	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
 
 .PHONE: prepare-multi-arch
 prepare-multi-arch:
@@ -321,17 +321,18 @@ prepare-multi-arch:
 	setenforce 0
 
 .PHONY: go-cache
-go-cache:
-	mkdir -p $(GO_CACHE_DIR)
+go-cache: ## Build all container images necessary to run the whole operator
+	mkdir -p $(GO_CONTAINER_CACHE)
 
+## Build all container images necessary to run the whole operator
 .PHONY: local-buildx
-local-buildx: local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-network-resources-injector
+local-buildx: prepare-multi-arch go-cache local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-network-resources-injector
 	@echo "local-buildx completed"
 
 define build_image
 	buildah manifest rm $($(1))-manifest || true
 	buildah manifest create $($(1))-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform linux/amd64,linux/arm64 -v $(GO_CACHE_DIR):/go:z -f $(2) -t $($(1))
+	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform linux/amd64,linux/arm64 -v $(GO_CONTAINER_CACHE):/go:z -f $(2) -t $($(1))
 endef
 
 .PHONY: local-buildx-manager
@@ -361,6 +362,7 @@ define build_image_incremental
     $(call build_image,$(1),$(TMP_FILE))
 endef
 
+## Build all container images necessary to run the whole operator incrementally.
 ## It only makes sense to use this target after you've called local-buildx at
 ## least once.
 .PHONY: local-buildx-incremental-manager
@@ -394,7 +396,7 @@ local-buildx-incremental-network-resources-injector: prepare-multi-arch go-cache
 	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,Dockerfile.networkResourcesInjector.rhel)
 
 .PHONY: incremental-local-buildx
-incremental-local-buildx: incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-network-resources-injector
+incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-network-resources-injector
 	@echo "local-buildx-incremental completed"
 
 .PHONY: local-pushx-incremental
