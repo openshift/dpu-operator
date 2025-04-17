@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM quay.io/sdaniele/builder-4-19:1-23.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -17,7 +17,7 @@ RUN mkdir -p /bin && \
 
 # Use distroless as minimal base image to package the Marvell VSP binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM quay.io/sdaniele/base-4-19:1-23.2
 ARG TARGETARCH
 COPY --from=builder /workspace/bin/vsp-mrvl.${TARGETARCH} vsp-mrvl
 ENV DEBIAN_FRONTEND=noninteractive

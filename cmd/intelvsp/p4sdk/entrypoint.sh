@@ -81,10 +81,6 @@ $P4CP_INSTALL/bin/tdi_pipeline_builder \
     --p4c_conf_file=/usr/share/stratum/es2k/es2k_skip_p4.conf \
     --tdi_pipeline_config_binary_file="/opt/$P4_NAME/$P4_NAME.pb.bin"
 
-# Set hugepages
-mkdir -p /dev/hugepages
-mount -t hugetlbfs -o pagesize=2M none /dev/hugepages || true
-echo 512 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
 
 # Copy files required by infrap4d
 mkdir -p /usr/share/target_sys/

@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM registry.access.redhat.com/ubi9/ubi:9.5
 
 ARG P4_NAME=fxp-net_linux-networking
 ENV P4_NAME $P4_NAME
@@ -9,7 +9,7 @@ ENV ARCHSUFFIX="aarch64"
 
 COPY . /src
 WORKDIR /src
-RUN dnf install -y \
+RUN ART_DNF_WRAPPER_POLICY="skip" dnf install -y \
    kmod \
    gettext \
    python3-pip \
@@ -18,7 +18,7 @@ RUN dnf install -y \
    libedit \
    net-tools \
    libatomic \
-   libconfig \
+#   libconfig \
    gcc gcc-c++ \
    && dnf clean all
 
@@ -27,6 +27,9 @@ COPY cmd/intelvsp/$P4_NAME/* /opt/${P4_NAME}/
 COPY cmd/intelvsp/p4sdk/entrypoint.sh /
 COPY cmd/intelvsp/p4sdk/es2k_skip_p4.conf.template /
 
+RUN curl -L -o libconfig-1.7.2-9.el9.aarch64.rpm \
+     https://mirror.stream.centos.org/9-stream/BaseOS/aarch64/os/Packages/libconfig-1.7.2-9.el9.aarch64.rpm \
+    && ART_DNF_WRAPPER_POLICY="skip" dnf -y install libconfig-1.7.2-9.el9.aarch64.rpm && rm -f libconfig-1.7.2-9.el9.aarch64.rpm && dnf clean all
 
 RUN python3 -m pip install --no-cache-dir \
     netaddr==1.2.1

@@ -7,14 +7,14 @@ metadata:
     k8s.v1.cni.cncf.io/networks: default-sriov-net
 spec:
   nodeSelector:
-    kubernetes.io/hostname: worker-237
+    kubernetes.io/hostname: worker-216
   containers:
   - name: appcntr1
-    image: registry.access.redhat.com/ubi9/ubi:latest
+    image: ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest
     command: ['/bin/sh', '-c', 'sleep infinity']
     imagePullPolicy: Always
     securityContext:
-      priviledged: true
+      privileged: true
       runAsNonRoot: false
       runAsUser: 0
       seccompProfile:

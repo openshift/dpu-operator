@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM quay.io/sdaniele/builder-4-19:1-23.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -18,7 +18,7 @@ RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM quay.io/sdaniele/base-4-19:1-23.2
 WORKDIR /
 ARG TARGETARCH
 COPY --from=builder /workspace/bin/manager.${TARGETARCH} manager

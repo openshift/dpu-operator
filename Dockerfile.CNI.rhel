@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM quay.io/sdaniele/builder-4-19:1-23.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -7,7 +7,7 @@ COPY . /usr/src/dpu-cni
 WORKDIR /usr/src/dpu-cni
 RUN go build -o dpucni ./dpu-cni/dpu-cni.go
 
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM quay.io/sdaniele/base-4-19:1-23.2
 COPY --from=builder /usr/src/dpu-cni/dpucni /usr/bin/
 WORKDIR /
 

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM quay.io/sdaniele/builder-4-19:1-23.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -18,14 +18,14 @@ RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM quay.io/sdaniele/base-4-19:1-23.2
 ARG TARGETARCH
 WORKDIR /
 COPY --from=builder /workspace/bin/daemon.${TARGETARCH} daemon
 COPY --from=builder /workspace/bin/dpu-cni.${TARGETARCH} dpu-cni
 
 # Install the hwdata package to include pci.ids to ensure jaypipes/ghw can run offline
-RUN yum install -y hwdata && yum clean all
+RUN ART_DNF_WRAPPER_POLICY="skip" yum install -y hwdata && ART_DNF_WRAPPER_POLICY="skip" yum clean all
 
 USER 65532:65532
 

@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM quay.io/sdaniele/builder-4-19:1-23.2 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -9,23 +9,27 @@ COPY . .
 # As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
 RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
 
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM quay.io/centos/centos:stream9
 ARG TARGETARCH
 ENV PYTHONUNBUFFERED=1
 WORKDIR /
 
+COPY redhat.aarch64.repo /etc/yum.repos.d/
+COPY redhat.amd64.repo /etc/yum.repos.d/
+
 # https://github.com/grpc/grpc/issues/24556
 # dependencies needed to compile python packages
 # python3-dev gcc gcc-c++
-RUN dnf install -y \
-	NetworkManager openvswitch3.4 iproute python3 python3-devel openssh-clients gcc gcc-c++ \
-    && python3 -m ensurepip --upgrade
+RUN ART_DNF_WRAPPER_POLICY="skip" dnf install -y \
+	NetworkManager openvswitch3.4 iproute python3.11 python3.11-devel openssh-clients gcc gcc-c++ \
+    && python3.11 -m ensurepip --upgrade
 
 #By setting workdir, the directory is created automatically
 WORKDIR /opt/p4/p4-cp-nws/bin/
 
 RUN mkdir -p /opt/p4/p4-cp-nws/bin/p4
-
+RUN rm /usr/bin/python3
+RUN ln -s /usr/bin/python3.11 /usr/bin/python3
 COPY ./cmd/intelvsp/fxp-net_linux-networking/fxp-net_linux-networking.pkg /
 COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
 
