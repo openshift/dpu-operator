@@ -12,6 +12,7 @@ RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETARCH
 ENV PYTHONUNBUFFERED=1
+WORKDIR /
 
 # https://github.com/grpc/grpc/issues/24556
 # dependencies needed to compile python packages
@@ -48,6 +49,7 @@ COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4rt_proto
 RUN chmod a+x /opt/p4rt_proto/copy_p4rt_python_deps.sh
 RUN /opt/p4rt_proto/copy_p4rt_python_deps.sh
 
-COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /usr/bin/ipuplugin
-WORKDIR /
+COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /ipuplugin
 LABEL io.k8s.display-name="IPU OPI Plugin"
+
+ENTRYPOINT ["/ipuplugin"]

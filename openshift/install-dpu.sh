@@ -12,10 +12,6 @@ else
     cd  ${REMOTE_SOURCES_DIR}
 fi
 
-# On CentOS we might have python3-setuptools package installed. That will
-# interfere with pip requirements. Workaround.
-dnf rm python3-setuptools -y || :
-
 python3 -m pip install --upgrade pip
 
 # Install the packages in order of build dependency to avoid issues during installation.

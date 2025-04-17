@@ -71,7 +71,7 @@ func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, cl
 		VspP4ServiceName, vars.Namespace, p4Image)
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
-	template_vars.Command = `[ "/usr/bin/ipuplugin" ]`
+	template_vars.Command = `[ "/ipuplugin" ]`
 	template_vars.Args = args
 	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
 }
