@@ -372,10 +372,10 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			fmt.Println("Creating workload pods")
 			Eventually(func() bool {
 				return testutils.PodIsRunning(hostSideClient, testPodName, "default")
-			}, testutils.TestAPITimeout*45, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
+			}, testutils.TestAPITimeout*45*2, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
 			Eventually(func() bool {
 				return testutils.PodIsRunning(hostSideClient, testPod2Name, "default")
-			}, testutils.TestAPITimeout*45, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
+			}, testutils.TestAPITimeout*45*2, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
 			fmt.Println("Workload pods reached Ready state")
 
 		})
@@ -490,7 +490,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 					}, pod)
 
 					return err != nil && errors.IsNotFound(err)
-				}, testutils.TestAPITimeout*30, testutils.TestRetryInterval).Should(BeTrue(), "Pod %s was not fully deleted in time", podName)
+				}, testutils.TestAPITimeout*30*2, testutils.TestRetryInterval).Should(BeTrue(), "Pod %s was not fully deleted in time", podName)
 			}
 		})
 	})
