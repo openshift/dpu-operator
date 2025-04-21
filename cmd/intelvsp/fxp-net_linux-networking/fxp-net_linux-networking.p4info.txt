@@ -547,12 +547,7 @@ tables {
     annotations: "@defaultonly"
     scope: DEFAULT_ONLY
   }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  const_default_action_id: 21257015
+  const_default_action_id: 21790705
   size: 1024
 }
 tables {
@@ -953,6 +948,7 @@ tables {
   action_refs {
     id: 29238102
   }
+  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -1232,97 +1228,6 @@ tables {
     id: 29238102
   }
   const_default_action_id: 29238102
-  size: 1024
-}
-tables {
-  preamble {
-    id: 44641644
-    name: "linux_networking_control.hash_ipv4_tcp"
-    alias: "hash_ipv4_tcp"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  size: 1024
-}
-tables {
-  preamble {
-    id: 46678878
-    name: "linux_networking_control.hash_ipv4_udp"
-    alias: "hash_ipv4_udp"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  size: 1024
-}
-tables {
-  preamble {
-    id: 45972289
-    name: "linux_networking_control.hash_ipv4"
-    alias: "hash_ipv4"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  size: 1024
-}
-tables {
-  preamble {
-    id: 33896331
-    name: "linux_networking_control.hash_l2"
-    alias: "hash_l2"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  size: 1024
-}
-tables {
-  preamble {
-    id: 46852435
-    name: "linux_networking_control.hash_ipv6_tcp"
-    alias: "hash_ipv6_tcp"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  size: 1024
-}
-tables {
-  preamble {
-    id: 46359163
-    name: "linux_networking_control.hash_ipv6_udp"
-    alias: "hash_ipv6_udp"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
-  size: 1024
-}
-tables {
-  preamble {
-    id: 34506208
-    name: "linux_networking_control.hash_ipv6"
-    alias: "hash_ipv6"
-  }
-  action_refs {
-    id: 21257015
-    annotations: "@defaultonly"
-    scope: DEFAULT_ONLY
-  }
   size: 1024
 }
 tables {
@@ -2758,6 +2663,18 @@ actions {
   params {
     id: 3
     name: "dmac_low"
+    bitwidth: 16
+  }
+}
+actions {
+  preamble {
+    id: 22609087
+    name: "linux_networking_control.send_rss_queue"
+    alias: "send_rss_queue"
+  }
+  params {
+    id: 1
+    name: "q_id"
     bitwidth: 16
   }
 }

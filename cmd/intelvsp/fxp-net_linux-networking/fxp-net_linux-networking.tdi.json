@@ -1923,17 +1923,6 @@
             }
           ],
           "data" : []
-        },
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
         }
       ],
       "data" : [],
@@ -3325,7 +3314,7 @@
       "size" : 1024,
       "annotations" : [],
       "depends_on" : [],
-      "has_const_default_action" : false,
+      "has_const_default_action" : true,
       "key" : [
         {
           "id" : 1,
@@ -4103,188 +4092,6 @@
           "name" : "linux_networking_control.drop",
           "action_scope" : "TableAndDefault",
           "annotations" : [],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_ipv4_tcp",
-      "id" : 44641644,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_ipv4_udp",
-      "id" : 46678878,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_ipv4",
-      "id" : 45972289,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_l2",
-      "id" : 33896331,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_ipv6_tcp",
-      "id" : 46852435,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_ipv6_udp",
-      "id" : 46359163,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
-          "data" : []
-        }
-      ],
-      "data" : [],
-      "supported_operations" : [],
-      "attributes" : []
-    },
-    {
-      "name" : "main.linux_networking_control.hash_ipv6",
-      "id" : 34506208,
-      "table_type" : "MatchAction_Direct",
-      "size" : 1024,
-      "annotations" : [],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [],
-      "action_specs" : [
-        {
-          "id" : 21257015,
-          "name" : "NoAction",
-          "action_scope" : "DefaultOnly",
-          "annotations" : [
-            {
-              "name" : "@defaultonly"
-            }
-          ],
           "data" : []
         }
       ],
