@@ -110,6 +110,14 @@ func (t *KindCluster) EnsureDeleted() {
 func deleteKindCluster(name string) {
 	provider := cluster.NewProvider()
 	provider.Delete(name, "")
+
+	Eventually(func() error {
+		if clusterExists(provider, name) {
+			return fmt.Errorf("Cluster still exists")
+		} else {
+			return nil
+		}
+	}, TestAPITimeout, TestRetryInterval).ShouldNot(HaveOccurred())
 }
 
 func envToKubeConfig() ([]byte, error) {
