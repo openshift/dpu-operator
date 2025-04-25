@@ -27,7 +27,7 @@ func testPod(node corev1.Node) *corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:  "test-container",
-					Image: "nginx:latest",
+					Image: "registry.access.redhat.com/ubi9/ubi:latest",
 					Ports: []corev1.ContainerPort{
 						{
 							ContainerPort: 80,
