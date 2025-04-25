@@ -20,7 +20,7 @@ clusters:
       mac: "{{DPU_mac_address(0)}}"
     preconfig:
     - name: dpu_firmware
-      mev_version: "1.8.0.10052"
+      mev_version: "2.0.0.11126"
     postconfig:
     - name: "rh_subscription"
       organization_id: "{{organization_id()}}"
