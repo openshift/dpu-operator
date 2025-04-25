@@ -64,10 +64,10 @@ var PeerToPeerP4RulesAdded = false
 
 // Reserved ACC interfaces(using vport_id or last digit of interface name, like 4 represents-> enp0s1f0d4)
 const (
-	PHY_PORT0_INTF_INDEX = 4
-	PHY_PORT1_INTF_INDEX = 5
-	NF_IN_PR_INTF_INDEX  = 9
-	NF_OUT_PR_INTF_INDEX = 10
+	PHY_PORT0_PRIMARY_INTF_INDEX    = 1
+	PHY_PORT0_SECONDARY_INTF_INDEX  = 4
+	NF_IN_PR_INTF_INDEX             = 9
+	NF_OUT_PR_INTF_INDEX            = 10
 )
 
 // TODO: GetFilteredPFs can be used to fill the array.
@@ -633,8 +633,8 @@ func countAPFDevices() int {
 /*
 Updates post_init_app.sh script, which installs
 port-setup.sh script. port-setup.sh script,
-will run devmem command for D5 interface, as soon as
-D5 comes up on ACC, to enable connectivity.
+will run devmem command for D1 interface, as soon as
+D1 comes up on ACC, to enable connectivity.
 There is an intermittent race condition, when port-setup.log file, is
 accessed(for file removal or any other case) by post_init_app.sh,
 then later when nohup tries to stdout to that log file(port-setup.log),
@@ -676,8 +676,8 @@ pkill -9 $(basename ${PORT_SETUP_SCRIPT})
 
 cat<<PORT_CONFIG_EOF > ${PORT_SETUP_SCRIPT}
 #!/bin/bash
-IDPF_VPORT_NAME="enp0s1f0d5"
-ACC_VPORT_ID=0x5
+IDPF_VPORT_NAME="enp0s1f0d1"
+ACC_VPORT_ID=0x1
 retry=0
 ran_cmds=0
 ran_cmds_cnt=0
@@ -727,7 +727,7 @@ if [ \${#cli_entry[@]} -gt 1 ] ; then
                   echo "RunDevMemCmds_Start: LogFile->"
                   # Critical section - only one script can be here at a time
                   set -x
-		  # OPCODE update to program the rx_phy_port_to_pr_map table default action with the correct vsi_id of D5 interface, which could potentially change
+		  # OPCODE update to program the rx_phy_port_to_pr_map table default action with the correct vsi_id of D1 interface, which could potentially change
 		  # per reboot of IMC.
 		  # opcode 0x1305 is for DELETE an entry.
                   echo "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00 act=set_vsi{act_val=\${vsi_id} val_type=0 dst_pe=0 slot=0x0}" > $OPCODE_CFG_FILE
@@ -762,8 +762,8 @@ fi
 done
 }
 
-# Function to check if D5 interface is up on ACC
-d5_interface_up() {
+# Function to check if D1 interface is up on ACC
+primary_interface_up() {
   cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
   if [ \${#cli_entry[@]} -gt 1 ] ; then
    return 1  # Success
@@ -771,7 +771,7 @@ d5_interface_up() {
   return 0
 }
 
-# Invokes run_devmem_cmds, upon startup, and periodically checks if D5 is alive, if not re-run.
+# Invokes run_devmem_cmds, upon startup, and periodically checks if D1 is alive, if not re-run.
 while [[ \${ran_cmds} -eq 0 ]]; do
    echo "invoke run_devmem_cmds"
    run_devmem_cmds
@@ -789,12 +789,12 @@ while [[ \${ran_cmds} -eq 0 ]]; do
 
    #inner while
    while true ; do
-   d5_interface_up
+   primary_interface_up
    if [[ \$? -eq 1 ]]; then
-      #echo "D5 interface up, sleep"
+      #echo "Primary interface up, sleep"
       sleep 7
    else
-      echo "D5 not found. ACC may have gone down, retry."
+      echo "Primary not found. ACC may have gone down, retry."
       ran_cmds=0
       break
    fi
@@ -862,9 +862,9 @@ if [ -e %s ]; then
     sed -i 's/pf_mac_address = "00:00:00:00:03:14";/pf_mac_address = "%s";/g' $CP_INIT_CFG
     sed -i 's/acc_apf = 4;/acc_apf = %s;/g' $CP_INIT_CFG
     sed -i 's/comm_vports = .*/comm_vports = (([5,0],[4,0]),([0,3],[5,3]),([0,2],[4,3]));/g' $CP_INIT_CFG
-    sed -i 's/uplink_vports = .*/uplink_vports = ([4,5,0],[5,1,0],[5,2,1]);/g' $CP_INIT_CFG
-    sed -i 's/rep_vports = .*/rep_vports = ([4,5,0]);/g' $CP_INIT_CFG
-    sed -i 's/exception_vports = .*/exception_vports = ([4,5,0]); /g' $CP_INIT_CFG
+    sed -i 's/uplink_vports = .*/uplink_vports = ([4,1,0],[5,1,0],[5,2,1]);/g' $CP_INIT_CFG
+    sed -i 's/rep_vports = .*/rep_vports = ([0,0,0],[0,1,1]);/g' $CP_INIT_CFG
+    sed -i 's/exception_vports = .*/exception_vports = ([4,1,0]); /g' $CP_INIT_CFG
 else
     echo "No custom package found. Continuing with default package"
 fi
@@ -1030,13 +1030,13 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 	}
 	//Add Phy Port0 to ovs bridge
 	//Note: Per current design, Phy Port1 is added to a different bridge(through P4 rules).
-	if err := brCtlr.AddPort(AccIntfNames[PHY_PORT0_INTF_INDEX]); err != nil {
-		log.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_INTF_INDEX])
-		return fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_INTF_INDEX])
+	if err := brCtlr.AddPort(AccIntfNames[PHY_PORT0_SECONDARY_INTF_INDEX]); err != nil {
+		log.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_SECONDARY_INTF_INDEX])
+		return fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_SECONDARY_INTF_INDEX])
 	}
 	//Add P4 rules for phy ports
-	log.Infof("AddPhyPortRules, path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
-	p4rtclient.AddPhyPortRules(p, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	log.Infof("AddPhyPortRules, path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	p4rtclient.AddPhyPortRules(p, AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
 
 	CheckAndAddPeerToPeerP4Rules(p)
 
@@ -1052,8 +1052,8 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 	time.Sleep(2 * time.Second)
 
 	//Add P4 rules to handle Primary network traffic via phy port0
-	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
-	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
 
 	return nil
 }
