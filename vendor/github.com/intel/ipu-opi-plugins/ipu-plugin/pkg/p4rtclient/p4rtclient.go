@@ -1012,16 +1012,16 @@ func DeleteLAGP4Rules(p4rtClient types.P4RTClient) error {
 	return nil
 }
 
-func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, d5Mac string) error {
+func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, d1Mac string) error {
 	d4Vsi, _, err := getStrippedMacAndVsi(d4Mac)
 	if err != nil {
 		log.Info("AddRHPrimaryNetworkVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d4Mac)
 		return err
 	}
 
-	d5Vsi, d5MacAddr, err := getStrippedMacAndVsi(d5Mac)
+	d1Vsi, d1MacAddr, err := getStrippedMacAndVsi(d1Mac)
 	if err != nil {
-		log.Info("AddRHPrimaryNetworkVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d5Mac)
+		log.Info("AddRHPrimaryNetworkVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d1Mac)
 		return err
 	}
 
@@ -1032,7 +1032,7 @@ func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, 
 			Control: "linux_networking_control.mir_prof",
 			Metadata: fmt.Sprintf(
 				"mirror_prof_key=%d,action=linux_networking_control.mir_prof_action(vport_id=%d,mode=0,port_dest_type=0,dest_id=%d,func_valid=1,store_vsi=1)",
-				mirror_profile_id, d5Vsi, d5Vsi,
+				mirror_profile_id, d1Vsi, d1Vsi,
 			),
 		},
 		{
@@ -1050,7 +1050,7 @@ func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, 
 			Control: "linux_networking_control.tx_acc_vsi",
 			Metadata: fmt.Sprintf(
 				"vmeta.common.vsi=%d,zero_padding=0,action=linux_networking_control.l2_fwd_and_bypass_bridge(%d)",
-				d5Vsi, phyPort,
+				d1Vsi, phyPort,
 			),
 		},
 		/* rx_source_port rule is commented here as it gets handled at the PhyVportP4Rules. keeping the below rule for reference only.
@@ -1079,17 +1079,17 @@ func AddRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d4Mac string, 
 			Control: "linux_networking_control.l2_fwd_rx_table",
 			Metadata: fmt.Sprintf(
 				"user_meta.pmeta.bridge_id=%d,dst_mac=0x%s,action=linux_networking_control.l2_fwd(%d)",
-				bridgeId, d5MacAddr, d5Vsi+16,
+				bridgeId, d1MacAddr, d1Vsi+16,
 			),
 		},
 	}
 	return p4rtClient.ProgramFXPP4Rules(phyVportP4ruleSets)
 }
 
-func DeleteRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d5Mac string) error {
-	d5Vsi, d5MacAddr, err := getStrippedMacAndVsi(d5Mac)
+func DeleteRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d1Mac string) error {
+	d1Vsi, d1MacAddr, err := getStrippedMacAndVsi(d1Mac)
 	if err != nil {
-		log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d5Mac)
+		log.Info("programRHPrimarySecondaryVportP4Rules failed. Unable to find Vsi and Vport for PR mac: ", d1Mac)
 		return err
 	}
 
@@ -1117,7 +1117,7 @@ func DeleteRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d5Mac strin
 			Control: "linux_networking_control.tx_acc_vsi",
 			Metadata: fmt.Sprintf(
 				"vmeta.common.vsi=%d,zero_padding=0",
-				d5Vsi,
+				d1Vsi,
 			),
 		},
 		/* rx_source_port rule is commented here as it gets handled at the PhyVportP4Rules. keeping the below rule for reference only.
@@ -1145,7 +1145,7 @@ func DeleteRHPrimaryNetworkVportP4Rules(p4rtClient types.P4RTClient, d5Mac strin
 			Control: "linux_networking_control.l2_fwd_rx_table",
 			Metadata: fmt.Sprintf(
 				"user_meta.pmeta.bridge_id=%d,dst_mac=0x%s",
-				bridgeId, d5MacAddr,
+				bridgeId, d1MacAddr,
 			),
 		},
 	}
