@@ -98,8 +98,14 @@ fast_e2e_test: prepare-e2e-test
 	hack/deploy_fast.sh
 
 .PHONY: e2e_test
-e2e-test: deploy_clusters e2e-test-suite traffic-flow-tests
+e2e-test: deploy_clusters build-and-deploy e2e-test-suite traffic-flow-tests
 	@echo "E2E Test Completed"
+
+.PHONY: build-and-deploy
+build-and-deploy: local-buildx local-pushx
+	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
+	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
+	hack/setup.sh
 
 .PHONY: redeploy-both-incremental
 redeploy-both-incremental:
@@ -280,8 +286,9 @@ INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
 INTEL_VSP_P4_IMAGE := $(REGISTRY):5000/intel-vsp-p4:dev
 NETWORK_RESOURCES_INJECTOR_IMAGE:= $(REGISTRY):5000/network-resources-injector-image:dev
 
-.PHONY: local-deploy-prep
+.PHONY: prep-local-deploy
 prep-local-deploy:
+	mkdir -p bin
 	go run ./tools/config/config.go -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
 	cp config/dev/kustomization.yaml bin
 
