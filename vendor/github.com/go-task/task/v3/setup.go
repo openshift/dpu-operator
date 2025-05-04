@@ -64,6 +64,8 @@ func (e *Executor) getRootNode() (taskfile.Node, error) {
 }
 
 func (e *Executor) readTaskfile(node taskfile.Node) error {
+	ctx, cf := context.WithTimeout(context.Background(), e.Timeout)
+	defer cf()
 	debugFunc := func(s string) {
 		e.Logger.VerboseOutf(logger.Magenta, s)
 	}
@@ -71,17 +73,19 @@ func (e *Executor) readTaskfile(node taskfile.Node) error {
 		return e.Logger.Prompt(logger.Yellow, s, "n", "y", "yes")
 	}
 	reader := taskfile.NewReader(
-		node,
 		taskfile.WithInsecure(e.Insecure),
 		taskfile.WithDownload(e.Download),
 		taskfile.WithOffline(e.Offline),
-		taskfile.WithTimeout(e.Timeout),
 		taskfile.WithTempDir(e.TempDir.Remote),
+		taskfile.WithCacheExpiryDuration(e.CacheExpiryDuration),
 		taskfile.WithDebugFunc(debugFunc),
 		taskfile.WithPromptFunc(promptFunc),
 	)
-	graph, err := reader.Read()
+	graph, err := reader.Read(ctx, node)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return &errors.TaskfileNetworkTimeoutError{URI: node.Location(), Timeout: e.Timeout}
+		}
 		return err
 	}
 	if e.Taskfile, err = graph.Merge(); err != nil {
@@ -120,7 +124,7 @@ func (e *Executor) setupTempDir() error {
 			Fingerprint: filepathext.SmartJoin(e.Dir, ".task"),
 		}
 	} else if filepath.IsAbs(tempDir) || strings.HasPrefix(tempDir, "~") {
-		tempDir, err := execext.Expand(tempDir)
+		tempDir, err := execext.ExpandLiteral(tempDir)
 		if err != nil {
 			return err
 		}
@@ -141,7 +145,7 @@ func (e *Executor) setupTempDir() error {
 	remoteDir := env.GetTaskEnv("REMOTE_DIR")
 	if remoteDir != "" {
 		if filepath.IsAbs(remoteDir) || strings.HasPrefix(remoteDir, "~") {
-			remoteTempDir, err := execext.Expand(remoteDir)
+			remoteTempDir, err := execext.ExpandLiteral(remoteDir)
 			if err != nil {
 				return err
 			}

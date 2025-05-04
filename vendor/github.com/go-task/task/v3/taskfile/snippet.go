@@ -33,8 +33,13 @@ func init() {
 }
 
 type (
-	SnippetOption func(*Snippet)
-	Snippet       struct {
+	// A SnippetOption is any type that can apply a configuration to a [Snippet].
+	SnippetOption interface {
+		ApplyToSnippet(*Snippet)
+	}
+	// A Snippet is a syntax highlighted snippet of a Taskfile with optional
+	// padding and a line and column indicator.
+	Snippet struct {
 		linesRaw         []string
 		linesHighlighted []string
 		start            int
@@ -46,15 +51,13 @@ type (
 	}
 )
 
-// NewSnippet creates a new snippet from a byte slice and a line and column
+// NewSnippet creates a new [Snippet] from a byte slice and a line and column
 // number. The line and column numbers should be 1-indexed. For example, the
 // first character in the file would be 1:1 (line 1, column 1). The padding
 // determines the number of lines to include before and after the chosen line.
 func NewSnippet(b []byte, opts ...SnippetOption) *Snippet {
 	snippet := &Snippet{}
-	for _, opt := range opts {
-		opt(snippet)
-	}
+	snippet.Options(opts...)
 
 	// Syntax highlight the input and split it into lines
 	buf := &bytes.Buffer{}
@@ -73,50 +76,87 @@ func NewSnippet(b []byte, opts ...SnippetOption) *Snippet {
 	return snippet
 }
 
-func SnippetWithLine(line int) SnippetOption {
-	return func(snippet *Snippet) {
-		snippet.line = line
+// Options loops through the given [SnippetOption] functions and applies them
+// to the [Snippet].
+func (s *Snippet) Options(opts ...SnippetOption) {
+	for _, opt := range opts {
+		opt.ApplyToSnippet(s)
 	}
 }
 
-func SnippetWithColumn(column int) SnippetOption {
-	return func(snippet *Snippet) {
-		snippet.column = column
-	}
+// WithLine specifies the line number that the [Snippet] should center around
+// and point to.
+func WithLine(line int) SnippetOption {
+	return &lineOption{line: line}
 }
 
-func SnippetWithPadding(padding int) SnippetOption {
-	return func(snippet *Snippet) {
-		snippet.padding = padding
-	}
+type lineOption struct {
+	line int
 }
 
-func SnippetWithNoIndicators() SnippetOption {
-	return func(snippet *Snippet) {
-		snippet.noIndicators = true
-	}
+func (o *lineOption) ApplyToSnippet(s *Snippet) {
+	s.line = o.line
 }
 
-func (snippet *Snippet) String() string {
+// WithColumn specifies the column number that the [Snippet] should point to.
+func WithColumn(column int) SnippetOption {
+	return &columnOption{column: column}
+}
+
+type columnOption struct {
+	column int
+}
+
+func (o *columnOption) ApplyToSnippet(s *Snippet) {
+	s.column = o.column
+}
+
+// WithPadding specifies the number of lines to include before and after the
+// selected line in the [Snippet].
+func WithPadding(padding int) SnippetOption {
+	return &paddingOption{padding: padding}
+}
+
+type paddingOption struct {
+	padding int
+}
+
+func (o *paddingOption) ApplyToSnippet(s *Snippet) {
+	s.padding = o.padding
+}
+
+// WithNoIndicators specifies that the [Snippet] should not include line or
+// column indicators.
+func WithNoIndicators() SnippetOption {
+	return &noIndicatorsOption{}
+}
+
+type noIndicatorsOption struct{}
+
+func (o *noIndicatorsOption) ApplyToSnippet(s *Snippet) {
+	s.noIndicators = true
+}
+
+func (s *Snippet) String() string {
 	buf := &bytes.Buffer{}
 
-	maxLineNumberDigits := digits(snippet.end)
+	maxLineNumberDigits := digits(s.end)
 	lineNumberFormat := fmt.Sprintf("%%%dd", maxLineNumberDigits)
 	lineNumberSpacer := strings.Repeat(" ", maxLineNumberDigits)
 	lineIndicatorSpacer := strings.Repeat(" ", len(lineIndicator))
-	columnSpacer := strings.Repeat(" ", max(snippet.column-1, 0))
+	columnSpacer := strings.Repeat(" ", max(s.column-1, 0))
 
 	// Loop over each line in the snippet
-	for i, lineHighlighted := range snippet.linesHighlighted {
+	for i, lineHighlighted := range s.linesHighlighted {
 		if i > 0 {
 			fmt.Fprintln(buf)
 		}
 
-		currentLine := snippet.start + i
+		currentLine := s.start + i
 		lineNumber := fmt.Sprintf(lineNumberFormat, currentLine)
 
 		// If this is a padding line or indicators are disabled, print it as normal
-		if currentLine != snippet.line || snippet.noIndicators {
+		if currentLine != s.line || s.noIndicators {
 			fmt.Fprintf(buf, "%s %s | %s", lineIndicatorSpacer, lineNumber, lineHighlighted)
 			continue
 		}
@@ -125,13 +165,13 @@ func (snippet *Snippet) String() string {
 		fmt.Fprintf(buf, "%s %s | %s", color.RedString(lineIndicator), lineNumber, lineHighlighted)
 
 		// Only print the column indicator if the column is in bounds
-		if snippet.column > 0 && snippet.column <= len(snippet.linesRaw[i]) {
+		if s.column > 0 && s.column <= len(s.linesRaw[i]) {
 			fmt.Fprintf(buf, "\n%s %s | %s%s", lineIndicatorSpacer, lineNumberSpacer, columnSpacer, color.RedString(columnIndicator))
 		}
 	}
 
 	// If there are lines, but no line is selected, print the column indicator under all the lines
-	if len(snippet.linesHighlighted) > 0 && snippet.line == 0 && snippet.column > 0 {
+	if len(s.linesHighlighted) > 0 && s.line == 0 && s.column > 0 {
 		fmt.Fprintf(buf, "\n%s %s | %s%s", lineIndicatorSpacer, lineNumberSpacer, columnSpacer, color.RedString(columnIndicator))
 	}
 
