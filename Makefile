@@ -93,35 +93,9 @@ deploy_clusters: prepare-e2e-test
 traffic-flow-tests:
 	hack/traffic_flow_tests.sh
 
-.PHONY: fast_e2e_test
-fast_e2e_test: prepare-e2e-test
-	hack/deploy_fast.sh
-
 .PHONY: e2e_test
-e2e-test: deploy_clusters build-and-deploy e2e-test-suite traffic-flow-tests
-	@echo "E2E Test Completed"
-
-.PHONY: build-and-deploy
-build-and-deploy: local-buildx local-pushx
-	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
-	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
-	hack/setup.sh
-
-.PHONY: redeploy-both-incremental
-redeploy-both-incremental:
-	$(MAKE) local-pushx-incremental
-	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
-	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
-	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
-	KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
-
-.PHONY: redeploy-both
-redeploy-both:
-	$(MAKE) local-pushx
-	KUBECONFIG=/root/kubeconfig.microshift $(MAKE) local-deploy
-	KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
-	KUBECONFIG=/root/kubeconfig.ocpcluster $(MAKE) local-deploy
-	KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
+e2e-test:
+	go run tools/task/task.go e2e-test
 
 .PHONY: all
 all: build
@@ -215,18 +189,6 @@ test: podman-check manifests generate fmt vet envtest ginkgo
 fast-test: envtest ginkgo
 	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) -coverprofile cover.out ./internal/... ./pkgs/... ./api/v1/...
 
-# Set default values for environment variables for the external client in e2e-test-suite
-NF_INGRESS_IP ?= 10.20.30.2
-EXTERNAL_CLIENT_DEV ?= eno12409
-EXTERNAL_CLIENT_IP ?= 10.20.30.100
-
-export NF_INGRESS_IP
-export EXTERNAL_CLIENT_DEV
-export EXTERNAL_CLIENT_IP
-
-.PHONY: e2e-test-suite
-e2e-test-suite: envtest ginkgo
-	FAST_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) $(if $(TEST_FOCUS),-focus $(TEST_FOCUS),) -coverprofile cover.out ./e2e_test/...
 ##@ Build
 
 MANAGER_BIN     = bin/manager
@@ -313,17 +275,6 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	done
 	@echo "Namespace 'openshift-dpu-operator' has been removed."
 
-
-.PHONY: local-build
-local-build: ## Build all container images necessary to run the whole operator
-	mkdir -p $(GO_CONTAINER_CACHE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.rhel -t $(DPU_OPERATOR_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.daemon.rhel -t $(DPU_DAEMON_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.mrvlVSP.rhel -t $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSP.rhel -t $(INTEL_VSP_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.IntelVSPP4.rhel -t $(INTEL_VSP_P4_IMAGE)
-	$(CONTAINER_TOOL) build -v $(GO_CONTAINER_CACHE):/go:z -f Dockerfile.networkResourcesInjector.rhel -t $(NETWORK_RESOURCES_INJECTOR_IMAGE)
-
 .PHONE: prepare-multi-arch
 prepare-multi-arch:
 	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
@@ -334,124 +285,6 @@ go-cache: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
 
 ## Build all container images necessary to run the whole operator
-.PHONY: local-buildx
-local-buildx: prepare-multi-arch go-cache local-buildx-manager local-buildx-daemon local-buildx-marvell-vsp local-buildx-intel-vsp local-buildx-intel-vsp-p4 local-buildx-network-resources-injector
-	@echo "local-buildx completed"
-
-define build_image
-	buildah manifest rm $($(1))-manifest || true
-	buildah manifest create $($(1))-manifest
-	buildah build $(LOCAL_BUILDX_ARGS) --layers --manifest $($(1))-manifest --platform $($(2)) -v $(GO_CONTAINER_CACHE):/go:z -f $(3) -t $($(1))
-endef
-
-BOTHARCH="linux/amd64,linux/arm64"
-AARCH="linux/arm64"
-
-.PHONY: local-buildx-manager
-local-buildx-manager: prepare-multi-arch go-cache
-	$(call build_image,DPU_OPERATOR_IMAGE,BOTHARCH,Dockerfile.rhel)
-
-.PHONY: local-buildx-daemon
-local-buildx-daemon: prepare-multi-arch go-cache
-	$(call build_image,DPU_DAEMON_IMAGE,BOTHARCH,Dockerfile.daemon.rhel)
-
-.PHONY: local-buildx-marvell-vsp
-local-buildx-marvell-vsp: prepare-multi-arch go-cache
-	$(call build_image,MARVELL_VSP_IMAGE,BOTHARCH,Dockerfile.mrvlVSP.rhel)
-
-.PHONY: local-buildx-intel-vsp
-local-buildx-intel-vsp: prepare-multi-arch go-cache
-	$(call build_image,INTEL_VSP_IMAGE,BOTHARCH,Dockerfile.IntelVSP.rhel)
-
-.PHONY: local-buildx-intel-vsp-p4
-local-buildx-intel-vsp-p4: prepare-multi-arch go-cache
-	$(call build_image,INTEL_VSP_P4_IMAGE,AARCH,Dockerfile.IntelVSPP4.rhel)
-
-.PHONY: local-buildx-network-resources-injector
-local-buildx-network-resources-injector: prepare-multi-arch go-cache
-	$(call build_image,NETWORK_RESOURCES_INJECTOR_IMAGE,BOTHARCH,Dockerfile.networkResourcesInjector.rhel)
-
-TMP_FILE=/tmp/dpu-operator-incremental-build
-define build_image_incremental
-    go run ./tools/incremental/incremental.go -dockerfile $(3) -base-uri $($(1))-base -output-file $(TMP_FILE)
-    # Pass the newly generated Dockerfile to build_image
-    $(call build_image,$(1),$(2),$(TMP_FILE))
-endef
-
-## Build all container images necessary to run the whole operator incrementally.
-## It only makes sense to use this target after you've called local-buildx at
-## least once.
-.PHONY: local-buildx-incremental-manager
-local-buildx-incremental-manager: prepare-multi-arch go-cache
-	GOARCH=arm64 $(MAKE) build-manager
-	GOARCH=amd64 $(MAKE) build-manager
-	$(call build_image_incremental,DPU_OPERATOR_IMAGE,BOTHARCH,Dockerfile.rhel)
-
-.PHONY: local-buildx-incremental-daemon
-local-buildx-incremental-daemon: prepare-multi-arch go-cache
-	GOARCH=amd64 $(MAKE) build-daemon
-	GOARCH=arm64 $(MAKE) build-daemon
-	$(call build_image_incremental,DPU_DAEMON_IMAGE,BOTHARCH,Dockerfile.daemon.rhel)
-
-.PHONY: local-buildx-incremental-marvell-vsp
-local-buildx-incremental-marvell-vsp: prepare-multi-arch go-cache
-	GOARCH=arm64 $(MAKE) build-marvell-vsp
-	GOARCH=amd64 $(MAKE) build-marvell-vsp
-	$(call build_image_incremental,MARVELL_VSP_IMAGE,BOTHARCH,Dockerfile.mrvlVSP.rhel)
-
-.PHONY: local-buildx-incremental-intel-vsp
-local-buildx-incremental-intel-vsp: prepare-multi-arch go-cache
-	GOARCH=arm64 $(MAKE) build-intel-vsp
-	GOARCH=amd64 $(MAKE) build-intel-vsp
-	$(call build_image_incremental,INTEL_VSP_IMAGE,BOTHARCH,Dockerfile.IntelVSP.rhel)
-
-.PHONY: local-buildx-incremental-intel-vsp-p4
-local-buildx-incremental-intel-vsp-p4: prepare-multi-arch go-cache
-	# No go build target exists for vsp-p4
-	$(call build_image_incremental,INTEL_VSP_P4_IMAGE,AARCH,Dockerfile.IntelVSPP4.rhel)
-
-.PHONY: local-buildx-incremental-network-resources-injector
-local-buildx-incremental-network-resources-injector: prepare-multi-arch go-cache
-	GOARCH=arm64 $(MAKE) build-network-resources-injector
-	GOARCH=amd64 $(MAKE) build-network-resources-injector
-	$(call build_image_incremental,NETWORK_RESOURCES_INJECTOR_IMAGE,BOTHARCH,Dockerfile.networkResourcesInjector.rhel)
-
-.PHONY: incremental-local-buildx
-incremental-local-buildx: prepare-multi-arch go-cache incremental-prep-local-deploy local-buildx-incremental-manager local-buildx-incremental-daemon local-buildx-incremental-marvell-vsp local-buildx-incremental-intel-vsp local-buildx-incremental-intel-vsp-p4 local-buildx-incremental-network-resources-injector
-	@echo "local-buildx-incremental completed"
-
-.PHONY: local-pushx-incremental
-local-pushx-incremental: ## Push all container images necessary to run the whole operator
-	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)
-	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
-	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
-	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
-	buildah manifest push --all $(INTEL_VSP_P4_IMAGE)-manifest docker://$(INTEL_VSP_P4_IMAGE)
-	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(NETWORK_RESOURCES_INJECTOR_IMAGE)
-
-.PHONY: local-pushx
-local-pushx: ## Push all container images necessary to run the whole operator
-	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)
-	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)
-	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)
-	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)
-	buildah manifest push --all $(INTEL_VSP_P4_IMAGE)-manifest docker://$(INTEL_VSP_P4_IMAGE)
-	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(NETWORK_RESOURCES_INJECTOR_IMAGE)
-	buildah manifest push --all $(DPU_OPERATOR_IMAGE)-manifest docker://$(DPU_OPERATOR_IMAGE)-base
-	buildah manifest push --all $(DPU_DAEMON_IMAGE)-manifest docker://$(DPU_DAEMON_IMAGE)-base
-	buildah manifest push --all $(MARVELL_VSP_IMAGE)-manifest docker://$(MARVELL_VSP_IMAGE)-base
-	buildah manifest push --all $(INTEL_VSP_IMAGE)-manifest docker://$(INTEL_VSP_IMAGE)-base
-	buildah manifest push --all $(INTEL_VSP_P4_IMAGE)-manifest docker://$(INTEL_VSP_P4_IMAGE)-base
-	buildah manifest push --all $(NETWORK_RESOURCES_INJECTOR_IMAGE)-manifest docker://$(NETWORK_RESOURCES_INJECTOR_IMAGE)-base
-
-.PHONY: local-push
-local-push: ## Push all container images necessary to run the whole operator
-	$(CONTAINER_TOOL) push $(DPU_OPERATOR_IMAGE)
-	$(CONTAINER_TOOL) push $(DPU_DAEMON_IMAGE)
-	$(CONTAINER_TOOL) push $(MARVELL_VSP_IMAGE)
-	$(CONTAINER_TOOL) push $(INTEL_VSP_IMAGE)
-	$(CONTAINER_TOOL) push $(INTEL_VSP_P4_IMAGE)
-	$(CONTAINER_TOOL) push $(NETWORK_RESOURCES_INJECTOR_IMAGE)
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
