@@ -198,6 +198,24 @@ tasks:
         vars:
           NAME: mrvl-vsp
 
+  build-image-marvell-cpagent:
+    deps:
+      - task: clean-image-layer
+        vars:
+          NAME: mrvl-cpagent
+    cmds:
+      - task: build-image
+        vars:
+          NAME: mrvl-cpagent
+          DOCKERFILE: Dockerfile.mrvlCPAgent.rhel
+          PLATFORM: arm64
+
+  clean-image-marvell-cpagent:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: mrvl-cpagent
+
   build-image-intel-vsp:
     deps:
       - task: build-bin-intel-vsp
@@ -282,6 +300,7 @@ tasks:
       - task: clean-image-intel-vsp
       - task: clean-image-intel-vsp-p4
       - task: clean-image-marvell-vsp
+      - task: clean-image-marvell-cpagent
       - task: clean-image-network-resources-injector
 
   build-image-all:
@@ -291,5 +310,6 @@ tasks:
       - task: build-image-intel-vsp
       - task: build-image-intel-vsp-p4
       - task: build-image-marvell-vsp
+      - task: build-image-marvell-cpagent
       - task: build-image-network-resources-injector
 

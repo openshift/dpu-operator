@@ -1,0 +1,11 @@
+[Unit]
+Description=Octeon Control Plane Agent for Marvell Octeon Device
+
+[Service]
+Environment=IMAGE='{{.IMAGE}}'
+Restart=always
+ExecStart=/usr/bin/podman run --rm --name cp_agent --privileged --pull newer --network host -v /tmp:/tmp -v /lib/modules:/lib/modules  -v /sys/bus/pci:/sys/bus/pci -v /:/host -v /dev:/dev --entrypoint cp-agent-run ${IMAGE}
+ExecStop=/usr/bin/podman stop cp_agent
+
+[Install]
+WantedBy=multi-user.target
