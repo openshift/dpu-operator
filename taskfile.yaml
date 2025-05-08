@@ -4,6 +4,7 @@ env:
   CGO_ENABLED: "0"
   GOARCH:   '{{ default "amd64" .GOARCH }}'
   GOOS:     '{{ default "linux" .GOOS }}'
+  SUBMODULES: '{{ default "true" .SUBMODULES }}'
 
 vars:
   DPU_OPERATOR_TEMP_DIR: /tmp/dpu-operator-tmp
@@ -18,6 +19,9 @@ includes:
     flatten: true
   binaries:
     taskfile: ./taskfiles/binaries.yaml
+    flatten: true
+  clusters:
+    taskfile: ./taskfiles/clusters.yaml
     flatten: true
   
 tasks:
@@ -117,10 +121,18 @@ tasks:
       - KUBECONFIG="/root/kubeconfig.microshift" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
       - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
+  prepare-e2e-test:
+    cmds:
+      - >
+        if [ "{{.SUBMODULES}}" = "true" ]; then
+            hack/prepare-submodules.sh
+        fi
+            hack/prepare-venv.sh
+
   e2e-test:
     cmds:
-      - make prepare-e2e-test
-      - sh hack/both.sh
+      - task: prepare-e2e-test
+      - task: deploy-clusters
       - task: fast-e2e-test
 
   fast-e2e-test:

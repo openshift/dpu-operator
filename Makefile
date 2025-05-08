@@ -85,9 +85,10 @@ ifeq ($(SUBMODULES), true)
 endif
 	hack/prepare-venv.sh
 
+# TODO: remove this when we don't call this target directly anymore
 .PHONY: deploy_clusters
-deploy_clusters: prepare-e2e-test
-	hack/both.sh
+deploy_clusters:
+	go run tools/task/task.go deploy-clusters
 
 .PHONY: traffic-flow-tests
 traffic-flow-tests:
