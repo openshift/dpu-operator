@@ -101,6 +101,10 @@ tasks:
           IMAGE: '{{.REGISTRY}}:5000/mrvl-vsp:dev'
       - task: push-image-helper
         vars:
+          SOURCE: 'localhost/mrvl-cpagent:dev'
+          IMAGE: '{{.REGISTRY}}:5000/mrvl-cpagent:dev'
+      - task: push-image-helper
+        vars:
           SOURCE: 'localhost/intel-vsp:dev'
           IMAGE: '{{.REGISTRY}}:5000/intel-vsp:dev'
       - task: push-image-helper
