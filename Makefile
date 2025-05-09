@@ -276,11 +276,6 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	done
 	@echo "Namespace 'openshift-dpu-operator' has been removed."
 
-.PHONE: prepare-multi-arch
-prepare-multi-arch:
-	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
-	setenforce 0
-
 .PHONY: go-cache
 go-cache: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
