@@ -12,60 +12,54 @@ Depending on the type of testing you are doing, you will either need real hardwa
 
 ### Manually deploying and testing on a cluster
 
-If you want to start from source, follow the steps below to build containers, push them to a local registry, and deploy to a cluster.
+If you want to start from source, follow the steps below to build containers, push them to a local registry, and deploy to a cluster. Prerequisite is to install taskfile (https://taskfile.dev/installation/), an modern more flexible alternative to makefile.
 
 1. **Configure and Build Containers**
 
 Run the following command to configure and build all the containers:
 ```sh
-make local-buildx
+task build-images-all
 ```
 
-2. **Push Built Images to a Local Registry**
+3. **Deploy to the Clusters**
 
-Run the following command to push the built images to a local registry:
+Run the following command to deploy the YAML files to the two clusters defined by /root/kubeconfig.ocpcluster and /root/kubeconfig.microshift. Make sure you have set up an image registry on the local host:
 ```sh
-make local-pushx
+task deploy
 ```
 
-3. **Deploy to the Cluster**
+4. **Undeploy**
 
-Run the following command to deploy the YAML files to the cluster based on `KUBECONFIG`. Make sure you have set up an image registry on the local host:
+Undoes what deploying did:
+
 ```sh
-make local-deploy
+task undeploy
 ```
 
-4. **Alternative: Remote Registry**
+5. **Alternative: Remote Registry**
 
-Alternatively, if you set up a registry remotely, define the `REGISTERY` variable:
+Alternatively, if you set up a registry remotely, define the `REGISTERY` variable. Note that you need to do this for the build step and the push/run step:
 ```sh
-make local-deploy REGISTERY=...
+REGISTERY task ...
 ```
 
 ### End-to-end testing
 
 The DPU operator also integrates with CDA (https://github.com/bn222/cluster-deployment-automation) used to set up a complete OpenShift cluster before tests are ran against it. For that, you can use the following makefile target:
 ```sh
-make e2e-test
+task e2e-test
 ```
 
 ### End-to-end testing on any cluster
-It is possible to run the e2e test suite separately by using the 'e2e-test-suite' target. This will execute the tests on two clusters, which are referenced by the configuration files located at `/root/kubeconfig.ocpcluster` and `/root/kubeconfig.microshift`.
+It is possible to run the e2e test suite separately by using the 'e2e-test-suite' target. This will execute the tests on two clusters, which are referenced by the configuration files located at `/root/kubeconfig.ocpcluster` and `/root/kubeconfig.microshift`. This target will skip re-deploying the clusters. It's also used at the end of the e2e-test target.
 ```sh
-make e2e-test-suite
+task fast-e2e-test
 ```
 ### Integration testing
 
 Using the following makefile target, a Kind cluster will be set up against which some tests are ran. This is mainly used during development.
 ```sh
 make test
-```
-
-### Undeploy controller
-
-UnDeploy the controller from the cluster:
-```sh
-make undeploy
 ```
 
 ## Contributing
