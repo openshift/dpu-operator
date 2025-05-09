@@ -1,0 +1,74 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN dnf config-manager --set-enabled crb
+RUN dnf update -y && dnf install tar gawk gcc g++ git libconfig-devel -y ; \
+    dnf clean all ; \
+    rm -rf /var/cache/dnf ;
+
+WORKDIR /workspace
+COPY . .
+# Build
+# the GOARCH has not a default value to allow the binary be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+
+# Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
+# As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
+
+WORKDIR /workspace
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+        git clone https://github.com/MarvellEmbeddedProcessors/pcie_ep_octeon_target.git && \
+        cd /workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib && \
+	git checkout aa84a2331f76b68583e7b5861f17f5f3cef0fbd0 && \
+        export CFLAGS="$CFLAGS -Wno-error=unused-result -DUSE_PEM_AND_DPI_PF=1" && make ; \
+    fi
+
+WORKDIR "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent"
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+        export OCTEP_PATH="/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        export CFLAGS="$CFLAGS -I$OCTEP_PATH/include" && \
+        export LDFLAGS="-L$OCTEP_PATH" && \
+        make && \
+        cp bin/bin/octep_cp_agent /workspace/bin/ && \
+        cp cn106xx.cfg /workspace/bin/; \
+    fi
+
+WORKDIR /workspace
+RUN go build -o /workspace/bin/cp-agent-run internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent-run.go
+
+# Use distroless as minimal base image to package the Marvell CP agent binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+ARG TARGETARCH
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN dnf config-manager --set-enabled crb
+RUN yum update -y \
+    && yum install -y \
+       net-tools \
+       kmod \
+       pciutils \
+       iputils \
+       iproute \
+       libconfig-devel \
+    && yum clean all \
+    && rm -rf /var/cache/dnf
+
+RUN mkdir -p /workspace/bin/
+COPY --from=builder /workspace/bin/ /workspace/bin/
+COPY --from=builder /workspace/bin/cp-agent-run /
+
+RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+       cp /workspace/bin/lib/libconfig* /usr/lib64/; \
+       cp /workspace/bin/octep_cp_agent /usr/bin/; \
+       cp /workspace/bin/cn106xx.cfg /usr/bin/; \
+    fi
+
+RUN rm -fr /workspace/bin/
+
+USER 0
+
+ENTRYPOINT ["/cp-agent-run"]
