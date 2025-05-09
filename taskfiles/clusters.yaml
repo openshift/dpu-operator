@@ -2,14 +2,14 @@ version: '3'
 
 tasks:
   deploy-clusters:
-    deps:
-      - task: prepare-e2e-test
     cmds:
       - task: clean-clusters
       - task: deploy-clusters-both-phase-1
       - task: deploy-clusters-host-phase-2
 
   clean-clusters:
+    deps:
+      - task: prepare-e2e-test
     cmds:
       - >
         cd cluster-deployment-automation;
@@ -18,6 +18,8 @@ tasks:
 
   deploy-clusters-dpu-phase-all:
     internal: true
+    deps:
+      - task: prepare-e2e-test
     cmds:
       - >
         cd cluster-deployment-automation;
@@ -26,6 +28,8 @@ tasks:
 
   deploy-clusters-host-phase-1:
     internal: true
+    deps:
+      - task: prepare-e2e-test
     cmds:
       - >
         cd cluster-deployment-automation;
@@ -34,6 +38,8 @@ tasks:
 
   deploy-clusters-host-phase-2:
     internal: true
+    deps:
+      - task: prepare-e2e-test
     cmds:
       - >
         cd cluster-deployment-automation;
