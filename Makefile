@@ -85,9 +85,10 @@ ifeq ($(SUBMODULES), true)
 endif
 	hack/prepare-venv.sh
 
+# TODO: remove this when we don't call this target directly anymore
 .PHONY: deploy_clusters
-deploy_clusters: prepare-e2e-test
-	hack/both.sh
+deploy_clusters:
+	go run tools/task/task.go deploy-clusters
 
 .PHONY: traffic-flow-tests
 traffic-flow-tests:
@@ -274,11 +275,6 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 		sleep 5; \
 	done
 	@echo "Namespace 'openshift-dpu-operator' has been removed."
-
-.PHONE: prepare-multi-arch
-prepare-multi-arch:
-	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
-	setenforce 0
 
 .PHONY: go-cache
 go-cache: ## Build all container images necessary to run the whole operator
