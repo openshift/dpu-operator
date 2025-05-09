@@ -109,6 +109,10 @@ tasks:
           IMAGE: '{{.REGISTRY}}:5000/intel-vsp:dev'
       - task: push-image-helper
         vars:
+          SOURCE: 'localhost/intel-vsp-p4:dev'
+          IMAGE: '{{.REGISTRY}}:5000/iintel-vsp-p4:dev'
+      - task: push-image-helper
+        vars:
           SOURCE: 'localhost/network-resources-injector:dev'
           IMAGE: '{{.REGISTRY}}:5000/network-resources-injector:dev'
     cmds:
