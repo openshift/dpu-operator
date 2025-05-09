@@ -4,11 +4,13 @@ reviewers:
   - SalDaniele
   - vrindle
   - thom311
+  - m-naught
 approvers:
   - bn222
   - wizhaoredhat
   - SalDaniele
   - vrindle
   - thom311
+  - m-naught
 component: "Networking"
 subcomponent: "DPU"
