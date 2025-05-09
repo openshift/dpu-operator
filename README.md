@@ -18,7 +18,7 @@ If you want to start from source, follow the steps below to build containers, pu
 
 Run the following command to configure and build all the containers:
 ```sh
-task build-images-all
+task build-image-all
 ```
 
 3. **Deploy to the Clusters**
@@ -43,6 +43,12 @@ Alternatively, if you set up a registry remotely, define the `REGISTERY` variabl
 REGISTERY task ...
 ```
 
+5. **Alternative: Deploy only one of the cluster**
+
+You can deploy part of the env (host or dpu) using either `-host` or `-dpu`. For example, for the host side cluster, use this:
+```sh
+task deploy-cluster-host
+```
 ### End-to-end testing
 
 The DPU operator also integrates with CDA (https://github.com/bn222/cluster-deployment-automation) used to set up a complete OpenShift cluster before tests are ran against it. For that, you can use the following makefile target:
