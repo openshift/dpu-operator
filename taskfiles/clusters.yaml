@@ -51,3 +51,14 @@ tasks:
     deps:
       - task: deploy-clusters-host-phase-1
       - task: deploy-clusters-dpu-phase-all
+
+
+# The following two targets are useful for manually deploying part of the env
+  deploy-cluster-host:
+    cmds:
+      - task: deploy-clusters-host-phase-1
+      - task: deploy-clusters-host-phase-2
+
+  deploy-cluster-dpu:
+    cmds:
+      - task: deploy-clusters-dpu-phase-all
