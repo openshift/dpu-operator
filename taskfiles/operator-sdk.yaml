@@ -1,0 +1,13 @@
+version: '3'
+
+tasks:
+  kustomize:
+    cmds:
+      - mkdir -p {{.BINDIR}}
+      - GOBIN=$(pwd)/{{.BINDIR}} GOFLAGS='' GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+      - echo "{{.KUSTOMIZE_VERSION}}" > {{.BINDIR}}/kustomize_version
+    status:
+      - test -d {{.BINDIR}}
+      - test -x {{.BINDIR}}/kustomize
+      - test -f {{.BINDIR}}/kustomize_version
+      - test "$(cat {{.BINDIR}}/kustomize_version)" = "{{.KUSTOMIZE_VERSION}}"
