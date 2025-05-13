@@ -4,6 +4,7 @@ env:
   CGO_ENABLED: "0"
   GOARCH:   '{{ default "amd64" .GOARCH }}'
   GOOS:     '{{ default "linux" .GOOS }}'
+  SUBMODULES: '{{ default "true" .SUBMODULES }}'
 
 vars:
   DPU_OPERATOR_TEMP_DIR: /tmp/dpu-operator-tmp
@@ -11,6 +12,9 @@ vars:
   REGISTRY:
     sh: hostname
   ENVTEST_K8S_VERSION: 1.27.1
+  KUSTOMIZE_VERSION: v5.6.0
+  GINKGO_VERSION:
+    sh: go list -m -f '{{"{{.Version}}"}}' github.com/onsi/ginkgo/v2 | sed 's/^v//'
 
 includes:
   images:
@@ -18,6 +22,12 @@ includes:
     flatten: true
   binaries:
     taskfile: ./taskfiles/binaries.yaml
+    flatten: true
+  clusters:
+    taskfile: ./taskfiles/clusters.yaml
+    flatten: true
+  operator-sdk:
+    taskfile: ./taskfiles/operator-sdk.yaml
     flatten: true
   
 tasks:
@@ -67,16 +77,6 @@ tasks:
         -output-file bin/local-images.yaml
       - cp config/dev/kustomization.yaml bin
   
-  kustomize:
-    cmds:
-      - make kustomize
-
-  ginkgo:
-    status:
-      - test -f {{.BINDIR}}/ginkgo
-    cmds:
-      - make ginkgo
-
   envtest:
     status:
       - test -f {{.BINDIR}}/setup-envtest
@@ -105,6 +105,10 @@ tasks:
           IMAGE: '{{.REGISTRY}}:5000/intel-vsp:dev'
       - task: push-image-helper
         vars:
+          SOURCE: 'localhost/intel-vsp-p4:dev'
+          IMAGE: '{{.REGISTRY}}:5000/iintel-vsp-p4:dev'
+      - task: push-image-helper
+        vars:
           SOURCE: 'localhost/network-resources-injector:dev'
           IMAGE: '{{.REGISTRY}}:5000/network-resources-injector:dev'
     cmds:
@@ -117,10 +121,20 @@ tasks:
       - KUBECONFIG="/root/kubeconfig.microshift" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
       - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
-  e2e-test:
+  prepare-e2e-test:
     cmds:
-      - make prepare-e2e-test
-      - sh hack/both.sh
+      - >
+        if [ "{{.SUBMODULES}}" = "true" ]; then
+            hack/prepare-submodules.sh
+        fi
+            hack/prepare-venv.sh
+
+  e2e-test:
+    deps:
+      - task: kustomize
+    cmds:
+      - task: prepare-e2e-test
+      - task: deploy-clusters
       - task: fast-e2e-test
 
   fast-e2e-test:

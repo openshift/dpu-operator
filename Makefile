@@ -85,9 +85,14 @@ ifeq ($(SUBMODULES), true)
 endif
 	hack/prepare-venv.sh
 
+# TODO: remove this when we don't call this target directly anymore
 .PHONY: deploy_clusters
-deploy_clusters: prepare-e2e-test
-	hack/both.sh
+deploy_clusters:
+	go run tools/task/task.go deploy-clusters
+
+.PHONY: ginkgo
+ginkgo:
+	go run tools/task/task.go ginkgo
 
 .PHONY: traffic-flow-tests
 traffic-flow-tests:
@@ -275,11 +280,6 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	done
 	@echo "Namespace 'openshift-dpu-operator' has been removed."
 
-.PHONE: prepare-multi-arch
-prepare-multi-arch:
-	test -f /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
-	setenforce 0
-
 .PHONY: go-cache
 go-cache: ## Build all container images necessary to run the whole operator
 	mkdir -p $(GO_CONTAINER_CACHE)
@@ -336,30 +336,13 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.0.1
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GINKGO_VER := $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
-
-.PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
-$(KUSTOMIZE): $(LOCALBIN)
-	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
-		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
-		rm -rf $(LOCALBIN)/kustomize; \
-	fi
-	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GOFLAGS='' GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) GOFLAGS='' go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-
-.PHONY: ginkgo
-ginkgo: $(GINKGO)
-$(GINKGO): $(LOCALBIN)
-	test -s $(LOCALBIN)/ginkgo && $(LOCALBIN)/ginkgo version | grep -q $(GINKGO_VER) || \
-	GOBIN=$(LOCALBIN) GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VER)
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
