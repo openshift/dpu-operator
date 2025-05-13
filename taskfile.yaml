@@ -13,6 +13,8 @@ vars:
     sh: hostname
   ENVTEST_K8S_VERSION: 1.27.1
   KUSTOMIZE_VERSION: v5.6.0
+  GINKGO_VERSION:
+    sh: go list -m -f '{{"{{.Version}}"}}' github.com/onsi/ginkgo/v2 | sed 's/^v//'
 
 includes:
   images:
@@ -75,12 +77,6 @@ tasks:
         -output-file bin/local-images.yaml
       - cp config/dev/kustomization.yaml bin
   
-  ginkgo:
-    status:
-      - test -f {{.BINDIR}}/ginkgo
-    cmds:
-      - make ginkgo
-
   envtest:
     status:
       - test -f {{.BINDIR}}/setup-envtest

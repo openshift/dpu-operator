@@ -90,6 +90,10 @@ endif
 deploy_clusters:
 	go run tools/task/task.go deploy-clusters
 
+.PHONY: ginkgo
+ginkgo:
+	go run tools/task/task.go ginkgo
+
 .PHONY: traffic-flow-tests
 traffic-flow-tests:
 	hack/traffic_flow_tests.sh
@@ -333,19 +337,12 @@ GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GINKGO_VER := $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) GOFLAGS='' go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-
-.PHONY: ginkgo
-ginkgo: $(GINKGO)
-$(GINKGO): $(LOCALBIN)
-	test -s $(LOCALBIN)/ginkgo && $(LOCALBIN)/ginkgo version | grep -q $(GINKGO_VER) || \
-	GOBIN=$(LOCALBIN) GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VER)
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

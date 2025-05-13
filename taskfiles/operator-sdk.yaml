@@ -11,3 +11,10 @@ tasks:
       - test -x {{.BINDIR}}/kustomize
       - test -f {{.BINDIR}}/kustomize_version
       - test "$(cat {{.BINDIR}}/kustomize_version)" = "{{.KUSTOMIZE_VERSION}}"
+
+  ginkgo:
+    status:
+      - test -x {{.BINDIR}}/ginkgo
+      - ./{{.BINDIR}}/ginkgo version | grep -q "{{.GINKGO_VERSION}}"
+    cmds:
+      - GOBIN=$(pwd)/{{.BINDIR}} GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@v{{.GINKGO_VERSION}}
