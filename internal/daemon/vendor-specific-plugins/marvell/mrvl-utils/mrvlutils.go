@@ -37,6 +37,22 @@ func GetAllVfsByDeviceID(deviceID string) ([]string, error) {
 	return targetAddresses, nil
 }
 
+func GetAllVfsNameByDeviceID(deviceID string) ([]string, error) {
+	dpuVfsPCI, err := GetAllVfsByDeviceID(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	dpuVfsName := make([]string, 0)
+	for _, vfpci := range dpuVfsPCI {
+		vfName, err := GetNameByPCI(vfpci)
+		if err != nil {
+			return nil, err
+		}
+		dpuVfsName = append(dpuVfsName, vfName)
+	}
+	return dpuVfsName, nil
+}
+
 // Mapped_VF returns the PCI address of the VF mapped to the given PF
 func Mapped_VF(pf_count int, pfid int, vfid int) (string, error) {
 	pci, err := ghw.PCI()

@@ -108,3 +108,55 @@ func (ovsdp *OvsDP) ReadAllPortFromDataPlane(bridgeName string) (string, error) 
 	}
 	return string(out), nil
 }
+
+// Add Flow rule to ovs bridge
+func (ovsdp *OvsDP) AddFlowRuleToDataPlane(bridgeName string, srcInterface string, dstInterface string, dstMac string) error {
+	ovsdp.log.Info("Adding Flow Rule to Bridge", "SrcInterfaces", srcInterface, "DstInterface", dstInterface, "DestinationMac", dstMac)
+	// Add flow rule to bridge
+	if dstMac != "" {
+		if srcInterface == dstInterface {
+			ovsdp.log.Info("This is Hairpinning Rule", "SrcInterface", srcInterface, "DstInterface", dstInterface)
+			// Hairpinning rule with priority 100
+			cmd := exec.Command("chroot", "/host", "ovs-ofctl", "add-flow", bridgeName, fmt.Sprintf("priority=100,in_port=%s,dl_dst=%s,actions=in_port", srcInterface, dstMac))
+			if err := cmd.Run(); err != nil {
+				ovsdp.log.Error(err, "Error occurred in adding Flow Rule to Bridge")
+				return err
+			}
+		} else {
+			ovsdp.log.Info("Adding Flow Rule with dstMac", "SrcInterface", srcInterface, "DstInterface", dstInterface, "DestinationMac", dstMac)
+			cmd := exec.Command("chroot", "/host", "ovs-ofctl", "add-flow", bridgeName, fmt.Sprintf("in_port=%s,dl_dst=%s,actions=output:%s", srcInterface, dstMac, dstInterface))
+			if err := cmd.Run(); err != nil {
+				ovsdp.log.Error(err, "Error occurred in adding Flow Rule to Bridge")
+				return err
+			}
+		}
+	} else {
+		ovsdp.log.Info("Adding Flow Rule without dstMac", "SrcInterface", srcInterface, "DstInterface", dstInterface)
+		cmd := exec.Command("chroot", "/host", "ovs-ofctl", "add-flow", bridgeName, fmt.Sprintf("priority=10,in_port=%s,actions=output:%s", srcInterface, dstInterface))
+		if err := cmd.Run(); err != nil {
+			ovsdp.log.Error(err, "Error occurred in adding Flow Rule to Bridge")
+			return err
+		}
+	}
+	return nil
+}
+func (ovsdp *OvsDP) DeleteFlowRuleFromDataPlane(bridgeName string, srcInterface string, dstinterface string, dstMac string) error {
+	ovsdp.log.Info("Deleting Flow Rule from Bridge", "SrcInterfaces", srcInterface)
+	// Delete flow rule from bridge
+	if dstMac != "" {
+		cmd := exec.Command("chroot", "/host", "ovs-ofctl", "del-flows", bridgeName, fmt.Sprintf("in_port=%s,dl_dst=%s", srcInterface, dstMac))
+		if err := cmd.Run(); err != nil {
+			ovsdp.log.Error(err, "Error occurred in deleting Flow Rule from Bridge")
+			return err
+		}
+	} else {
+		cmd := exec.Command("chroot", "/host", "ovs-ofctl", "del-flows", bridgeName, fmt.Sprintf("in_port=%s", srcInterface))
+		if err := cmd.Run(); err != nil {
+			ovsdp.log.Error(err, "Error occurred in deleting Flow Rule from Bridge")
+			return err
+		}
+	}
+
+	ovsdp.log.Info("Flow Rule Deleted Successfully", "SrcInterfaces", srcInterface)
+	return nil
+}
