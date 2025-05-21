@@ -29,7 +29,7 @@ setup_venv() {
 
 setup_all_venvs() {
     setup_venv cluster-deployment-automation /tmp/cda-venv "sh ./dependencies.sh"
-    setup_venv kubernetes-traffic-flow-tests /tmp/tft-venv "pip install -r requirements.txt"
+    setup_venv kubernetes-traffic-flow-tests /tmp/tft-venv "pip install -U pip setuptools -r requirements.txt"
 }
 
 exec 9> "/tmp/dpu-operator-prepare-venv.lock"
