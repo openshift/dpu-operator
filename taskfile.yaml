@@ -137,15 +137,19 @@ tasks:
       - task: deploy-clusters
       - task: fast-e2e-test
 
-  fast-e2e-test:
-    deps:
-      - task: ginkgo
-      - task: envtest
+  redeploy:
     cmds:
       - task: build-image-all
       - task: undeploy
       - task: deploy
       - sh hack/setup.sh
+
+  fast-e2e-test:
+    deps:
+      - task: ginkgo
+      - task: envtest
+    cmds:
+      - task: redeploy
       - >
         FAST_TEST=true
         NF_INGRESS_IP=10.20.30.2
