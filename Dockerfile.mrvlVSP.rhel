@@ -19,15 +19,19 @@ RUN mkdir -p /bin && \
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETARCH
-COPY --from=builder /workspace/bin/vsp-mrvl.${TARGETARCH} vsp-mrvl
+COPY --from=builder /workspace/bin/vsp-mrvl.${TARGETARCH} /vsp-mrvl
+COPY --from=builder /workspace/bin/cp-agent.service /
 ENV DEBIAN_FRONTEND=noninteractive
 RUN yum update -y \
     && yum install -y \
        net-tools \
        kmod \
        pciutils \
-       make \
        iputils \
-       iproute
-USER 65532:65532
+       iproute \
+    && yum clean all \
+    && rm -rf /var/cache/dnf
+
+USER 0
+
 ENTRYPOINT ["/vsp-mrvl"]
