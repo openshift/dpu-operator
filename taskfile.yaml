@@ -144,12 +144,11 @@ tasks:
       - task: deploy
       - sh hack/setup.sh
 
-  fast-e2e-test:
+  run-e2e-test-suite:
     deps:
       - task: ginkgo
       - task: envtest
     cmds:
-      - task: redeploy
       - >
         FAST_TEST=true
         NF_INGRESS_IP=10.20.30.2
@@ -157,4 +156,9 @@ tasks:
         EXTERNAL_CLIENT_IP=10.20.30.100
         KUBEBUILDER_ASSETS="$({{.BINDIR}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.BINDIR}} -p path)"
         {{.BINDIR}}/ginkgo -coverprofile cover.out ./e2e_test/...
+
+  fast-e2e-test:
+    cmds:
+      - task: redeploy
+      - task: run-e2e-test-suite
       - hack/traffic_flow_tests.sh
