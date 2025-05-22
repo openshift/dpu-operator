@@ -110,7 +110,7 @@ tasks:
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/network-resources-injector:dev'
-          IMAGE: '{{.REGISTRY}}:5000/network-resources-injector:dev'
+          IMAGE: '{{.REGISTRY}}:5000/network-resources-injector-image:dev'
     cmds:
       - task: undeploy
         vars:
