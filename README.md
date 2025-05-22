@@ -12,18 +12,23 @@ Depending on the type of testing you are doing, you will either need real hardwa
 
 ### Manually deploying and testing on a cluster
 
-If you want to start from source, follow the steps below to build containers, push them to a local registry, and deploy to a cluster. Prerequisite is to install taskfile (https://taskfile.dev/installation/), an modern more flexible alternative to makefile.
+If you want to start from source, follow the steps below to build containers, push them to a local registry, and deploy to a cluster. Prerequisite is to install taskfile (https://taskfile.dev/installation/), an modern more flexible alternative to makefile. The easiest way to set up taskfile is to install it using the following command:
+
+```sh
+env GOBIN=/bin go install github.com/go-task/task/v3/cmd/task@latest
+```
 
 1. **Configure and Build Containers**
 
-Run the following command to configure and build all the containers:
+Run the following command to configure and build all the containers. The images will be built, and will be in the container image store. In other words, the images are not yet pushed to a registry.
 ```sh
 task build-image-all
 ```
 
 3. **Deploy to the Clusters**
 
-Run the following command to deploy the YAML files to the two clusters defined by /root/kubeconfig.ocpcluster and /root/kubeconfig.microshift. Make sure you have set up an image registry on the local host:
+Run the following command to deploy the YAML files to the two clusters defined by /root/kubeconfig.ocpcluster and /root/kubeconfig.microshift. Make sure you have set up an image registry as the deploy target will both push all the images and start the main operator image which, in turn, will start the other containers.
+
 ```sh
 task deploy
 ```
@@ -36,19 +41,36 @@ Undoes what deploying did:
 task undeploy
 ```
 
-5. **Alternative: Remote Registry**
+5. **Clean up images**
+The build target will use previously built images if they are available to speed compilation up. To clear the previously built images, use the following command:
 
-Alternatively, if you set up a registry remotely, define the `REGISTERY` variable. Note that you need to do this for the build step and the push/run step:
 ```sh
-REGISTERY task ...
+task clean-image-all
 ```
 
-5. **Alternative: Deploy only one of the cluster**
+6. **Alternative: Remote Registry**
+
+Alternatively, if you set up a registry remotely, define the `REGISTERY` variable. Note that you need to do this for the build step and the push/run step:
+
+```sh
+REGISTERY=... task ...
+```
+
+7. **Alternative: Deploy only one of the cluster**
 
 You can deploy part of the env (host or dpu) using either `-host` or `-dpu`. For example, for the host side cluster, use this:
+
 ```sh
 task deploy-cluster-host
 ```
+
+8. **Alternative: Workflow of redeploying to test local changes**
+A common way to test out changes is to combine three targets.
+
+```sh
+task build-image-all undeploy deploy
+```
+
 ### End-to-end testing
 
 The DPU operator also integrates with CDA (https://github.com/bn222/cluster-deployment-automation) used to set up a complete OpenShift cluster before tests are ran against it. For that, you can use the following makefile target:
