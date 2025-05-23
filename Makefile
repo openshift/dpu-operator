@@ -85,11 +85,6 @@ ifeq ($(SUBMODULES), true)
 endif
 	hack/prepare-venv.sh
 
-# TODO: remove this when we don't call this target directly anymore
-.PHONY: deploy_clusters
-deploy_clusters:
-	go run tools/task/task.go deploy-clusters
-
 .PHONY: ginkgo
 ginkgo:
 	go run tools/task/task.go ginkgo
