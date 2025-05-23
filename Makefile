@@ -89,6 +89,7 @@ endif
 .PHONY: deploy_clusters
 deploy_clusters:
 	go run tools/task/task.go deploy-clusters
+	go run tools/task/task.go redeploy
 
 .PHONY: ginkgo
 ginkgo:
