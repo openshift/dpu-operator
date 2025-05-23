@@ -2,7 +2,6 @@ cluster-deployment-automation/
 kubernetes-traffic-flow-tests/
 ocp-traffic-flow-tests/
 hack/
-tools/
 examples/
 Dockerfile.*
 *.Dockerfile
