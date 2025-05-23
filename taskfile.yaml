@@ -133,7 +133,6 @@ tasks:
     deps:
       - task: kustomize
     cmds:
-      - task: prepare-e2e-test
       - task: deploy-clusters
       - task: fast-e2e-test
 

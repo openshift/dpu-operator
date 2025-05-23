@@ -2,6 +2,8 @@ version: '3'
 
 tasks:
   deploy-clusters:
+    deps:
+      - task: prepare-e2e-test
     cmds:
       - task: clean-clusters
       - task: deploy-clusters-both-phase-1
