@@ -1,5 +1,7 @@
 version: '3'
 
+run: once
+
 env:
   CGO_ENABLED: "0"
   GOARCH:   '{{ default "amd64" .GOARCH }}'
