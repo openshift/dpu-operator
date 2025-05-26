@@ -76,15 +76,6 @@ SHELL = /usr/bin/env bash -o pipefail
 .PHONY: default
 default: build
 
-SUBMODULES ?= true
-
-.PHONY: prepare-e2e-test
-prepare-e2e-test:
-ifeq ($(SUBMODULES), true)
-	hack/prepare-submodules.sh
-endif
-	hack/prepare-venv.sh
-
 # TODO: remove this when we don't call this target directly anymore
 .PHONY: deploy_clusters
 deploy_clusters:
@@ -97,10 +88,6 @@ ginkgo:
 .PHONY: traffic-flow-tests
 traffic-flow-tests:
 	hack/traffic_flow_tests.sh
-
-.PHONY: e2e_test
-e2e-test:
-	go run tools/task/task.go e2e-test
 
 .PHONY: all
 all: build
@@ -196,13 +183,6 @@ fast-test: envtest ginkgo
 
 ##@ Build
 
-MANAGER_BIN     = bin/manager
-DAEMON_BIN      = bin/daemon
-DPU_CNI_BIN     = bin/dpu-cni
-IPU_PLUGIN_BIN  = bin/ipuplugin
-VSP_BIN         = bin/vsp-mrvl
-NRI_BIN		= bin/nri
-
 GOARCH ?= amd64
 GOOS ?= linux
 
@@ -212,24 +192,23 @@ build: manifests generate fmt vet build-manager build-daemon build-intel-vsp bui
 
 .PHONY: build-manager
 build-manager:
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(MANAGER_BIN).${GOARCH} cmd/main.go
+	go run tools/task/task.go build-bin-manager
 
 .PHONY: build-daemon
 build-daemon:
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(DAEMON_BIN).${GOARCH} cmd/daemon/daemon.go
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(DPU_CNI_BIN).${GOARCH} dpu-cni/dpu-cni.go
+	go run tools/task/task.go build-bin-daemon
 
 .PHONY: build-intel-vsp
 build-intel-vsp:
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(IPU_PLUGIN_BIN).${GOARCH} cmd/intelvsp/intelvsp.go
+	go run tools/task/task.go build-bin-intel-vsp
 
 .PHONY: build-marvell-vsp
 build-marvell-vsp:
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o $(VSP_BIN).${GOARCH} internal/daemon/vendor-specific-plugins/marvell/main.go
+	go run tools/task/task.go build-bin-marvell-vsp
 
 .PHONY: build-network-resources-injector
 build-network-resources-injector:
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${NRI_BIN}.${GOARCH} cmd/nri/networkresourcesinjector.go
+	go run tools/task/task.go build-bin-network-resources-injector
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
@@ -244,31 +223,6 @@ docker-push: ## Push docker image with the manager.
 
 GO_CONTAINER_CACHE = /tmp/dpu-operator-cache
 REGISTRY ?= $(shell hostname)
-# Use the image urls from the yaml that is used with Kustomize for local
-# development.
-DPU_OPERATOR_IMAGE := $(REGISTRY):5000/dpu-operator:dev
-DPU_DAEMON_IMAGE := $(REGISTRY):5000/dpu-daemon:dev
-MARVELL_VSP_IMAGE := $(REGISTRY):5000/mrvl-vsp:dev
-INTEL_VSP_IMAGE := $(REGISTRY):5000/intel-vsp:dev
-INTEL_VSP_P4_IMAGE := $(REGISTRY):5000/intel-vsp-p4:dev
-NETWORK_RESOURCES_INJECTOR_IMAGE:= $(REGISTRY):5000/network-resources-injector-image:dev
-
-.PHONY: prep-local-deploy
-prep-local-deploy:
-	mkdir -p bin
-	go run ./tools/config/config.go -registry-url $(REGISTRY) -template-file config/dev/local-images-template.yaml -output-file bin/local-images.yaml
-	cp config/dev/kustomization.yaml bin
-
-.PHONY: incremental-prep-local-deploy
-incremental-prep-local-deploy:
-	go run ./tools/config/config.go -registry-url $(REGISTRY) -template-file config/incremental/local-images-template.yaml -output-file bin/local-images.yaml
-	cp config/dev/kustomization.yaml bin
-
-.PHONY: local-deploy
-local-deploy: prep-local-deploy manifests kustomize ## Deploy controller with images hosted on local registry
-	-$(MAKE) undeploy
-	$(KUSTOMIZE) build bin | $(KUBECTL) apply -f -
-	$(KUBECTL) -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=120s
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

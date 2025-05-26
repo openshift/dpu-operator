@@ -29,6 +29,6 @@ spec:
         - name: IMAGE_PULL_POLICIES
           value: Always
         - name: NETWORK_RESOURCES_INJECTOR_IMAGE
-          value: {{ .RegistryURL }}:5000/network-resources-injector-image:dev
+          value: {{ .RegistryURL }}:5000/network-resources-injector:dev
         image: {{ .RegistryURL }}:5000/dpu-operator:dev
         imagePullPolicy: Always
