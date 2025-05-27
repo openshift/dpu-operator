@@ -141,9 +141,7 @@ tasks:
       - task: ginkgo
       - task: envtest
     cmds:
-      - task: build-image-all
-      - task: undeploy
-      - task: deploy
+      - task: redeploy
       - sh hack/setup.sh
       - >
         FAST_TEST=true
@@ -153,3 +151,9 @@ tasks:
         KUBEBUILDER_ASSETS="$({{.BINDIR}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.BINDIR}} -p path)"
         {{.BINDIR}}/ginkgo -coverprofile cover.out ./e2e_test/...
       - hack/traffic_flow_tests.sh
+
+  redeploy:
+    cmds:
+      - task: build-image-all
+      - task: undeploy
+      - task: deploy
