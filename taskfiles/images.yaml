@@ -70,6 +70,8 @@ tasks:
     cmds:
       - buildah manifest rm localhost/{{.NAME}}:dev-base-manifest || true
       - task: clean-image-layer
+        vars:
+          NAME: '{{.NAME}}'
 
   build-image:
     internal: true
