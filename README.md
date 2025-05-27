@@ -65,10 +65,10 @@ task deploy-cluster-host
 ```
 
 8. **Alternative: Workflow of redeploying to test local changes**
-A common way to test out changes is to combine three targets.
+A common way to test out changes is to combine `build-image-all` followed by `undeploy` and `deploy`. A target that combines these three steps is provided.
 
 ```sh
-task build-image-all undeploy deploy
+task redeploy
 ```
 
 ### End-to-end testing
