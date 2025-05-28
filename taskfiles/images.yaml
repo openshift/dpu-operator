@@ -285,6 +285,14 @@ tasks:
       - task: clean-image-network-resources-injector
 
   build-image-all:
+    # build all the binaries in parallel for speed
+    # they will be picked up by the build-image-* targets
+    deps:
+      - build-bin-manager
+      - build-bin-daemon
+      - build-bin-intel-vsp
+      - build-bin-marvell-vsp
+      - build-bin-network-resources-injector
     cmds: # can't run in parallel since multiple concurrent pulls are not supported 
       - task: build-image-manager
       - task: build-image-daemon
