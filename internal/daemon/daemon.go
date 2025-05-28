@@ -35,9 +35,10 @@ type Daemon struct {
 	mgr       SideManager
 	client    client.Client
 	fs        afero.Fs
+	p         platform.Platform
 }
 
-func NewDaemon(fs afero.Fs, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
+func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		fs:        fs,
@@ -46,6 +47,7 @@ func NewDaemon(fs afero.Fs, mode string, config *rest.Config, vspImages map[stri
 		log:       log,
 		vspImages: vspImages,
 		config:    config,
+		p:         p,
 	}
 }
 
@@ -109,7 +111,7 @@ func (d *Daemon) Serve(listener net.Listener) error {
 }
 
 func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[string]string, client client.Client) (SideManager, error) {
-	platform := platform.NewPlatformInfo()
+	platform := platform.NewPlatformInfo(d.p)
 	plugin, err := platform.NewVspPlugin(dpuMode, vspImages, client)
 	if err != nil {
 		return nil, err
@@ -147,8 +149,8 @@ func (d *Daemon) isDpuMode() (bool, error) {
 	} else if d.mode == "dpu" {
 		return true, nil
 	} else if d.mode == "auto" {
-		platform := platform.NewPlatformInfo()
-		detectedDpuMode, err := platform.IsDpu()
+		plat := platform.NewPlatformInfo(d.p)
+		detectedDpuMode, err := plat.IsDpu()
 		if err != nil {
 			return false, fmt.Errorf("Failed to query platform info: %v", err)
 		}
