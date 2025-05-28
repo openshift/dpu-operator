@@ -5,6 +5,7 @@ reviewers:
   - vrindle
   - thom311
   - m-naught
+  - samd2021
 approvers:
   - bn222
   - wizhaoredhat
@@ -12,5 +13,6 @@ approvers:
   - vrindle
   - thom311
   - m-naught
+  - samd2021
 component: "Networking"
 subcomponent: "DPU"
