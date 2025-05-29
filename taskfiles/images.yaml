@@ -59,8 +59,10 @@ tasks:
     internal: true
     vars:
       NAME: '{{.NAME}}'
+    status:
+      - sh -c '! buildah manifest inspect localhost/{{.NAME}}:dev-manifest'
     cmds:
-      - buildah manifest rm localhost/{{.NAME}}:dev-manifest || true
+      - buildah manifest rm localhost/{{.NAME}}:dev-manifest
 
   clean-image:
     internal: true
