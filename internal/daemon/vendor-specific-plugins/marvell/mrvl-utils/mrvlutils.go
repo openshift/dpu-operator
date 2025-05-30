@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jaypipes/ghw"
 	"github.com/vishvananda/netlink"
@@ -14,9 +16,12 @@ import (
 )
 
 const (
-	VendorID         = "177d" // vendor ID for Marvell OCTEON
-	deviceID         = "a0f7" // device ID for Marvell OCTEON(CN10K) SDP Interface
-	SysBusPci string = "/sys/bus/pci/devices"
+	MrvlVendorID           = "177d" // vendor ID for Marvell OCTEON
+	MrvlDPUSDPPFId         = "a0f7" // device ID for Marvell OCTEON(CN10K) SDP Interface
+	MrvlHostSDPPFId        = "b900" // device ID for Host SDP Interface
+	MrvlDPIPFId            = "a080" // device ID for Marvell OCTEON(CN10K) DPI PF
+	MrvlPEMPFId            = "a06c" // device ID for Marvell OCTEON(CN10K) PEM PF
+	SysBusPci       string = "/sys/bus/pci/devices"
 )
 
 // GetAllVfsByDeviceID returns the list of all VFs associated with the given device ID
@@ -27,7 +32,7 @@ func GetAllVfsByDeviceID(deviceID string) ([]string, error) {
 	}
 	var targetAddresses []string
 	for _, dev := range pci.Devices {
-		if dev.Vendor.ID == VendorID && dev.Product.ID == deviceID {
+		if dev.Vendor.ID == MrvlVendorID && dev.Product.ID == deviceID {
 			targetAddresses = append(targetAddresses, dev.Address)
 		}
 	}
@@ -64,8 +69,8 @@ func Mapped_VF(pf_count int, pfid int, vfid int) (string, error) {
 	var list []string
 	for _, device := range devices {
 		if device.Vendor != nil && device.Product != nil {
-			if device.Vendor.ID == VendorID &&
-				device.Product.ID == deviceID {
+			if device.Vendor.ID == MrvlVendorID &&
+				device.Product.ID == MrvlDPUSDPPFId {
 				list = append(list, device.Address)
 			}
 		}
@@ -83,7 +88,7 @@ func Mapped_VF(pf_count int, pfid int, vfid int) (string, error) {
 // getInterfaceName function to get the Interface Name of the given Device ID and vendor ID
 // It will return the Interface Name and error
 func GetNameByDeviceID(deviceID string) (string, error) {
-	targetVendorID := VendorID
+	targetVendorID := MrvlVendorID
 	targetDeviceID := deviceID
 	pci, err := ghw.PCI()
 	if err != nil {
@@ -130,7 +135,7 @@ func GetNameByPCI(pciAddress string) (string, error) {
 
 // GetPCIByDeviceID returns the First Interface's PCI address of the device for the given device ID
 func GetPCIByDeviceID(deviceID string) (string, error) {
-	targetVendorID := VendorID
+	targetVendorID := MrvlVendorID
 	targetDeviceID := deviceID
 	pci, err := ghw.PCI()
 	if err != nil {
@@ -211,4 +216,181 @@ func GetPCIByName(portName string) (string, error) {
 		return "", err
 	}
 	return link.Attrs().Name, nil
+}
+
+// GetPCIDriver returns the driver in use for the PCI address
+func GetPCIDriver(pciAddress string) string {
+	pci, err := ghw.PCI()
+	if err != nil {
+		klog.Errorf("Error getting ghw product info: %v", err)
+		os.Exit(1)
+	}
+
+	deviceInfo := pci.GetDevice(pciAddress)
+	return deviceInfo.Driver
+}
+
+// DetectPlatformMode returns detects platform mode
+func DetectPlatformMode() string {
+	pci, err := ghw.PCI()
+	if err != nil {
+		klog.Fatalf("Error getting ghw product info: %v", err)
+	}
+
+	for _, pci := range pci.Devices {
+		if pci.Vendor.ID == MrvlVendorID &&
+			pci.Product.ID == MrvlDPUSDPPFId {
+			return "dpu"
+		}
+	}
+
+	return "host"
+}
+
+func BindToVFIO(pciAddress string) error {
+	driver := GetPCIDriver(pciAddress)
+	if driver != "" {
+		// Path to the device driver
+		unbindPath := filepath.Join("/sys/bus/pci/drivers/", driver, "unbind")
+
+		// Unbind the device from its current driver
+		if err := os.WriteFile(unbindPath, []byte(pciAddress), 0644); err != nil {
+			klog.Errorf("failed to unbind device: %v", err)
+			return err
+		}
+	}
+
+	// Bind the device to VFIO
+	overridePath := filepath.Join("/sys/bus/pci/devices/", pciAddress, "driver_override")
+	if err := os.WriteFile(overridePath, []byte("vfio-pci"), 0644); err != nil {
+		klog.Errorf("failed to override device to VFIO: %v", err)
+		return err
+	}
+
+	probePath := filepath.Join("/sys/bus/pci/drivers_probe")
+	if err := os.WriteFile(probePath, []byte(pciAddress), 0644); err != nil {
+		klog.Errorf("failed to probe device to VFIO: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func SetupHugepages() error {
+	cmd := "mkdir -p /dev/huge"
+	err := exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to create /dev/huge: %v", err)
+		return err
+	}
+
+	cmd = "mount -t hugetlbfs none /dev/huge"
+	err = exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to mount /dev/huge: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func loadHostDriver() error {
+	cmd := "chroot /host modprobe octeon_ep"
+	err := exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to load driver octeon_ep: %v", err)
+	}
+
+	cmd = "chroot /host modprobe octeon_ep_vf"
+	err = exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to load driver octeon_ep_vf: %v", err)
+	}
+
+	return nil
+}
+
+func unloadHostDriver() {
+	cmd := "chroot /host rmmod octeon_ep_vf"
+	_ = exec.Command("bash", "-c", cmd).Run()
+
+	cmd = "chroot /host rmmod octeon_ep"
+	_ = exec.Command("bash", "-c", cmd).Run()
+}
+
+func SetupHostInterface() error {
+	for i := 1; i < 10; i++ {
+		ifName, err := GetNameByDeviceID(MrvlHostSDPPFId)
+		if err == nil && ifName != "" {
+			klog.Info("Host Interface found")
+			return nil
+		}
+
+		unloadHostDriver()
+
+		klog.Info("Waiting for host interface")
+		time.Sleep(20 * time.Second)
+
+		err = loadHostDriver()
+		if err != nil {
+			klog.Error("Failed to load host drivers")
+			os.Exit(1)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+
+	return errors.New("Failed to set up Host Interface")
+}
+
+func SetupDpuService() error {
+	cmd := "cp /cp-agent.service /host/etc/systemd/system/cp-agent.service"
+	err := exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to copy cp-agent.service: %v", err)
+		return err
+	}
+
+	cmd = "chroot /host systemctl enable cp-agent"
+	err = exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to enable cp-agent.service: %v", err)
+		return err
+	}
+
+	cmd = "chroot /host systemctl daemon-reload"
+	err = exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to reload daemon with cp-agent.service: %v", err)
+		return err
+	}
+
+	cmd = "chroot /host systemctl start cp-agent"
+	err = exec.Command("bash", "-c", cmd).Run()
+	if err != nil {
+		klog.Errorf("Failed to start cp-agent.service: %v", err)
+		return err
+	}
+
+	klog.Info("cp-agent service enabled")
+	return nil
+}
+
+func SetupPlatform() error {
+	if DetectPlatformMode() == "host" {
+		err := SetupHostInterface()
+		if err != nil {
+			klog.Errorf("Failed to set up PF: %v", err)
+			return err
+		}
+	} else {
+		// TODO: move away from using systemd file
+		err := SetupDpuService()
+		if err != nil {
+			klog.Errorf("Failed to set up Control Plane Agent: %v", err)
+			return err
+		}
+	}
+
+	return nil
 }
