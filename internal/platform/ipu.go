@@ -50,8 +50,8 @@ func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
 		pci.Product.Name == "Infrastructure Data Path Function", nil
 }
 
-func (pi *IntelDetector) IsDpuPlatform() (bool, error) {
-	product, err := ghw.Product()
+func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
+	product, err := platform.Product()
 	if err != nil {
 		return false, errors.Errorf("Error getting product info: %v", err)
 	}

@@ -35,13 +35,13 @@ func (pi *MarvellDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
 }
 
 // IsDpuPlatform checks if the platform is a Marvell DPU
-func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
-	pci, err := ghw.PCI()
+func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
+	devices, err := platform.PciDevices()
 	if err != nil {
-		return false, errors.Errorf("Error getting product info: %v", err)
+		return false, errors.Errorf("Error getting devices: %v", err)
 	}
 
-	for _, pci := range pci.Devices {
+	for _, pci := range devices {
 		if pci.Vendor.ID == MrvlVendorID &&
 			pci.Product.ID == MrvlDPUdeviceID {
 			return true, nil
