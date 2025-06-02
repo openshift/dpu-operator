@@ -1,6 +1,6 @@
 version: '3'
 
-run: once
+run: when_changed
 
 env:
   CGO_ENABLED: "0"

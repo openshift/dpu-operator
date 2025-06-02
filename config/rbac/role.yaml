@@ -91,6 +91,7 @@ rules:
   - customresourcedefinitions
   verbs:
   - get
+  - list
 - apiGroups:
   - apps
   resources:

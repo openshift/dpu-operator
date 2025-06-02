@@ -82,13 +82,7 @@ func (d *Daemon) Listen() (net.Listener, error) {
 		return nil, fmt.Errorf("Failed to create client: %v", err)
 	}
 
-	ce := utils.NewClusterEnvironment(d.client)
-	flavour, err := ce.Flavour(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-	d.log.Info("Detected Kuberentes flavour", "flavour", flavour)
-	err = d.prepareCni(flavour)
+	err = d.prepareCni()
 	if err != nil {
 		return nil, err
 	}
@@ -122,14 +116,11 @@ func (d *Daemon) createDaemon(dpuMode bool, config *rest.Config, vspImages map[s
 	}
 }
 
-func (d *Daemon) prepareCni(flavour utils.Flavour) error {
-	cniPath, err := d.pm.CniPath(flavour)
-	if err != nil {
-		d.log.Error(err, "Failed to get cni path")
-		return err
-	}
+func (d *Daemon) prepareCni() error {
+	cniPath := d.pm.CniPath()
+	d.log.Info("Copying dpu-cni to", "cniPath", cniPath)
 
-	err = utils.CopyFile(d.fs, "/dpu-cni", cniPath)
+	err := utils.CopyFile(d.fs, "/dpu-cni", cniPath)
 	if err != nil {
 		return fmt.Errorf("Failed to prepare CNI binary from /dpu-cni to %v", cniPath)
 	}
