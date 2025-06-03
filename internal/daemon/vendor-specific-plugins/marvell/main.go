@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -691,6 +692,11 @@ func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
 
 }
 
+func linkHasAddrgenmodeEui64(interfaceName string) bool {
+	out, err := exec.Command("ip", "-d", "link", "show", "dev", interfaceName).Output()
+	return err == nil && strings.Contains(string(out), "addrgenmode eui64")
+}
+
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
 func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
@@ -708,10 +714,16 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 		klog.Errorf("Error setting %s: %v", optimistic_dad_file, err1)
 	}
 
-	// Ensure to set addrgenmode and toggle link state (which can result in creating
-	// the IPv6 link local address. Ignore errors here.
-	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
-	exec.Command("ip", "link", "set", interfaceName, "down").Run()
+	if linkHasAddrgenmodeEui64(interfaceName) {
+		// Kernel may require that the SDP interfaces are up at all times (RHEL-90248).
+		// If the addrgenmode is already eui64, assume we are fine and don't need to reset
+		// it (and don't need to toggle the link state).
+	} else {
+		// Ensure to set addrgenmode and toggle link state (which can result in creating
+		// the IPv6 link local address. Ignore errors here.
+		exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
+		exec.Command("ip", "link", "set", interfaceName, "down").Run()
+	}
 
 	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
 	if err != nil {
