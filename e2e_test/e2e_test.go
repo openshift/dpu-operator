@@ -422,6 +422,9 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				fmt.Println("Nf pod successfully created")
 			})
 			g.It("Should support pod -> pod with Network-Function deployed", func() {
+				if skipNetworkFunctionTesting {
+					g.Skip("Skipping Network Function Testing")
+				}
 				fmt.Println("Testing pod-to-pod connectivity w/ Network Function Deployed")
 				pingTest(hostClientSet, hostRestConfig, pod1, pod2_ip, pod1.Name, pod2.Name)
 				pingTest(hostClientSet, hostRestConfig, pod2, pod1_ip, pod2.Name, pod1.Name)
