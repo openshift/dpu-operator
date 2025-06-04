@@ -4,7 +4,7 @@ clusters:
     ingress_vip: "192.168.122.101"
     network_api_port: "{{secondary_network_port()}}"
     kind: "iso"
-    install_iso: "{{iso_server()}}/RHEL-9.6.0-20250416.8-aarch64-dvd1-w-kickstart.iso"
+    install_iso: "./RHEL-9.6.0-20250416.8-aarch64-dvd1-w-kickstart.iso"
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
@@ -19,12 +19,14 @@ clusters:
       ip: "172.16.3.16"
       mac: "{{DPU_mac_address(0)}}"
     preconfig:
+    - name: "host_registries"
+      import_pull_secret: true
     - name: dpu_firmware
       mev_version: "2.0.0.11126"
-    postconfig:
-    - name: "rh_subscription"
+    - name: "iso_builder"
+      final_iso_name: "./RHEL-9.6.0-20250416.8-aarch64-dvd1-w-kickstart.iso"
       organization_id: "{{organization_id()}}"
       activation_key: "{{activation_key()}}"
-    - name: "microshift"
+    postconfig:
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
