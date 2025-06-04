@@ -720,9 +720,15 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 		// it (and don't need to toggle the link state).
 	} else {
 		// Ensure to set addrgenmode and toggle link state (which can result in creating
-		// the IPv6 link local address. Ignore errors here.
-		exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
-		exec.Command("ip", "link", "set", interfaceName, "down").Run()
+		// the IPv6 link local address).
+		err2 := exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
+		if err2 != nil {
+			return fmt.Errorf("Error setting link %s addrgenmode: %v", interfaceName, err2)
+		}
+		err2 = exec.Command("ip", "link", "set", interfaceName, "down").Run()
+		if err2 != nil {
+			return fmt.Errorf("Error setting link %s down after setting addrgenmode: %v", interfaceName, err2)
+		}
 	}
 
 	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
