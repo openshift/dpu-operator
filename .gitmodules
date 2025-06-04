@@ -1,6 +1,6 @@
 [submodule "cluster-deployment-automation"]
 	path = cluster-deployment-automation
-	url = https://github.com/bn222/cluster-deployment-automation
+	url = https://github.com/samd2021/cluster-deployment-automation
 [submodule "kubernetes-traffic-flow-tests"]
 	path = kubernetes-traffic-flow-tests
 	url = https://github.com/ovn-kubernetes/kubernetes-traffic-flow-tests
