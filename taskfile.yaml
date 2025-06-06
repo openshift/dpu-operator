@@ -12,7 +12,7 @@ vars:
   DPU_OPERATOR_TEMP_DIR: /tmp/dpu-operator-tmp
   BINDIR: bin
   REGISTRY:
-    sh: hostname
+    sh: hostname | sed 's/$/:5000/'
   ENVTEST_K8S_VERSION: 1.27.1
   KUSTOMIZE_VERSION: v5.6.0
   GINKGO_VERSION:
@@ -92,27 +92,27 @@ tasks:
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/dpu-operator:dev'
-          IMAGE: '{{.REGISTRY}}:5000/dpu-operator:dev'
+          IMAGE: '{{.REGISTRY}}/dpu-operator:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/dpu-daemon:dev'
-          IMAGE: '{{.REGISTRY}}:5000/dpu-daemon:dev'
+          IMAGE: '{{.REGISTRY}}/dpu-daemon:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/mrvl-vsp:dev'
-          IMAGE: '{{.REGISTRY}}:5000/mrvl-vsp:dev'
+          IMAGE: '{{.REGISTRY}}/mrvl-vsp:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/intel-vsp:dev'
-          IMAGE: '{{.REGISTRY}}:5000/intel-vsp:dev'
+          IMAGE: '{{.REGISTRY}}/intel-vsp:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/intel-vsp-p4:dev'
-          IMAGE: '{{.REGISTRY}}:5000/intel-vsp-p4:dev'
+          IMAGE: '{{.REGISTRY}}/intel-vsp-p4:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/network-resources-injector:dev'
-          IMAGE: '{{.REGISTRY}}:5000/network-resources-injector:dev'
+          IMAGE: '{{.REGISTRY}}/network-resources-injector:dev'
     cmds:
       - task: undeploy
         vars:
