@@ -35,9 +35,8 @@ var (
 	cfg     *rest.Config
 	testEnv *envtest.Environment
 	// TODO: reduce to 2 seconds
-	timeout  = 2 * time.Minute
+	timeout  = 1 * time.Minute
 	interval = 1 * time.Second
-	nfImage  = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
 	nfName   = "test-nf"
 	sfcName  = "sfc-test"
 )
@@ -311,24 +310,44 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			externalClientIp           string
 			externalSubnet             string
 			skipNetworkFunctionTesting = false
+			sfc                        *configv1.ServiceFunctionChain
+			imageRef                   string
 		)
 
-		sfc := &configv1.ServiceFunctionChain{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      sfcName,
-				Namespace: vars.Namespace,
-			},
-			Spec: configv1.ServiceFunctionChainSpec{
-				NetworkFunctions: []configv1.NetworkFunction{
-					{
-						Name:  nfName,
-						Image: nfImage,
+		g.BeforeAll(func() {
+			localContainer := testutils.ContainerImage{
+				Registry: os.Getenv("REGISTRY"),
+				Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+				Tag:      "latest",
+			}
+
+			remoteContainer := testutils.ContainerImage{
+				Registry: "ghcr.io",
+				Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+				Tag:      "latest",
+			}
+			if val, found := os.LookupEnv("USE_LOCAL_REGISTRY"); !found || val == "true" {
+				err := testutils.EnsurePullAndPush(context.TODO(), remoteContainer, localContainer)
+				Expect(err).NotTo(HaveOccurred())
+				imageRef = localContainer.FullRef()
+			} else {
+				imageRef = remoteContainer.FullRef()
+			}
+
+			sfc = &configv1.ServiceFunctionChain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sfcName,
+					Namespace: vars.Namespace,
+				},
+				Spec: configv1.ServiceFunctionChainSpec{
+					NetworkFunctions: []configv1.NetworkFunction{
+						{
+							Name:  nfName,
+							Image: imageRef,
+						},
 					},
 				},
-			},
-		}
-
-		g.BeforeAll(func() {
+			}
 			nodeList, err := testutils.GetDPUNodes(hostSideClient)
 			Expect(err).NotTo(HaveOccurred())
 			pod := testutils.NewTestPod(testPodName, nodeList[0].Name)
@@ -415,7 +434,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				Eventually(func() bool {
 					nfPod = testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
 					if nfPod != nil {
-						return nfPod.Spec.Containers[0].Image == nfImage && nfPod.Status.Phase == corev1.PodRunning
+						return nfPod.Spec.Containers[0].Image == imageRef && nfPod.Status.Phase == corev1.PodRunning
 					}
 					return false
 				}, timeout, interval).Should(BeTrue())
