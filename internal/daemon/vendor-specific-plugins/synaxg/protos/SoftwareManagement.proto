@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+option go_package = "./gen;gen";
+
+import "Common.proto";
+
+message SoftwareStopRequest {
+  bool enableStop = 1;
+}
+
+message SoftwareStopResponse {
+  	ResultStatus result = 1;
+	string error_message = 2;
+}
+
+//Use TFTP to download software package. The gRPC client send software upgrade request to gRPC server, and gRPC server will reply the upgrade status after software upgrade process.
+message SoftwareUpgradeRequest {
+  string remote_file = 1;
+	//The URI of software image include username. The format should be: tftp://<host>[:<port]/file-with-path
+	//For example: tftp://192.168.2.1:69//root/package/software-upgrade.tar.gz
+	ImageType type = 2;
+}
+
+message SoftwareUpgradeStreamRequest {
+    string remote_file = 1; //file-with-path For example: /root/package/software-upgrade.tar.gz
+	bytes chunk_data = 2; 
+}
+
+enum UpgradeResultStatus {
+	UPG_SUCCESS = 0;
+    UPG_FAIL = 1;
+	UPG_NOT_RUNNING = 2;
+}
+
+message SoftwareUpgradeResponse {
+  UpgradeResultStatus result = 1;
+  string error_message = 2; //empty when result is SUCCESS
+}
+
+enum ImageType {
+	APP = 0;
+	SDK = 1;
+	PLL = 2;
+}
+
+service SoftwareManagementService {
+  // Set RPC, send from server-OAM to vDU-OAM. Used to trigger vDU software upgrade. 
+  rpc SoftwareUpgrade(SoftwareUpgradeRequest) returns (SoftwareUpgradeResponse);
+  // Set RPC, send from operator to vDU-OAM. Used to trigger vDU software upgrade. 
+  rpc SoftwareUpgradeStream(stream SoftwareUpgradeStreamRequest) returns (SoftwareUpgradeResponse);
+
+  // Set RPC, send from server-OAM to vDU-OAM. Used to trigger vDU software stop. 
+  rpc SoftwareStop(SoftwareStopRequest) returns (SoftwareStopResponse);
+}
