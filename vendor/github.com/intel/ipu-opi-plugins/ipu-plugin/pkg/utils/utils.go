@@ -491,7 +491,7 @@ func CopyBinary(imcPath string, vspPath string, sftpClient *sftp.Client) error {
 }
 
 func RestoreRHPrimaryNetwork() {
-        remoteCliCmd := "set -o pipefail && cli_client -x -f /tmp/tmp.*.txt"
+        remoteCliCmd := "set -o pipefail && /work/scripts/post_init_app.sh"
 	_, err := RunCliCmdOnImc(remoteCliCmd, "")
         if err != nil {
                log.Info("RunCliCmdOnImc: Warning!. Unable to restore primary network access for to this IPU-ACC")
