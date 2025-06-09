@@ -87,32 +87,7 @@ tasks:
 
   deploy:
     deps:
-      - task: kustomize
       - task: deploy-prep
-      - task: push-image-helper
-        vars:
-          SOURCE: 'localhost/dpu-operator:dev'
-          IMAGE: '{{.REGISTRY}}/dpu-operator:dev'
-      - task: push-image-helper
-        vars:
-          SOURCE: 'localhost/dpu-daemon:dev'
-          IMAGE: '{{.REGISTRY}}/dpu-daemon:dev'
-      - task: push-image-helper
-        vars:
-          SOURCE: 'localhost/mrvl-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/mrvl-vsp:dev'
-      - task: push-image-helper
-        vars:
-          SOURCE: 'localhost/intel-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/intel-vsp:dev'
-      - task: push-image-helper
-        vars:
-          SOURCE: 'localhost/intel-vsp-p4:dev'
-          IMAGE: '{{.REGISTRY}}/intel-vsp-p4:dev'
-      - task: push-image-helper
-        vars:
-          SOURCE: 'localhost/network-resources-injector:dev'
-          IMAGE: '{{.REGISTRY}}/network-resources-injector:dev'
     cmds:
       - task: undeploy
         vars:
