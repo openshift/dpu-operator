@@ -277,8 +277,8 @@ github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+h
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
-github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250425184833-c99215d87699 h1:uWW0QvVKtacTGizhcVmLlhQrBd8Aqi7gsUtOInee64k=
-github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250425184833-c99215d87699/go.mod h1:0YQiXuQYeBjxQjcxHe1NYHiuo+3kz0qeHnO0tJw2Qc0=
+github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250609180822-3e02ec6c556d h1:SfGN4hHjpHYx7dINtQ//X3nsHmaNCd9zmNDWhwRCzEc=
+github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250609180822-3e02ec6c556d/go.mod h1:0YQiXuQYeBjxQjcxHe1NYHiuo+3kz0qeHnO0tJw2Qc0=
 github.com/jaypipes/ghw v0.13.1-0.20241024164530-c1bfc6e6cd6a h1:orxBMCkYww7RFCk3iCDP9DC3l+yKtp4VdWtctCTyjPQ=
 github.com/jaypipes/ghw v0.13.1-0.20241024164530-c1bfc6e6cd6a/go.mod h1:F4UM7Ix55ONYwD3Lck2S4BI+hKezOwtizuJxXDFsioo=
 github.com/jaypipes/pcidb v1.0.1 h1:WB2zh27T3nwg8AE8ei81sNRb9yWBii3JGNJtT7K9Oic=
