@@ -262,6 +262,8 @@ func (s *server) Stop() {
 			log.Error(err, "unable to Delete Crs : %v", err)
 			// Do not return since we continue on error
 		}
+		//Restore Red Hat primary network path via opcodes - This is required after the primiary network P4 rules are deleted.
+		utils.RestoreRHPrimaryNetwork()
 	}
 	// Stopping the gRPC server for the DPU daemon
 	s.grpcSrvr.GracefulStop()
