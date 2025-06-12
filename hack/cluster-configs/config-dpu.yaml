@@ -4,7 +4,7 @@ clusters:
     ingress_vip: "192.168.122.101"
     network_api_port: "{{secondary_network_port()}}"
     kind: "iso"
-    install_iso: "{{iso_server()}}/RHEL-9.6.0-20250416.8-aarch64-dvd1-w-kickstart.iso"
+    install_iso: "{{iso_server()}}/RHEL-IPU-CUSTOM-LATEST-20250612-aarch64-v1.iso"
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
@@ -22,9 +22,9 @@ clusters:
     - name: dpu_firmware
       mev_version: "2.0.0.11126"
     postconfig:
-    - name: "rh_subscription"
-      organization_id: "{{organization_id()}}"
-      activation_key: "{{activation_key()}}"
-    - name: "microshift"
+    # - name: "rh_subscription"
+    #   organization_id: "{{organization_id()}}"
+    #   activation_key: "{{activation_key()}}"
+    # - name: "microshift"
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
