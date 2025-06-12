@@ -1,0 +1,36 @@
+PCIe-EP Octeon Software Release Notes
+=====================================
+
+Supported SoCs
+~~~~~~~~~~~~~~
+- CN96xx
+- CN98xx
+- CNF95n
+- CNF105xx
+- CN106xx
+
+Known Issues
+------------
+
+Change Logs
+-----------
+pcie_ep_octeontx
+~~~~~~~~~~~~~~~~
+
+SDK11.24.04
+~~~~~~~~~~~
+- Added repository for public release
+
+SDK11.23.11
+~~~~~~~~~~~
+- CP LIB: Added entries for detection of soc model for cn106-b0 cards
+
+SDK11.23.09
+~~~~~~~~~~~
+- CP LIB: Integrated plugin server / client APIs to cp library
+
+SDK11.23.04
+~~~~~~~~~~~
+- CP Agent:Add configurable support for sleep time between consecutive polls and max number of messages per poll
+- CP Agent: Fix multi PEM support
+
