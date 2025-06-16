@@ -449,3 +449,59 @@ func DeleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 		return err
 	}, TestAPITimeout, TestRetryInterval).Should(Succeed())
 }
+
+func SfcNew(namespace, sfcName, nfName, nfImage string) *configv1.ServiceFunctionChain {
+	return &configv1.ServiceFunctionChain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sfcName,
+			Namespace: namespace,
+		},
+		Spec: configv1.ServiceFunctionChainSpec{
+			NetworkFunctions: []configv1.NetworkFunction{
+				{
+					Name:  nfName,
+					Image: nfImage,
+				},
+			},
+		},
+	}
+}
+
+func SfcGet(c client.Client, name string, namespace string) *configv1.ServiceFunctionChain {
+	obj := client.ObjectKey{Namespace: namespace, Name: name}
+	pod := &configv1.ServiceFunctionChain{}
+	err := c.Get(context.TODO(), obj, pod)
+	if err != nil {
+		Expect(errors.IsNotFound(err)).To(BeTrue())
+		return nil
+	}
+	return pod
+}
+
+func SfcWait(c client.Client, name, namespace string, timeout time.Duration) *configv1.ServiceFunctionChain {
+	var sfc *configv1.ServiceFunctionChain
+
+	Eventually(func() bool {
+		sfc = SfcGet(c, name, namespace)
+		return sfc != nil
+	}, timeout, 100*time.Millisecond).Should(BeTrue())
+
+	return sfc
+}
+
+func SfcCreate(c client.Client, sfc *configv1.ServiceFunctionChain) *configv1.ServiceFunctionChain {
+	err := c.Create(context.TODO(), sfc)
+	Expect(err).NotTo(HaveOccurred())
+
+	sfc2 := SfcWait(c, sfc.ObjectMeta.Name, sfc.ObjectMeta.Namespace, 2*time.Second)
+	Expect(sfc2).NotTo(BeNil())
+
+	return sfc2
+}
+
+func SfcList(c client.Client, namespace string) *configv1.ServiceFunctionChainList {
+	sfcLs := &configv1.ServiceFunctionChainList{}
+	err := c.List(context.TODO(), sfcLs, client.InNamespace(namespace))
+	Expect(err).NotTo(HaveOccurred())
+	return sfcLs
+}
