@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,12 +39,62 @@ var (
 
 const (
 	// TODO: reduce to 2 seconds
-	timeout  = 2 * time.Minute
-	interval = 1 * time.Second
-	nfImage  = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
-	nfName   = "test-nf"
-	sfcName  = "sfc-test"
+	timeout   = 2 * time.Minute
+	interval  = 1 * time.Second
+	nfImage   = "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
+	nfName    = "test-nf"
+	sfcName   = "sfc-test"
+	sfcNumMax = 12
 )
+
+func getMaxDpuResources(cli client.Client) int {
+	var nodeList corev1.NodeList
+	err := cli.List(context.TODO(), &nodeList)
+	Expect(err).NotTo(HaveOccurred())
+
+	var maxDPU resource.Quantity
+
+	for _, node := range nodeList.Items {
+		if val, ok := node.Status.Allocatable[corev1.ResourceName("openshift.io/dpu")]; ok {
+			if val.Cmp(maxDPU) > 0 {
+				maxDPU = val
+			}
+		}
+	}
+
+	v64 := maxDPU.Value()
+	v := int(v64)
+	Expect(int64(v)).To(Equal(v64))
+	return v
+}
+
+func sfcNew(i int) *configv1.ServiceFunctionChain {
+	return testutils.SfcNew(vars.Namespace,
+		fmt.Sprintf("%s%d", sfcName, i),
+		fmt.Sprintf("%s%d", nfName, i),
+		nfImage)
+}
+
+func sfcFindRunningSfc(c client.Client, sfcNum int) *configv1.ServiceFunctionChain {
+
+	var found_sfc *configv1.ServiceFunctionChain
+
+	Eventually(func() bool {
+		for i := 0; i < sfcNum; i++ {
+			sfc := sfcNew(i)
+
+			pod := testutils.GetPod(c, sfc.Spec.NetworkFunctions[0].Name, sfc.ObjectMeta.Namespace)
+
+			if pod != nil && pod.Status.Phase == corev1.PodRunning {
+				found_sfc = sfc
+				break
+			}
+		}
+		return found_sfc != nil
+	}, timeout, 250*time.Millisecond).Should(BeTrue())
+
+	return found_sfc
+}
 
 func pingTest(srcClientSet kubernetes.Interface, srcRestConfig *rest.Config, srcPod *corev1.Pod, destIP, srcName, destName string) {
 	Eventually(func() bool {
@@ -110,6 +161,7 @@ var _ = g.AfterSuite(func() {
 })
 
 var _ = g.Describe("E2E integration testing", g.Ordered, func() {
+
 	var (
 		dpuSideClient                      client.Client
 		hostSideClient                     client.Client
@@ -316,20 +368,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			skipNetworkFunctionTesting = false
 		)
 
-		sfc := &configv1.ServiceFunctionChain{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      sfcName,
-				Namespace: vars.Namespace,
-			},
-			Spec: configv1.ServiceFunctionChainSpec{
-				NetworkFunctions: []configv1.NetworkFunction{
-					{
-						Name:  nfName,
-						Image: nfImage,
-					},
-				},
-			},
-		}
+		sfc := testutils.SfcNew(vars.Namespace, sfcName, nfName, nfImage)
 
 		g.BeforeAll(func() {
 			nodeList, err := testutils.GetDPUNodes(hostSideClient)
@@ -468,6 +507,50 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				}, timeout, interval).Should(BeTrue())
 			})
 		})
+
+		g.Context("With more ServiceFunctionChains than resources", g.Ordered, func() {
+			g.It("Should have all SFC Pods eventually running", func() {
+
+				dpuResNum := getMaxDpuResources(dpuSideClient)
+				Expect(dpuResNum).To(BeNumerically(">=", 0))
+
+				sfcNum := (dpuResNum / 2) + 2
+				if sfcNum > sfcNumMax {
+					sfcNum = sfcNumMax
+				}
+
+				g.By(fmt.Sprintf("Creating %d SFCs to allocate all DPU side resources", sfcNum))
+				for i := 0; i < sfcNum; i++ {
+					sfc := sfcNew(i)
+					testutils.SfcCreate(dpuSideClient, sfc)
+
+					Eventually(func() bool {
+						return testutils.GetPod(dpuSideClient, sfc.Spec.NetworkFunctions[0].Name, sfc.ObjectMeta.Namespace) != nil
+					}, timeout, interval).Should(BeTrue())
+				}
+
+				for i := 0; i < sfcNum; i++ {
+					g.By(fmt.Sprintf("Find a running SFC Pod (%d of %d)", i, sfcNum))
+					sfc := sfcFindRunningSfc(dpuSideClient, sfcNum)
+
+					g.By(fmt.Sprintf("Delete SFC %s", sfc.ObjectMeta.Name))
+					err := dpuSideClient.Delete(context.TODO(), sfc)
+					Expect(err).NotTo(HaveOccurred())
+
+					Eventually(func() bool {
+						return testutils.GetPod(dpuSideClient, sfc.Spec.NetworkFunctions[0].Name, sfc.ObjectMeta.Namespace) == nil
+					}, timeout, interval).Should(BeTrue())
+				}
+
+				g.By(fmt.Sprintf("Check all %d SFCs are gone", sfcNum))
+				for i := 0; i < sfcNum; i++ {
+					sfc := sfcNew(i)
+					sfc2 := testutils.SfcGet(dpuSideClient, sfc.ObjectMeta.Name, sfc.ObjectMeta.Namespace)
+					Expect(sfc2).To(BeNil())
+				}
+			})
+		})
+
 		g.AfterAll(func() {
 			// To maintain idempotency, make sure to clean up the SFC we created incase an earlier test failed
 			err := dpuSideClient.Delete(context.TODO(), sfc)
@@ -497,6 +580,10 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 					return err != nil && errors.IsNotFound(err)
 				}, testutils.TestAPITimeout*30*2, testutils.TestRetryInterval).Should(BeTrue(), "Pod %s was not fully deleted in time", podName)
+			}
+
+			for i := 0; i < sfcNumMax; i++ {
+				dpuSideClient.Delete(context.TODO(), sfcNew(i))
 			}
 		})
 	})
