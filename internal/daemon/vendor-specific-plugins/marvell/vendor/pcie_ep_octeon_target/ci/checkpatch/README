@@ -1,0 +1,91 @@
+Marvell Checkpatch utility for developers Documentation {#MarvellDocumentation}
+===========================================
+
+```
+  Copyright (C) 2022 Marvell.
+  All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause
+```
+
+Introduction {#section2}
+-----------------------------------------
+PROJECT_ROOT is the root directory of the pcie_ep_octeontx project directory
+and will contain the following sub-directories:
+
+.
+├── ci
+│   └── checkpatch
+├── host
+│   ├── drivers
+│   └── target
+└── target
+    ├── apps
+    ├── drivers
+    └── libs
+
+The ci directory contains the checkpatch directory, which in turn
+contains the checkpatch utility.
+
+.
+└── checkpatch
+    ├── checkformat.sh
+    ├── checkpatch.conf
+    ├── checkpatch.pl
+    ├── const_structs.checkpatch
+    ├── devtools
+    │   ├── checkpatches.sh
+    │   └── check-symbol-change.sh
+    ├── dictionary.txt
+    ├── README
+    ├── run_checkbundle.sh
+    ├── run_checkformat.sh
+    ├── run_checkpatch.sh
+    └── spelling.txt
+
+There are two main utilities currently provided with the checkpatch bundle:
+
+1. run_checkformat.sh
+2. run_checkpatch.sh
+
+A third utility script -- run_checkbundle.sh -- is also provided to bundle both utilities at a single go.
+
+All the checkpatch utilities will act on the latest git commit seen in the git log.
+So the code the user wants to do checkpatch on has to be set as the latest commit, which
+can be done either by rebasing or using other git utilities.
+
+run_checkformat.sh {#section3}
+-----------------------------------------
+The checkformat.sh script checks for indention and format mistakes in the patch
+and corrects it using the clang-format-diff tool for the user. If the utility is not found,
+the user can install it using the following command:
+
+```bash
+sudo apt-get install clang-format
+
+Commit your code or the patch you want to test as the latest git commit.
+Enter PROJECT_ROOT, and run the script as follows:
+
+```bash
+
+./ci/checkpatch/run_checkformat.sh
+
+run_checkpatch.sh {#section4}
+------------------------------------------
+The checkpatch.pl is a pearlscript which alerts the user about stylistic and formatting
+issues in the code as errors and warnings.
+
+Commit your code or the patch you want to test as the latest git commit.
+Enter PROJECT_ROOT, and run the script as follows:
+
+```bash
+
+./ci/checkpatch/run_checkpatch.sh
+
+The warnings and errors will be posted as output
+
+run_checkbundle.sh {#section5}
+------------------------------------------
+The run_checkbundle.sh runs both the run_checkformat.sh and run_checkpatch scripts for the user.
+
+```bash
+./ci/checkpatch/run_checkbundle.sh

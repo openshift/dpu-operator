@@ -173,8 +173,21 @@ tasks:
         vars:
           NAME: dpu-daemon
 
+  build-cpagent-service:
+    internal: true
+    vars:
+      IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
+      CPIMAGE: "Environment=IMAGE='{{.IMAGE}}'"
+      CPFILE: 'internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent.service'
+    cmds:
+    - mkdir -p bin
+    - echo "[Service]" > bin/cp-agent.service
+    - echo '{{.CPIMAGE}}' >> bin/cp-agent.service
+    - cat '{{.CPFILE}}' >> bin/cp-agent.service
+
   build-image-marvell-vsp:
     deps:
+      - task: build-cpagent-service
       - task: build-bin-marvell-vsp
         vars:
           GOARCH: arm64
@@ -201,6 +214,24 @@ tasks:
       - task: clean-image
         vars:
           NAME: mrvl-vsp
+
+  build-image-marvell-cpagent:
+    deps:
+      - task: clean-image-layer
+        vars:
+          NAME: mrvl-cpagent
+    cmds:
+      - task: build-image
+        vars:
+          NAME: mrvl-cpagent
+          DOCKERFILE: Dockerfile.mrvlCPAgent.rhel
+          PLATFORM: arm64
+
+  clean-image-marvell-cpagent:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: mrvl-cpagent
 
   build-image-intel-vsp:
     deps:
@@ -286,6 +317,7 @@ tasks:
       - task: clean-image-intel-vsp
       - task: clean-image-intel-vsp-p4
       - task: clean-image-marvell-vsp
+      - task: clean-image-marvell-cpagent
       - task: clean-image-network-resources-injector
 
   build-image-all:
@@ -303,6 +335,7 @@ tasks:
       - task: build-image-intel-vsp
       - task: build-image-intel-vsp-p4
       - task: build-image-marvell-vsp
+      - task: build-image-marvell-cpagent
       - task: build-image-network-resources-injector
       - task: push-image-all
 
@@ -321,6 +354,10 @@ tasks:
         vars:
           SOURCE: 'localhost/mrvl-vsp:dev'
           IMAGE: '{{.REGISTRY}}/mrvl-vsp:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/mrvl-cpagent:dev'
+          IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/intel-vsp:dev'

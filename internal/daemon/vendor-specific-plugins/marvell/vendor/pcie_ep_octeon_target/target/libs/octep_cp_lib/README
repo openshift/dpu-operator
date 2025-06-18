@@ -1,0 +1,53 @@
+Marvell Control Plane Library Documentation {#MarvellDocumentation}
+===========================================
+
+```
+  Copyright (C) 2022 Marvell.
+  All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause
+```
+
+Library Directory structure {#section1}
+=======================
+
+Tree below describes the most important directories in library structure for end user::
+
+    octep_cp_lib
+    |-- include - Public header files for library users
+    |-- compat - compatibility header files for different platforms
+    |-- soc - internal api implementation for different platforms
+    |-- plugin - plugin server and client api implementation
+
+
+Library {#section4}
+---
+
+LIB_DIR is location of library source code
+
+```bash
+
+  cd $LIB_DIR
+  make
+```
+
+In environments where the marvell provided OOT PEM kernel driver (pcie-marvell-cnxk-ep.ko)
+is not available, the VFIO driver solution can be enabled in the library.
+
+Note: The VFIO-PCI driver solution is currently available only for cn106xx.
+
+To enable this solution, add USE_PEM_AND_DPI_PF=1 to CFLAGS to compile support for PEM and DPI PF vfio drivers in:
+```bash
+
+	export CFLAGS="$CFLAGS -DUSE_PEM_AND_DPI_PF=1"
+	make
+```
+
+Optional parameters for make are
+
+- PLAT=<aarch64(default)/x86_64>
+
+
+Following artifacts will be available in ``LIB_DIR``:
+
+- Libraries liboctep_cp.a and liboctep_cp.so
+

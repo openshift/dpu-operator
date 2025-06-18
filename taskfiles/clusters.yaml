@@ -22,10 +22,13 @@ tasks:
     internal: true
     deps:
       - task: prepare-e2e-test
+    vars:
+      CDA_MARVELL_TOOLS_EXTRA_ARGS: "--octep-cp-agent-service-disable"
     cmds:
       - >
         cd cluster-deployment-automation;
         source /tmp/cda-venv/bin/activate;
+        export CDA_MARVELL_TOOLS_EXTRA_ARGS="{{.CDA_MARVELL_TOOLS_EXTRA_ARGS}}";
         ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
 
   deploy-clusters-host-phase-1:

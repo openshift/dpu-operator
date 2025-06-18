@@ -839,6 +839,12 @@ func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
 }
 
 func main() {
+	err := mrvlutils.SetupPlatform()
+	if err != nil {
+		klog.Errorf("Failed to set up platform: %v", err)
+		return
+	}
+
 	mrvlVspServer := NewMarvellVspServer()
 	listener, err := mrvlVspServer.Listen()
 
