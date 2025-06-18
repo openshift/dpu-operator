@@ -457,6 +457,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				Eventually(func() bool {
 					nfPod = testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
 					if nfPod != nil {
+						Expect(testutils.PodGetDpuResourceRequests(nfPod)).To(Equal(2))
 						return nfPod.Spec.Containers[0].Image == nfImage && nfPod.Status.Phase == corev1.PodRunning
 					}
 					return false

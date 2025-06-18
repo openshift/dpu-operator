@@ -38,6 +38,28 @@ type NetworkStatus struct {
 	DNS       struct{} `json:"dns"`
 }
 
+func PodGetDpuResourceRequests(pod *corev1.Pod) int {
+	total := resource.MustParse("0")
+
+	// Regular containers gets summed up.
+	for _, c := range pod.Spec.Containers {
+		if qty, ok := c.Resources.Requests["openshift.io/dpu"]; ok {
+			total.Add(qty)
+		}
+	}
+
+	// For init containers we take the maximum.
+	for _, ic := range pod.Spec.InitContainers {
+		if qty, ok := ic.Resources.Requests["openshift.io/dpu"]; ok {
+			if qty.Cmp(total) > 0 {
+				total = qty
+			}
+		}
+	}
+
+	return int(total.Value())
+}
+
 func GetPod(c client.Client, name string, namespace string) *corev1.Pod {
 	obj := client.ObjectKey{Namespace: namespace, Name: name}
 	pod := &corev1.Pod{}
