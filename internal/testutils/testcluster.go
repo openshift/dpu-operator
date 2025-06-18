@@ -38,6 +38,18 @@ type NetworkStatus struct {
 	DNS       struct{} `json:"dns"`
 }
 
+func PodGetDpuResourceRequests(pod *corev1.Pod) int {
+	total := resource.MustParse("0")
+
+	for _, c := range pod.Spec.Containers {
+		if qty, ok := c.Resources.Requests["openshift.io/dpu"]; ok {
+			total.Add(qty)
+		}
+	}
+
+	return int(total.Value())
+}
+
 func GetPod(c client.Client, name string, namespace string) *corev1.Pod {
 	obj := client.ObjectKey{Namespace: namespace, Name: name}
 	pod := &corev1.Pod{}
