@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -36,6 +37,18 @@ type NetworkStatus struct {
 	IPs       []string `json:"ips"`
 	Mac       string   `json:"mac"`
 	DNS       struct{} `json:"dns"`
+}
+
+func PodGetDpuResourceRequests(pod *corev1.Pod) int {
+	total := resource.MustParse("0")
+
+	for _, c := range pod.Spec.Containers {
+		if qty, ok := c.Resources.Requests["openshift.io/dpu"]; ok {
+			total.Add(qty)
+		}
+	}
+
+	return int(total.Value())
 }
 
 func GetPod(c client.Client, name string, namespace string) *corev1.Pod {

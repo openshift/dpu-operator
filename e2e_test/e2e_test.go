@@ -435,6 +435,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				nfPod = testutils.EventuallyPodIsRunning(dpuSideClient, nfName, vars.Namespace, timeout_sfc_pod_running, interval)
 
 				Expect(nfPod.Spec.Containers[0].Image).To(Equal(imageRef), "Pod should have expected image")
+				Expect(testutils.PodGetDpuResourceRequests(nfPod)).To(Equal(2))
 
 				fmt.Println("Nf pod successfully created")
 			})
