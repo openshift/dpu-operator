@@ -98,14 +98,6 @@ tasks:
       - KUBECONFIG="/root/kubeconfig.microshift" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
       - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
-  prepare-e2e-test:
-    cmds:
-      - >
-        if [ "{{.SUBMODULES}}" = "true" ]; then
-            hack/prepare-submodules.sh
-        fi
-            hack/prepare-venv.sh
-
   e2e-test:
     deps:
       - task: kustomize
@@ -114,12 +106,16 @@ tasks:
       - task: fast-e2e-test
 
   fast-e2e-test:
+    cmds:
+      - task: redeploy
+      - sh hack/setup.sh
+      - task: run-e2e-test
+
+  run-e2e-test:
     deps:
       - task: ginkgo
       - task: envtest
     cmds:
-      - task: redeploy
-      - sh hack/setup.sh
       - >
         FAST_TEST=true
         NF_INGRESS_IP=10.20.30.2
@@ -128,6 +124,14 @@ tasks:
         KUBEBUILDER_ASSETS="$({{.BINDIR}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.BINDIR}} -p path)"
         {{.BINDIR}}/ginkgo -coverprofile cover.out ./e2e_test/...
       - hack/traffic_flow_tests.sh
+
+  prepare-e2e-test:
+    cmds:
+      - >
+        if [ "{{.SUBMODULES}}" = "true" ]; then
+            hack/prepare-submodules.sh
+        fi
+            hack/prepare-venv.sh
 
   redeploy:
     cmds:
