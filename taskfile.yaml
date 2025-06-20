@@ -118,6 +118,7 @@ tasks:
     cmds:
       - >
         FAST_TEST=true
+        REGISTRY={{.REGISTRY}}
         NF_INGRESS_IP=10.20.30.2
         EXTERNAL_CLIENT_DEV=eno12409
         EXTERNAL_CLIENT_IP=10.20.30.100
