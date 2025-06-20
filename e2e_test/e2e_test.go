@@ -34,6 +34,9 @@ import (
 var (
 	cfg     *rest.Config
 	testEnv *envtest.Environment
+)
+
+const (
 	// TODO: reduce to 2 seconds
 	timeout  = 1 * time.Minute
 	interval = 1 * time.Second
