@@ -23,28 +23,27 @@ func (ci ContainerImage) LocalRef() string {
 	return fmt.Sprintf("%s:%s", ci.Name, ci.Tag)
 }
 
-func executePodmanCommand(ctx context.Context, command string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "podman", append([]string{command}, args...)...)
+func executeCommand(ctx context.Context, binary string, command string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, binary, append([]string{command}, args...)...)
+	fullCommand := strings.Join(cmd.Args, " ")
+	fmt.Println(fullCommand)
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("podman %s failed: %w: %s", command, err, stderr.String())
+		return "", fmt.Errorf("command '%s' failed: %w: %s", fullCommand, err, stderr.String())
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-func executeBuildahCommand(ctx context.Context, command string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "buildah", append([]string{command}, args...)...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+func executePodmanCommand(ctx context.Context, command string, args ...string) (string, error) {
+	return executeCommand(ctx, "podman", command, args...)
+}
 
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("buildah %s failed: %w: %s", command, err, stderr.String())
-	}
-	return strings.TrimSpace(stdout.String()), nil
+func executeBuildahCommand(ctx context.Context, command string, args ...string) (string, error) {
+	return executeCommand(ctx, "buildah", command, args...)
 }
 
 func BuildContainer(ctx context.Context, dockerfilePath string, tag string) error {
