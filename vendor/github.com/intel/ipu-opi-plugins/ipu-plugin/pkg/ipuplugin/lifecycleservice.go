@@ -670,6 +670,9 @@ OPCODE_CFG_FILE=$(mktemp -p /tmp --suffix=.txt)
 sleep 1
 sync
 
+# For the redfish service to remain active after reboot, it must be started in the post_init.
+[ -e /work/scripts/start-redfish.sh ] && /work/scripts/start-redfish.sh
+
 exec 2>&1 1>${POST_INIT_LOG}
 
 pkill -9 $(basename ${PORT_SETUP_SCRIPT})
