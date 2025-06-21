@@ -61,7 +61,7 @@ func NewDpuSideManger(vsp plugin.VendorPlugin, config *rest.Config, opts ...func
 	d := &DpuSideManager{
 		vsp:         vsp,
 		pathManager: *utils.NewPathManager("/"),
-		log:         ctrl.Log.WithName("DpuDaemon"),
+		log:         ctrl.Log.WithName("DpuSideManager"),
 		macStore:    make(map[string][]string),
 		config:      config,
 	}
