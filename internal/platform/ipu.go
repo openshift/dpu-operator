@@ -8,6 +8,7 @@ import (
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
@@ -18,11 +19,15 @@ const VspP4ImageIntelEnv string = "IntelVspP4Image"
 const VspP4ServiceName string = "vsp-p4-service"
 
 type IntelDetector struct {
-	Name string
+	name string
 }
 
 func NewIntelDetector() *IntelDetector {
-	return &IntelDetector{Name: "Intel IPU"}
+	return &IntelDetector{name: "Intel IPU"}
+}
+
+func (d *IntelDetector) Name() string {
+	return d.name
 }
 
 func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
@@ -62,7 +67,7 @@ func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
 	return false, nil
 }
 
-func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
 	p4Image := os.Getenv(VspP4ImageIntelEnv)
 	if p4Image == "" {
 		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4")
@@ -73,7 +78,7 @@ func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, cl
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
 	template_vars.Command = `[ "/ipuplugin" ]`
 	template_vars.Args = args
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }
 
 func (d *IntelDetector) GetVendorName() string {
