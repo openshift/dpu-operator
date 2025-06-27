@@ -284,13 +284,18 @@ $(LOCALBIN):
 
 ## Tool Binaries
 KUBECTL ?= oc
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
+TASK_BINDIR := $(shell go run tools/task/task.go bindir)
+KUSTOMIZE ?= $(TASK_BINDIR)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
+
+.PHONY: kustomize
+kustomize: ## Download kustomize locally if necessary using taskfile
+	go run tools/task/task.go kustomize
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.

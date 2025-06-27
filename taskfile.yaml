@@ -33,6 +33,11 @@ includes:
     flatten: true
   
 tasks:
+  bindir:
+    silent: true
+    cmds:
+      - echo "{{.BINDIR}}"
+
   push-image-helper:
     internal: true
     vars:
