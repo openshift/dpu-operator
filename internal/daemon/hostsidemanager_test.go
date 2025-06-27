@@ -51,7 +51,7 @@ func (v *DummyPlugin) Start() (string, int32, error) {
 	return "127.0.0.1", 50051, nil
 }
 
-func (v *DummyPlugin) Stop() {
+func (v *DummyPlugin) Close() {
 
 }
 
@@ -129,17 +129,21 @@ func (d *DummyDpuDaemon) Listen() (net.Listener, error) {
 	return lis, nil
 }
 
-func (d *DummyDpuDaemon) Serve(listen net.Listener) error {
+func (d *DummyDpuDaemon) Serve(ctx context.Context, listen net.Listener) error {
 	d.server = grpc.NewServer()
 	pb.RegisterBridgePortServiceServer(d.server, d)
+
+	// Context for graceful shutdown
+	go func() {
+		<-ctx.Done()
+		d.server.Stop()
+		listen.Close()
+	}()
+
 	if err := d.server.Serve(listen); err != nil {
-		return fmt.Errorf("Fialed to start serving: %v", err)
+		return fmt.Errorf("Failed to start serving: %v", err)
 	}
 	return nil
-}
-
-func (d *DummyDpuDaemon) Stop() {
-	d.server.Stop()
 }
 
 func (d *DummyPlugin) GetDevices() (*pb2.DeviceListResponse, error) {
@@ -191,11 +195,15 @@ var _ = g.BeforeSuite(func() {
 
 var _ = g.Describe("Host Daemon", func() {
 	var (
-		err           error
-		fakeDpuDaemon *DummyDpuDaemon
-		hostDaemon    *HostSideManager
-		testCluster   *testutils.KindCluster
-		pathManager   *utils.PathManager
+		err               error
+		fakeDpuDaemon     *DummyDpuDaemon
+		hostDaemon        *HostSideManager
+		testCluster       *testutils.KindCluster
+		pathManager       *utils.PathManager
+		ctx               context.Context
+		cancel            context.CancelFunc
+		fakeDpuDaemonDone chan error
+		hostDaemonDone    chan error
 	)
 	g.BeforeEach(func() {
 		testCluster = &testutils.KindCluster{Name: "dpu-operator-test-cluster"}
@@ -206,12 +214,17 @@ var _ = g.Describe("Host Daemon", func() {
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
 		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
+
+		ctx, cancel = context.WithCancel(context.Background())
+		fakeDpuDaemonDone = make(chan error, 1)
+		hostDaemonDone = make(chan error, 1)
 	})
 
 	g.AfterEach(func() {
 		klog.Info("Cleaning up")
-		fakeDpuDaemon.Stop()
-		hostDaemon.Stop()
+		cancel()
+		<-fakeDpuDaemonDone
+		<-hostDaemonDone
 	})
 
 	g.Context("CNI Server", func() {
@@ -219,15 +232,15 @@ var _ = g.Describe("Host Daemon", func() {
 			dpuListen, err := fakeDpuDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				err = fakeDpuDaemon.Serve(dpuListen)
-				Expect(err).NotTo(HaveOccurred())
+				err = fakeDpuDaemon.Serve(ctx, dpuListen)
+				fakeDpuDaemonDone <- err
 			}()
 
 			hostListen, err := hostDaemon.Listen()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				err := hostDaemon.Serve(hostListen)
-				Expect(err).NotTo(HaveOccurred())
+				err := hostDaemon.Serve(ctx, hostListen)
+				hostDaemonDone <- err
 			}()
 
 			cniVersion := "0.4.0"

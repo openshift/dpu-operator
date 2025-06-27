@@ -149,19 +149,29 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 	return lis, err
 }
 
-func (d *DpuSideManager) ListenAndServe() error {
+func (d *DpuSideManager) ListenAndServe(ctx context.Context) error {
 	listener, err := d.Listen()
 
 	if err != nil {
 		return fmt.Errorf("ListenAndServe failed with error: %v", err)
 	}
-	return d.Serve(listener)
+	return d.Serve(ctx, listener)
 }
 
-func (d *DpuSideManager) Serve(listener net.Listener) error {
+func (d *DpuSideManager) Serve(ctx context.Context, listener net.Listener) error {
 	d.log.Info("Serve")
 	var wg sync.WaitGroup
 	done := make(chan error, 4)
+
+	go func() {
+		<-ctx.Done()
+		d.log.Info("Context cancelled, shutting down servers")
+		d.server.Stop()
+		d.dp.Stop()
+		d.vsp.Close()
+		d.cniserver.ShutdownAndWait()
+		listener.Close()
+	}()
 
 	wg.Add(1)
 	go func() {
@@ -199,7 +209,6 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		wg.Done()
 	}()
 
-	ctx, cancelManager := utils.CancelFunc()
 	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
@@ -208,31 +217,25 @@ func (d *DpuSideManager) Serve(listener net.Listener) error {
 		} else {
 			done <- nil
 		}
-		d.log.Info("Stoppped manager")
+		d.log.Info("Stopped manager")
 		wg.Done()
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
-	// are forced to exit.
-	err := <-done
-	if err != nil {
-		d.log.Error(err, "one of the go-routines failed")
+	// are forced to exit, or context cancellation
+	select {
+	case err := <-done:
+		if err != nil {
+			d.log.Error(err, "one of the go-routines failed")
+		}
+		wg.Wait()
+		d.startedWg.Done()
+		return err
+	case <-ctx.Done():
+		wg.Wait()
+		d.startedWg.Done()
+		return ctx.Err()
 	}
-
-	cancelManager()
-	d.dp.Stop()
-	d.cniserver.Shutdown(context.TODO())
-	d.server.Stop()
-	wg.Wait()
-	d.startedWg.Done()
-	return err
-}
-
-func (d *DpuSideManager) Stop() {
-	d.log.Info("Stopping DpuSideManager")
-	d.server.Stop()
-	d.startedWg.Wait()
-	d.log.Info("Stopped DpuSideManager")
 }
 
 func (d *DpuSideManager) setupReconcilers() {
@@ -248,7 +251,7 @@ func (d *DpuSideManager) setupReconcilers() {
 				}
 				return cache.New(config, opts)
 			},
-			// A timout needs to be specified, or else the mananger will wait indefinitely on stop()
+			// A timeout needs to be specified, or else the manager will wait indefinitely on stop()
 			GracefulShutdownTimeout: &t,
 			Metrics: server.Options{
 				BindAddress:    ":18001",

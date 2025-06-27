@@ -20,9 +20,7 @@ var ()
 
 type SideManager interface {
 	Listen() (net.Listener, error)
-	ListenAndServe() error
-	Serve(listen net.Listener) error
-	Stop()
+	Serve(ctx context.Context, listen net.Listener) error
 }
 
 type Daemon struct {
@@ -52,7 +50,7 @@ func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Confi
 	}
 }
 
-func (d *Daemon) Start(ctx context.Context) error {
+func (d *Daemon) ListenAndServe(ctx context.Context) error {
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -60,19 +58,7 @@ func (d *Daemon) Start(ctx context.Context) error {
 		return err
 	}
 
-	errChan := make(chan error, 1)
-
-	go func() {
-		errChan <- d.Serve(listener)
-	}()
-
-	select {
-	case err := <-errChan:
-		return err
-	case <-ctx.Done():
-		d.mgr.Stop()
-		return ctx.Err()
-	}
+	return d.Serve(ctx, listener)
 }
 
 func (d *Daemon) Listen() (net.Listener, error) {
@@ -97,8 +83,8 @@ func (d *Daemon) Listen() (net.Listener, error) {
 	return d.mgr.Listen()
 }
 
-func (d *Daemon) Serve(listener net.Listener) error {
-	return d.mgr.Serve(listener)
+func (d *Daemon) Serve(ctx context.Context, listener net.Listener) error {
+	return d.mgr.Serve(ctx, listener)
 }
 
 func (d *Daemon) createDaemon() (SideManager, error) {
