@@ -155,9 +155,17 @@ func (d *Daemon) createDaemon() (SideManager, error) {
 	}
 	if plugin != nil {
 		if dpuMode {
-			return NewDpuSideManger(plugin, d.config, WithPathManager(*d.pm)), nil
+			dsm, err := NewDpuSideManager(plugin, d.config, WithPathManager(*d.pm))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create DpuSideManager: %v", err)
+			}
+			return dsm, nil
 		} else {
-			return NewHostSideManager(plugin, WithPathManager2(d.pm)), nil
+			hsm, err := NewHostSideManager(plugin, WithPathManager2(d.pm))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create HostSideManager: %v", err)
+			}
+			return hsm, nil
 		}
 	}
 	return nil, nil
