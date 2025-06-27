@@ -81,7 +81,7 @@ func (d *HostSideManager) DeleteBridgePort(pf int, vf int, vlan int, mac string)
 	return err
 }
 
-func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager)) *HostSideManager {
+func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager)) (*HostSideManager, error) {
 	h := &HostSideManager{
 		vsp:           vsp,
 		log:           ctrl.Log.WithName("HostDaemon"),
@@ -98,7 +98,7 @@ func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager))
 	if h.config == nil {
 		h.config = ctrl.GetConfigOrDie()
 	}
-	return h
+	return h, nil
 }
 
 func WithPathManager2(pathManager *utils.PathManager) func(*HostSideManager) {
@@ -117,6 +117,24 @@ func WithClient(client *rest.Config) func(*HostSideManager) {
 	return func(d *HostSideManager) {
 		d.config = client
 	}
+}
+
+func (d *HostSideManager) StartVsp() error {
+	addr, port, err := d.vsp.Start()
+	if err != nil {
+		return fmt.Errorf("failed calling VSP Start(): %v", err)
+	}
+	d.addr = addr
+	d.port = port
+	return nil
+}
+
+func (d *HostSideManager) SetupDevices() error {
+	err := d.dp.SetupDevices()
+	if err != nil {
+		return fmt.Errorf("failed calling SetupDevices from DpuSideManager: %v", err)
+	}
+	return nil
 }
 
 func (d *HostSideManager) WithManager(manager ctrl.Manager) *HostSideManager {
@@ -194,17 +212,11 @@ func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Re
 }
 
 func (d *HostSideManager) Listen() (net.Listener, error) {
+	var err error
 	d.startedWg.Add(1)
 	d.log.Info("Starting HostDaemon", "devflag", d.dev, "cniServerPath", d.pathManager.CNIServerPath())
 
 	d.setupReconcilers()
-	addr, port, err := d.vsp.Start()
-	if err != nil {
-		d.log.Error(err, "VSP init returned error")
-		return nil, err
-	}
-	d.addr = addr
-	d.port = port
 
 	add := func(r *cnitypes.PodRequest) (*cni100.Result, error) {
 		return d.cniCmdAddHandler(r)

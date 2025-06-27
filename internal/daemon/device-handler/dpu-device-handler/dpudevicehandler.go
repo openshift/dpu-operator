@@ -34,22 +34,10 @@ func NewDpuDeviceHandler(vsp plugin.VendorPlugin, opts ...func(*dpuDeviceHandler
 		opt(devHandler)
 	}
 
-	// TODO: When changing the SRIOV numVfs, we should do the following:
-	// 1) Drain all pods running on the node with a drain controller running
-	// on the control plane. The nodes will be marked for draining and read by
-	// the drain controller.
-	// 2) Clearly define which PF and how many VFs from an API. User facing or
-	// otherwise
-	err := devHandler.SetupDevices()
-	if err != nil {
-		devHandler.log.Error(err, "Failed to setup devices")
-	}
-
 	return devHandler
 }
 
 func validatePciDevice(device string) (string, error) {
-
 	if sriovutils.IsValidPCIAddress(device) {
 		return device, nil
 	}
@@ -87,7 +75,12 @@ func (d *dpuDeviceHandler) GetDevices() (*dh.DeviceList, error) {
 	return &devices, nil
 }
 
-// SetupDevices
+// TODO: When changing the SRIOV numVfs, we should do the following:
+// 1) Drain all pods running on the node with a drain controller running
+// on the control plane. The nodes will be marked for draining and read by
+// the drain controller.
+// 2) Clearly define which PF and how many VFs from an API. User facing or
+// otherwise
 func (d *dpuDeviceHandler) SetupDevices() error {
 	d.setupDevicesDone = make(chan struct{})
 
