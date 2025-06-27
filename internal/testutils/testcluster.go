@@ -10,14 +10,19 @@ import (
 	"strings"
 	"time"
 
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	. "github.com/onsi/gomega"
 )
 
 type Cluster interface {
@@ -31,6 +36,18 @@ type NetworkStatus struct {
 	IPs       []string `json:"ips"`
 	Mac       string   `json:"mac"`
 	DNS       struct{} `json:"dns"`
+}
+
+func PodGetDpuResourceRequests(pod *corev1.Pod) int {
+	total := resource.MustParse("0")
+
+	for _, c := range pod.Spec.Containers {
+		if qty, ok := c.Resources.Requests["openshift.io/dpu"]; ok {
+			total.Add(qty)
+		}
+	}
+
+	return int(total.Value())
 }
 
 func GetPod(c client.Client, name string, namespace string) *corev1.Pod {
@@ -206,4 +223,53 @@ func GetFirstNode(c client.Client) (corev1.Node, error) {
 		return corev1.Node{}, fmt.Errorf("No nodes found in cluster")
 	}
 	return nodes.Items[0], nil
+}
+
+func SfcNew(namespace, sfcName, nfName, nfImage string) *configv1.ServiceFunctionChain {
+	return &configv1.ServiceFunctionChain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sfcName,
+			Namespace: namespace,
+		},
+		Spec: configv1.ServiceFunctionChainSpec{
+			NetworkFunctions: []configv1.NetworkFunction{
+				{
+					Name:  nfName,
+					Image: nfImage,
+				},
+			},
+		},
+	}
+}
+
+func SfcGet(c client.Client, name string, namespace string) *configv1.ServiceFunctionChain {
+	obj := client.ObjectKey{Namespace: namespace, Name: name}
+	pod := &configv1.ServiceFunctionChain{}
+	err := c.Get(context.TODO(), obj, pod)
+	if err != nil {
+		Expect(errors.IsNotFound(err)).To(BeTrue())
+		return nil
+	}
+	return pod
+}
+
+func SfcWait(c client.Client, name, namespace string, timeout time.Duration) *configv1.ServiceFunctionChain {
+	var sfc *configv1.ServiceFunctionChain
+
+	Eventually(func() bool {
+		sfc = SfcGet(c, name, namespace)
+		return sfc != nil
+	}, timeout, 100*time.Millisecond).Should(BeTrue())
+
+	return sfc
+}
+
+func SfcCreate(c client.Client, sfc *configv1.ServiceFunctionChain) *configv1.ServiceFunctionChain {
+	err := c.Create(context.TODO(), sfc)
+	Expect(err).NotTo(HaveOccurred())
+
+	sfc2 := SfcWait(c, sfc.ObjectMeta.Name, sfc.ObjectMeta.Namespace, 2*time.Second)
+	Expect(sfc2).NotTo(BeNil())
+
+	return sfc2
 }
