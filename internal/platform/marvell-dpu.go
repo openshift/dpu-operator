@@ -3,6 +3,7 @@ package platform
 import (
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
@@ -14,13 +15,17 @@ const (
 )
 
 type MarvellDetector struct {
-	Name string
+	name string
 }
 
 func NewMarvellDetector() *MarvellDetector {
 	return &MarvellDetector{
-		Name: "Marvell DPU",
+		name: "Marvell DPU",
 	}
+}
+
+func (d *MarvellDetector) Name() string {
+	return d.name
 }
 
 // IsDPU checks if the PCI device Attached to the host is a Marvell DPU
@@ -51,11 +56,11 @@ func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
 	return false, nil
 }
 
-func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageMarvell]
 	template_vars.Command = `[ "/vsp-mrvl" ]`
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }
 
 // GetVendorName returns the name of the vendor

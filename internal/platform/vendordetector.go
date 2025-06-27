@@ -6,30 +6,27 @@ import (
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
-	"k8s.io/klog/v2"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
-type PlatformInfoProvider interface {
+type DpuDetectorManager struct {
+	platform  Platform
+	detectors []VendorDetector
 }
 
 type VendorDetector interface {
+	Name() string
+	VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error)
 	IsDpuPlatform(platform Platform) (bool, error)
-	VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error)
 	IsDPU(pci ghw.PCIDevice) (bool, error)
-	GetVendorName() string
 }
 
-type PlatformInfo struct {
-	p         Platform
-	Detectors []VendorDetector
-}
-
-func NewPlatformInfo(p Platform) *PlatformInfo {
-	return &PlatformInfo{
-		p: p,
-		Detectors: []VendorDetector{
+func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
+	return &DpuDetectorManager{
+		platform: platform,
+		detectors: []VendorDetector{
 			NewIntelDetector(),
 			NewMarvellDetector(),
 			// add more detectors here
@@ -37,71 +34,13 @@ func NewPlatformInfo(p Platform) *PlatformInfo {
 	}
 }
 
-func (pi *PlatformInfo) NewVspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
-	var detector VendorDetector
-	var err error
-
-	if dpuMode {
-		detector, err = pi.detectDpuPlatform(true)
-	} else {
-		detector, err = pi.detectDpuSystem(true)
-	}
-	if err != nil {
-		return nil, err
-	}
-	vspPlugin, err := detector.VspPlugin(dpuMode, vspImages, client)
-	if err != nil {
-		return nil, errors.Errorf("Error encountered when deploying VspPlugin: %v", err)
-	}
-
-	return vspPlugin, nil
-}
-
-func (pi *PlatformInfo) Getvendorname() (string, error) {
-	klog.Infof("Detecting  Platform is DPU or not")
-	for _, detector := range pi.Detectors {
-		isDpu, err := detector.IsDpuPlatform(pi.p)
-		if err != nil {
-			return "", err
-
-		}
-
-		if isDpu {
-			klog.Infof("Platform is a %v's DPU detected", detector.GetVendorName())
-			return detector.GetVendorName(), nil
-		}
-	}
-	klog.Infof("Detecting Host has DPU or not")
-	devices, err := pi.p.PciDevices()
-	if err != nil {
-		return "", errors.Errorf("Failed to get PCI devices: %v", err)
-	}
-
-	for _, pci := range devices {
-		for _, detector := range pi.Detectors {
-			isDPU, err := detector.IsDPU(*pci)
-			if err != nil {
-				return "", err
-
-			}
-
-			if isDPU {
-				klog.Infof("Platform Host has %v's DPU detected", detector.GetVendorName())
-				return detector.GetVendorName(), nil
-			}
-		}
-	}
-
-	return "", errors.Errorf("No vendor found")
-}
-
-func (pi *PlatformInfo) GetPcieDevFilter() (string, string, string, error) {
-	devices, err := pi.p.PciDevices()
+func (pi *DpuDetectorManager) GetPcieDevFilter() (string, string, string, error) {
+	devices, err := pi.platform.PciDevices()
 	if err != nil {
 		return "", "", "", errors.Errorf("Failed to get PCI devices: %v", err)
 	}
 	for _, pci := range devices {
-		for _, detector := range pi.Detectors {
+		for _, detector := range pi.detectors {
 			isDPU, err := detector.IsDPU(*pci)
 			if err != nil {
 				return "", "", "", err
@@ -117,17 +56,17 @@ func (pi *PlatformInfo) GetPcieDevFilter() (string, string, string, error) {
 	return "", "", "", errors.Errorf("No vendor found")
 }
 
-func (pi *PlatformInfo) IsDpu() (bool, error) {
+func (pi *DpuDetectorManager) IsDpu() (bool, error) {
 	detector, err := pi.detectDpuPlatform(false)
 	return detector != nil, err
 }
 
-func (pi *PlatformInfo) detectDpuPlatform(required bool) (VendorDetector, error) {
+func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, error) {
 	var activeDetectors []VendorDetector
 	var errResult error
 
-	for _, detector := range pi.Detectors {
-		isDPU, err := detector.IsDpuPlatform(pi.p)
+	for _, detector := range pi.detectors {
+		isDPU, err := detector.IsDpuPlatform(pi.platform)
 		if err != nil {
 			errResult = stderrors.Join(errResult, err)
 			continue
@@ -151,8 +90,8 @@ func (pi *PlatformInfo) detectDpuPlatform(required bool) (VendorDetector, error)
 	return activeDetectors[0], nil
 }
 
-func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, error) {
-	devices, err := pi.p.PciDevices()
+func (pi *DpuDetectorManager) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, error) {
+	devices, err := pi.platform.PciDevices()
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to get PCI devices: %v", err)
 	}
@@ -160,7 +99,7 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 	var dpuDevices []ghw.PCIDevice
 	var activeDetectors []VendorDetector
 	for _, pci := range devices {
-		for _, detector := range pi.Detectors {
+		for _, detector := range pi.detectors {
 			isDPU, err := detector.IsDPU(*pci)
 			if err != nil {
 				return nil, nil, err
@@ -175,7 +114,7 @@ func (pi *PlatformInfo) listDpuDevices() ([]ghw.PCIDevice, []VendorDetector, err
 	return dpuDevices, activeDetectors, nil
 }
 
-func (pi *PlatformInfo) detectDpuSystem(required bool) (VendorDetector, error) {
+func (pi *DpuDetectorManager) detectDpuSystem(required bool) (VendorDetector, error) {
 	dpuDevices, detectors, err := pi.listDpuDevices()
 	if err != nil {
 		return nil, errors.Errorf("Failed to get VspPlugin from platform: %v", err)
@@ -190,4 +129,41 @@ func (pi *PlatformInfo) detectDpuSystem(required bool) (VendorDetector, error) {
 		return nil, nil
 	}
 	return detectors[0], nil
+}
+
+func (d *DpuDetectorManager) Detect(vspImages map[string]string, client client.Client, pm utils.PathManager) (bool, *plugin.GrpcPlugin, error) {
+	for _, detector := range d.detectors {
+		dpuPlatform, err := detector.IsDpuPlatform(d.platform)
+		if err != nil {
+			return false, nil, fmt.Errorf("Error detecting if running on DPU platform with detector %v: %v", detector.Name(), err)
+		}
+
+		if dpuPlatform {
+			vsp, err := detector.VspPlugin(true, vspImages, client, pm)
+			if err != nil {
+				return true, nil, err
+			}
+			return true, vsp, nil
+		}
+
+		devices, err := d.platform.PciDevices()
+		if err != nil {
+			return false, nil, errors.Errorf("Error getting PCI info: %v", err)
+		}
+
+		for _, pci := range devices {
+			isDpu, err := detector.IsDPU(*pci)
+			if err != nil {
+				return false, nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
+			}
+			if isDpu {
+				vsp, err := detector.VspPlugin(false, vspImages, client, pm)
+				if err != nil {
+					return true, nil, err
+				}
+				return false, vsp, nil
+			}
+		}
+	}
+	return false, nil, nil
 }

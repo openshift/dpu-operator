@@ -78,6 +78,7 @@ func (vsp *vspServer) Listen() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on the vendor plugin socket: %v", err)
 	}
+	vsp.log.Info("Starting to listen in Mock VSP", "path", vsp.pathManager.VendorPluginSocket())
 
 	vsp.grpcServer = grpc.NewServer()
 	pb.RegisterNetworkFunctionServiceServer(vsp.grpcServer, &vspServer{})
