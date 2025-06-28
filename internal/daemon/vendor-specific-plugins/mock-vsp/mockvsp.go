@@ -89,8 +89,18 @@ func (vsp *vspServer) Listen() (net.Listener, error) {
 	return listener, nil
 }
 
-func (vsp *vspServer) Serve(listener net.Listener) error {
+func (vsp *vspServer) Serve(ctx context.Context, listener net.Listener) error {
 	vsp.wg.Add(1)
+	vsp.startedWg.Add(1)
+
+	// Context for graceful shutdown
+	go func() {
+		<-ctx.Done()
+		vsp.log.Info("Context cancelled, shutting down Mock VSP")
+		vsp.grpcServer.Stop()
+		listener.Close()
+	}()
+
 	go func() {
 		vsp.log.Info("Starting Mock VSP")
 		if err := vsp.grpcServer.Serve(listener); err != nil {
@@ -103,18 +113,22 @@ func (vsp *vspServer) Serve(listener net.Listener) error {
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
-	// are forced to exit.
-	err := <-vsp.done
-
-	vsp.grpcServer.Stop()
-	vsp.wg.Wait()
-	vsp.startedWg.Done()
-	return err
+	// are forced to exit, or context cancellation
+	select {
+	case err := <-vsp.done:
+		vsp.wg.Wait()
+		vsp.startedWg.Done()
+		return err
+	case <-ctx.Done():
+		vsp.wg.Wait()
+		vsp.startedWg.Done()
+		return ctx.Err()
+	}
 }
 
-func (vsp *vspServer) Stop() {
-	vsp.done <- nil
-	vsp.startedWg.Wait()
+func (vsp *vspServer) Close() {
+	// Mock VSP doesn't need to close any persistent connections
+	// Context cancellation handles shutdown
 }
 
 func WithPathManager(pathManager utils.PathManager) func(*vspServer) {
@@ -127,6 +141,7 @@ func NewMockVsp(opts ...func(*vspServer)) *vspServer {
 	vsp := &vspServer{
 		log:         ctrl.Log.WithName("MockVsp"),
 		pathManager: *utils.NewPathManager("/"),
+		done:        make(chan error, 1),
 	}
 
 	for _, opt := range opts {

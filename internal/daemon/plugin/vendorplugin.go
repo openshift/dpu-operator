@@ -67,7 +67,7 @@ func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
 
 type VendorPlugin interface {
 	Start() (string, int32, error)
-	Stop()
+	Close()
 	CreateBridgePort(bpr *opi.CreateBridgePortRequest) (*opi.BridgePort, error)
 	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
 	CreateNetworkFunction(input string, output string) error
@@ -131,8 +131,15 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 	return ipPort.Ip, ipPort.Port, nil
 }
 
-func (g *GrpcPlugin) Stop() {
-	g.conn.Close()
+func (g *GrpcPlugin) Close() {
+	if g.conn != nil {
+		g.conn.Close()
+		g.conn = nil
+		g.client = nil
+		g.nfclient = nil
+		g.opiClient = nil
+		g.dsClient = nil
+	}
 }
 
 func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {

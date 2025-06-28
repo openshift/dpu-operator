@@ -222,7 +222,7 @@ func (d *HostSideManager) Listen() (net.Listener, error) {
 	return d.cniserver.Listen()
 }
 
-func (d *HostSideManager) ListenAndServe() error {
+func (d *HostSideManager) ListenAndServe(ctx context.Context) error {
 	listener, err := d.Listen()
 
 	if err != nil {
@@ -230,13 +230,24 @@ func (d *HostSideManager) ListenAndServe() error {
 		return err
 	}
 
-	return d.Serve(listener)
+	return d.Serve(ctx, listener)
 }
 
-func (d *HostSideManager) Serve(listener net.Listener) error {
+func (d *HostSideManager) Serve(ctx context.Context, listener net.Listener) error {
 	var wg sync.WaitGroup
 	var err error
 	done := make(chan error, 3)
+
+	// Context for graceful shutdown
+	go func() {
+		<-ctx.Done()
+		d.log.Info("Context cancelled, shutting down servers")
+		d.cniserver.Shutdown(context.TODO())
+		d.dp.Stop()
+		listener.Close()
+		d.dpListener.Close()
+	}()
+
 	wg.Add(1)
 	go func() {
 		d.log.Info("Starting CNI server")
@@ -261,8 +272,6 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 		wg.Done()
 	}()
 
-	ctx, cancelManager := utils.CancelFunc()
-
 	wg.Add(1)
 	go func() {
 		d.log.Info("Starting manager")
@@ -276,30 +285,20 @@ func (d *HostSideManager) Serve(listener net.Listener) error {
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
-	// are forced to exit.
-	err = <-done
-
-	d.cniserver.Shutdown(context.TODO())
-	d.dp.Stop()
-	cancelManager()
-	wg.Wait()
-	d.startedWg.Done()
-
-	if d.stopRequested {
-		err = nil
+	// are forced to exit, or context cancellation
+	select {
+	case err = <-done:
+		wg.Wait()
+		d.startedWg.Done()
+		if d.stopRequested {
+			err = nil
+		}
+		return err
+	case <-ctx.Done():
+		wg.Wait()
+		d.startedWg.Done()
+		return ctx.Err()
 	}
-	return err
-}
-
-func (d *HostSideManager) Stop() {
-	d.log.Info("Stopping HostSideManager")
-	d.stopRequested = true
-	if d.cniserver != nil {
-		d.cniserver.ShutdownAndWait()
-		d.startedWg.Wait()
-		d.cniserver = nil
-	}
-	d.log.Info("Stopped HostSideManager")
 }
 
 var (
