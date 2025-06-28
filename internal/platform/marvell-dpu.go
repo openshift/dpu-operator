@@ -3,6 +3,7 @@ package platform
 import (
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
@@ -14,13 +15,17 @@ const (
 )
 
 type MarvellDetector struct {
-	Name string
+	name string
 }
 
 func NewMarvellDetector() *MarvellDetector {
 	return &MarvellDetector{
-		Name: "Marvell DPU",
+		name: "Marvell DPU",
 	}
+}
+
+func (d *MarvellDetector) Name() string {
+	return d.name
 }
 
 // IsDPU checks if the PCI device Attached to the host is a Marvell DPU
@@ -35,13 +40,13 @@ func (pi *MarvellDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
 }
 
 // IsDpuPlatform checks if the platform is a Marvell DPU
-func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
-	pci, err := ghw.PCI()
+func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
+	devices, err := platform.PciDevices()
 	if err != nil {
-		return false, errors.Errorf("Error getting product info: %v", err)
+		return false, errors.Errorf("Error getting devices: %v", err)
 	}
 
-	for _, pci := range pci.Devices {
+	for _, pci := range devices {
 		if pci.Vendor.ID == MrvlVendorID &&
 			pci.Product.ID == MrvlDPUdeviceID {
 			return true, nil
@@ -51,11 +56,11 @@ func (pi *MarvellDetector) IsDpuPlatform() (bool, error) {
 	return false, nil
 }
 
-func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client) (*plugin.GrpcPlugin, error) {
+func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageMarvell]
 	template_vars.Command = `[ "/vsp-mrvl" ]`
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars))
+	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }
 
 // GetVendorName returns the name of the vendor

@@ -53,7 +53,7 @@ func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string)
 
 	m, err := net.ParseMAC(mac)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse Mac: %v", err)
+		return nil, fmt.Errorf("Failed to parse Mac '%s': %v", mac, err)
 	}
 
 	createRequest := &pb.CreateBridgePortRequest{

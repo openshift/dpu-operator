@@ -1,0 +1,373 @@
+version: '3'
+
+tasks:
+  helper-buildah:
+    internal: true
+    deps:
+      - task: helper-prepare-multi-arch
+      - task: helper-prep-tmp-dir
+    desc: Build {{.PLATFORM}} image using buildah
+    vars:
+      NAME: '{{ .NAME }}'
+      DOCKERFILE: '{{ .DOCKERFILE }}'
+      PLATFORM: '{{.PLATFORM}}'
+      INCREMENTAL: '{{ .INCREMENTAL }}'
+      BUILDAH_OPTIONS:
+        sh: |
+          if [ "{{.INCREMENTAL}}" = "true" ]; then
+            echo "--pull=never"
+          else
+            echo ""
+          fi
+    status:
+      - |
+        if [[ "{{.INCREMENTAL}}" == "false" ]]; then
+          buildah manifest inspect {{.NAME}}-manifest | grep {{.PLATFORM}}
+        else
+          false
+        fi
+    cmds:
+      - echo "Building image for {{.NAME}} using Dockerfile {{.DOCKERFILE}}"
+      - buildah manifest exists {{.NAME}}-manifest || buildah manifest create {{.NAME}}-manifest
+      - >
+        buildah build
+        --tls-verify=false
+        --layers
+        {{.BUILDAH_OPTIONS}}
+        --manifest {{.NAME}}-manifest
+        --platform linux/{{.PLATFORM}}
+        -v {{.DPU_OPERATOR_TEMP_DIR}}/go-cache:/go:z
+        -f {{.DOCKERFILE}}
+        -t {{.NAME}}-{{.PLATFORM}}
+
+  helper-prep-tmp-dir:
+    internal: true
+    status:
+      - test -d {{.DPU_OPERATOR_TEMP_DIR}}/go-cache
+    cmds:
+      - mkdir -p {{.DPU_OPERATOR_TEMP_DIR}}/go-cache
+
+  helper-prepare-multi-arch:
+    internal: true
+    status:
+      - test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+    cmds:
+      - sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
+      - setenforce 0
+
+  clean-image-layer:
+    internal: true
+    vars:
+      NAME: '{{.NAME}}'
+    status:
+      - sh -c '! buildah manifest inspect localhost/{{.NAME}}:dev-manifest'
+    cmds:
+      - buildah manifest rm localhost/{{.NAME}}:dev-manifest
+
+  clean-image:
+    internal: true
+    desc: Clean up image
+    vars:
+      NAME: '{{.NAME}}'
+    cmds:
+      - buildah manifest rm localhost/{{.NAME}}:dev-base-manifest || true
+      - task: clean-image-layer
+        vars:
+          NAME: '{{.NAME}}'
+
+  build-image:
+    internal: true
+    desc: Building {{.PLATFORM}} image {{.NAME}}
+    vars:
+      NAME: '{{.NAME}}'
+      DOCKERFILE: '{{.DOCKERFILE}}'
+      PLATFORM: '{{.PLATFORM }}'
+    cmds:
+      - task: helper-buildah
+        vars:
+          NAME: 'localhost/{{.NAME}}:dev-base'
+          DOCKERFILE: '{{.DOCKERFILE}}'
+          INCREMENTAL: "false"
+          PLATFORM: '{{.PLATFORM}}'
+      # - cmd: buildah tag localhost/{{.NAME}}:dev-base-{{.PLATFORM}} localhost/{{.NAME}}:dev-base
+      - task: prep-incremental-docker-file
+        vars:
+          BASE_NAME: 'localhost/{{.NAME}}:dev-base-{{.PLATFORM}}'
+          IN_FILE: '{{.DOCKERFILE}}'
+          OUT_FILE: '{{.DOCKERFILE}}.inc'
+      - task: helper-buildah
+        vars:
+          NAME: 'localhost/{{.NAME}}:dev'
+          DOCKERFILE: '{{.DOCKERFILE}}.inc'
+          INCREMENTAL: "true"
+          PLATFORM: '{{.PLATFORM}}'
+
+  prep-incremental-docker-file:
+    internal: true
+    vars:
+      BASE_NAME: '{{ .BASE_NAME }}'
+      IN_FILE: '{{ .IN_FILE }}'
+      OUT_FILE: '{{ .OUT_FILE }}'
+    cmds:
+      - >
+        go run tools/incremental/incremental.go
+        -dockerfile '{{ .IN_FILE }}'
+        -base-uri '{{ .BASE_NAME }}'
+        -output-file '{{ .OUT_FILE }}'
+
+  build-image-manager:
+    deps:
+      - task: build-bin-manager
+        vars:
+          GOARCH: arm64
+      - task: build-bin-manager
+        vars:
+          GOARCH: amd64
+      - task: clean-image-layer
+        vars:
+          NAME: dpu-operator
+    cmds:
+      - task: build-image
+        vars:
+          NAME: dpu-operator
+          DOCKERFILE: Dockerfile.rhel
+          PLATFORM: amd64
+      - task: build-image
+        vars:
+          NAME: dpu-operator
+          DOCKERFILE: Dockerfile.rhel
+          PLATFORM: arm64
+
+  clean-image-manager:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: dpu-operator
+
+  build-image-daemon:
+    deps:
+      - task: build-bin-daemon
+        vars:
+          GOARCH: arm64
+      - task: build-bin-daemon
+        vars:
+          GOARCH: amd64
+      - task: clean-image-layer
+        vars:
+          NAME: dpu-daemon
+    cmds:
+      - task: build-image
+        vars:
+          NAME: dpu-daemon
+          DOCKERFILE: Dockerfile.daemon.rhel
+          PLATFORM: amd64
+      - task: build-image
+        vars:
+          NAME: dpu-daemon
+          DOCKERFILE: Dockerfile.daemon.rhel
+          PLATFORM: arm64
+
+  clean-image-daemon:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: dpu-daemon
+
+  build-cpagent-service:
+    internal: true
+    vars:
+      IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
+      CPIMAGE: "Environment=IMAGE='{{.IMAGE}}'"
+      CPFILE: 'internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent.service'
+    cmds:
+    - mkdir -p bin
+    - echo "[Service]" > bin/cp-agent.service
+    - echo '{{.CPIMAGE}}' >> bin/cp-agent.service
+    - cat '{{.CPFILE}}' >> bin/cp-agent.service
+
+  build-image-marvell-vsp:
+    deps:
+      - task: build-cpagent-service
+      - task: build-bin-marvell-vsp
+        vars:
+          GOARCH: arm64
+      - task: build-bin-marvell-vsp
+        vars:
+          GOARCH: amd64
+      - task: clean-image-layer
+        vars:
+          NAME: mrvl-vsp
+    cmds:
+      - task: build-image
+        vars:
+          NAME: mrvl-vsp
+          DOCKERFILE: Dockerfile.mrvlVSP.rhel
+          PLATFORM: amd64
+      - task: build-image
+        vars:
+          NAME: mrvl-vsp
+          DOCKERFILE: Dockerfile.mrvlVSP.rhel
+          PLATFORM: arm64
+
+  clean-image-marvell-vsp:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: mrvl-vsp
+
+  build-image-marvell-cpagent:
+    deps:
+      - task: clean-image-layer
+        vars:
+          NAME: mrvl-cpagent
+    cmds:
+      - task: build-image
+        vars:
+          NAME: mrvl-cpagent
+          DOCKERFILE: Dockerfile.mrvlCPAgent.rhel
+          PLATFORM: arm64
+
+  clean-image-marvell-cpagent:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: mrvl-cpagent
+
+  build-image-intel-vsp:
+    deps:
+      - task: build-bin-intel-vsp
+        vars:
+          GOARCH: arm64
+      - task: build-bin-intel-vsp
+        vars:
+          GOARCH: amd64
+      - task: clean-image-layer
+        vars:
+          NAME: intel-vsp
+    cmds:
+      - task: build-image
+        vars:
+          NAME: intel-vsp
+          DOCKERFILE: Dockerfile.IntelVSP.rhel
+          PLATFORM: amd64
+      - task: build-image
+        vars:
+          NAME: intel-vsp
+          DOCKERFILE: Dockerfile.IntelVSP.rhel
+          PLATFORM: arm64
+
+  clean-image-intel-vsp:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: intel-vsp
+
+
+  build-image-intel-vsp-p4:
+    deps:
+      - task: clean-image-layer
+        vars:
+          NAME: intel-vsp-p4
+    cmds:
+      - task: build-image
+        vars:
+          NAME: intel-vsp-p4
+          DOCKERFILE: Dockerfile.IntelVSPP4.rhel
+          PLATFORM: arm64
+
+  clean-image-intel-vsp-p4:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: intel-vsp-p4
+
+  build-image-network-resources-injector:
+    deps:
+      - task: build-bin-network-resources-injector
+        vars:
+          GOARCH: arm64
+      - task: build-bin-network-resources-injector
+        vars:
+          GOARCH: amd64
+      - task: clean-image-layer
+        vars:
+          NAME: network-resources-injector
+    cmds:
+      - task: build-image
+        vars:
+          NAME: network-resources-injector
+          DOCKERFILE: Dockerfile.networkResourcesInjector.rhel
+          PLATFORM: amd64
+      - task: build-image
+        vars:
+          NAME: network-resources-injector
+          DOCKERFILE: Dockerfile.networkResourcesInjector.rhel
+          PLATFORM: arm64
+
+  clean-image-network-resources-injector:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: network-resources-injector
+
+  clean-image-all:
+    cmds: # can't run in parallel since multiple concurrent pulls are not supported 
+      - task: clean-image-manager
+      - task: clean-image-daemon
+      - task: clean-image-intel-vsp
+      - task: clean-image-intel-vsp-p4
+      - task: clean-image-marvell-vsp
+      - task: clean-image-marvell-cpagent
+      - task: clean-image-network-resources-injector
+
+  build-image-all:
+    # build all the binaries in parallel for speed
+    # they will be picked up by the build-image-* targets
+    deps:
+      - build-bin-manager
+      - build-bin-daemon
+      - build-bin-intel-vsp
+      - build-bin-marvell-vsp
+      - build-bin-network-resources-injector
+    cmds: # can't run in parallel since multiple concurrent pulls are not supported 
+      - task: build-image-manager
+      - task: build-image-daemon
+      - task: build-image-intel-vsp
+      - task: build-image-intel-vsp-p4
+      - task: build-image-marvell-vsp
+      - task: build-image-marvell-cpagent
+      - task: build-image-network-resources-injector
+      - task: push-image-all
+
+  push-image-all:
+    internal: true
+    deps:
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/dpu-operator:dev'
+          IMAGE: '{{.REGISTRY}}/dpu-operator:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/dpu-daemon:dev'
+          IMAGE: '{{.REGISTRY}}/dpu-daemon:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/mrvl-vsp:dev'
+          IMAGE: '{{.REGISTRY}}/mrvl-vsp:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/mrvl-cpagent:dev'
+          IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/intel-vsp:dev'
+          IMAGE: '{{.REGISTRY}}/intel-vsp:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/intel-vsp-p4:dev'
+          IMAGE: '{{.REGISTRY}}/intel-vsp-p4:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/network-resources-injector:dev'
+          IMAGE: '{{.REGISTRY}}/network-resources-injector:dev'
+

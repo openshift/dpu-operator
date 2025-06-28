@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +45,7 @@ type DpuOperatorConfigReconciler struct {
 	vspExtraData    map[string]string
 	imagePullPolicy string
 	nriWebhookImage string
+	pathManager     utils.PathManager
 }
 
 func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string, vspExtraData map[string]string, nriWebhookImage string) *DpuOperatorConfigReconciler {
@@ -79,7 +81,7 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;delete;patch
-//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=list;get
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=*
@@ -131,7 +133,21 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]string {
+func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
+	logger := log.FromContext(context.TODO())
+
+	logger.Info("Detecting Kuberentes flavour")
+	ce := utils.NewClusterEnvironment(r.Client)
+	flavour, err := ce.Flavour(context.TODO())
+	if err != nil {
+		return nil
+	}
+	logger.Info("Detected Kuberentes flavour", "flavour", flavour)
+	p, err := r.pathManager.CniHostDir(flavour)
+	if err != nil {
+		return nil
+	}
+
 	// All the CRs will be in the same namespace as the operator config
 	data := map[string]string{
 		"Namespace":              vars.Namespace,
@@ -140,6 +156,7 @@ func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperator
 		"DpuOperatorDaemonImage": r.dpuDaemonImage,
 		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
 		"NRIWebhookImage":        r.nriWebhookImage,
+		"CniDir":                 p,
 	}
 
 	for key, value := range r.vspImages {
@@ -153,8 +170,7 @@ func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperator
 }
 
 func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
-	data := r.createCommonData(cfg)
-	return render.ApplyAllFromBinData(logger, binDataPath, data, binData, r.Client, cfg, r.Scheme)
+	return render.ApplyAllFromBinData(logger, binDataPath, r.yamlVars(), binData, r.Client, cfg, r.Scheme)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {

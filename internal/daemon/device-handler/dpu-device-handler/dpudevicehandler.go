@@ -48,18 +48,13 @@ func NewDpuDeviceHandler(vsp plugin.VendorPlugin, opts ...func(*dpuDeviceHandler
 	return devHandler
 }
 
-func normalizeDeviceToPci(device string) (string, error) {
+func validatePciDevice(device string) (string, error) {
 
 	if sriovutils.IsValidPCIAddress(device) {
 		return device, nil
 	}
 
-	pciAddr, err := sriovutils.GetPciFromNetDev(device)
-	if err != nil {
-		return device, fmt.Errorf("failed to get PCI address for netdev %s: %v", device, err)
-	}
-
-	return pciAddr, nil
+	return device, fmt.Errorf("netdev %s is not a valid PCI device", device)
 }
 
 func (d *dpuDeviceHandler) GetDevices() (*dh.DeviceList, error) {
@@ -73,16 +68,18 @@ func (d *dpuDeviceHandler) GetDevices() (*dh.DeviceList, error) {
 
 	devices := make(dh.DeviceList)
 
-	// TODO: We need to properly enforce API boundaries at the VSP level. The host side requires pci-addresses when handling devices, however the dpu side requires a higher level of abstraction. For now, just enforce PCI addresses for device ID on the host only.
+	// In terms of the API boundaries between components, the host side requires pci-addresses
+	// when handling devices, however the dpu side requires a higher level of abstraction. For
+	// now, we will just enforce PCI addresses as the device ID on the host only.
 	for _, device := range Devices.Devices {
 		if d.dpuMode {
 			devices[device.ID] = pluginapi.Device{ID: device.ID, Health: pluginapi.Healthy}
 			continue
 		}
 
-		devPciId, err := normalizeDeviceToPci(device.ID)
+		devPciId, err := validatePciDevice(device.ID)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to normalize device %s from GetDevice request: %v", device.ID, err)
+			return nil, fmt.Errorf("Error in deviceHandler: device %s from GetDevice request: %v", device.ID, err)
 		}
 		devices[devPciId] = pluginapi.Device{ID: devPciId, Health: pluginapi.Healthy}
 	}

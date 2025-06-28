@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -44,6 +45,9 @@ const (
 	PFID           int    = 0
 	isDPDK         bool   = false
 	HostVFDeviceID string = "b903"
+	DpuRpmDeviceID string = "a063"
+	NfName         string = "mrvl-nf1"
+	isNf           bool   = false
 )
 
 // multiple dataplane can be added using mrvldp interface functions
@@ -53,6 +57,8 @@ type mrvldp interface {
 	InitDataPlane(bridgeName string) error
 	ReadAllPortFromDataPlane(bridgeName string) (string, error)
 	DeleteDataplane(bridgeName string) error
+	AddFlowRuleToDataPlane(bridgeName string, inPort string, outPort string, dstMac string) error
+	DeleteFlowRuleFromDataPlane(bridgeName string, inPort string, outPort string, dstMac string) error
 }
 type mrvlDeviceInfo struct {
 	secInterfaceName string
@@ -61,6 +67,16 @@ type mrvlDeviceInfo struct {
 	portType         string
 	health           string
 	pciAddress       string
+}
+
+type vfInfo struct {
+	vfName string
+	mac    string
+}
+type mrvlNfPortMap struct {
+	vfPort  []vfInfo
+	inpPort string
+	outPort string
 }
 type mrvlVspServer struct {
 	pb.UnimplementedLifeCycleServiceServer
@@ -80,6 +96,8 @@ type mrvlVspServer struct {
 	portType      string
 	bridgeName    string
 	mrvlDP        mrvldp
+	networkStore  map[string]mrvlNfPortMap
+	isNF          bool
 }
 
 // createVethPair function to create a veth pair with the given index and InterfaceInfo
@@ -316,6 +334,52 @@ func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBr
 		return nil, err
 	}
 	klog.Info("Port Added to Bridge Successfully")
+	// Store port into networkstore
+	if network, exists := vsp.networkStore[NfName]; exists {
+		mac := in.BridgePort.Spec.MacAddress
+		vfport := vfInfo{
+			vfName: vfName,
+			mac:    net.HardwareAddr(mac).String(),
+		}
+		network.vfPort = append(network.vfPort, vfport)
+		vsp.networkStore[NfName] = network
+	} else {
+		vsp.networkStore[NfName] = mrvlNfPortMap{
+			vfPort: []vfInfo{
+				{
+					vfName: vfName,
+					mac:    net.HardwareAddr(in.BridgePort.Spec.MacAddress).String(),
+				},
+			},
+			// No Network store exists hence no input/output port will be replaced by CNF with the actuall input/output port
+			inpPort: "",
+			outPort: "",
+		}
+	}
+	// Add Flow Rule if there is an NF
+	if vsp.isNF {
+		klog.Info("Marvell Store looks like", vsp.networkStore)
+		mac := net.HardwareAddr(in.BridgePort.Spec.MacAddress).String()
+		// Add Flow rule from vfName to inPort (where in_port=vfname action=out_port=vsp.networkStore[NfName].inpPort)
+		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vfName, vsp.networkStore[NfName].inpPort, ""); err != nil {
+			klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+			return nil, err
+		}
+
+		// Add flow rule from inPort to vfName (where in_port=vsp.networkStore[NfName].inpPort action=out_port=vfName)
+		// TODO: check if this can be done with Mac Learning?
+		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vsp.networkStore[NfName].inpPort, vfName, mac); err != nil {
+			klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+			return nil, err
+		}
+		// Add Hairpinning Flow Rule based on MAC Address
+		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vsp.networkStore[NfName].outPort, vsp.networkStore[NfName].outPort, mac); err != nil {
+			klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+			return nil, err
+		}
+		klog.Info("Flow Rule Added to Bridge Successfully")
+
+	}
 	if isDPDK {
 		if err = mrvlutils.PrintDPDKPortInfo(vfPCIAddress); err != nil {
 			klog.Errorf("Error occurred in printing DPDK Port Info: %v", err)
@@ -344,11 +408,53 @@ func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBr
 		klog.Info("Error occurred in getting VF Name")
 		return nil, err
 	}
+	// Delete Flow Rule before deleting Port from Bridge if there is NF
+	if vsp.isNF {
+		inpPort := vsp.networkStore[NfName].inpPort
+		outPort := vsp.networkStore[NfName].outPort
+		vf_mac := ""
+		for _, vf := range vsp.networkStore[NfName].vfPort {
+			if vf.vfName == vfName {
+				vf_mac = vf.mac
+				break
+			}
+		}
+		if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, vfName, "", ""); err != nil {
+			klog.Errorf("Error occurred in deleting Flow Rule: %v", err)
+			return nil, err
+		}
+		//Delete Hair pinning Flow Rule added for this port
+		if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, outPort, outPort, vf_mac); err != nil {
+			klog.Errorf("Error occurred in deleting Flow Rule: %v", err)
+			return nil, nil
+		}
+		// Delete Flow Rule from inpPort to vfName
+		// TODO: This can be removed if Mac Learning is enabled
+		if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, inpPort, vfName, vf_mac); err != nil {
+			klog.Errorf("Error occurred in deleting Flow Rule: %v", err)
+			return nil, nil
+		}
+		klog.Info("Flow Rule Deleted from Bridge Successfully")
+	}
 	if err := vsp.mrvlDP.DeletePortFromDataPlane(vsp.bridgeName, vfName); err != nil {
 		klog.Errorf("Error occurred in deleting Port from Bridge: %v", err)
 		return nil, err
 	}
 	klog.Info("Port Deleted from Bridge Successfully")
+	// Delete port from networkstore
+	if network, exists := vsp.networkStore[NfName]; exists {
+		for i, port := range network.vfPort {
+			if port.vfName == vfName {
+				copy(network.vfPort[i:], network.vfPort[i+1:])
+				network.vfPort = network.vfPort[:len(network.vfPort)-1]
+				vsp.networkStore[NfName] = network
+				break
+			}
+		}
+		vsp.networkStore[NfName] = network
+		klog.Info("Port Deleted from Network Function Store Successfully")
+	}
+	klog.Info("Network Function Store: ", vsp.networkStore)
 	if err = mrvlutils.PrintPortInfo(vfName); err != nil {
 		klog.Errorf("Error occurred in printing Port Info: %v", err)
 	}
@@ -360,14 +466,130 @@ func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBr
 // It will return the Empty and error
 func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
 	klog.Infof("Received CreateNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
+	vsp.isNF = true
+	inpDpInterfaceName := vsp.deviceStore[in.Input].dpInterfaceName
+	outDpInterfaceName := vsp.deviceStore[in.Output].dpInterfaceName
+	out, err := vsp.AddNetworkFunction(inpDpInterfaceName, outDpInterfaceName, NfName)
+	return out, err
+}
+
+// AddNetworkFunction function to add a network function with the given Interface Name and NFName
+// It will return the Empty and error
+func (vsp *mrvlVspServer) AddNetworkFunction(inpDpInterfaceName string, outDpInterfaceName string, nfName string) (*pb.Empty, error) {
+	if err := vsp.mrvlDP.AddPortToDataPlane(vsp.bridgeName, inpDpInterfaceName, "", isDPDK); err != nil {
+		klog.Errorf("Error occurred in adding Port to Bridge: %v", err)
+		return nil, err
+	}
+	klog.Info("Input Port Added to Bridge Successfully")
+	if err := vsp.mrvlDP.AddPortToDataPlane(vsp.bridgeName, outDpInterfaceName, "", isDPDK); err != nil {
+		klog.Errorf("Error occurred in adding Port to Bridge: %v", err)
+		return nil, err
+	}
+	klog.Info("Output Port Added to Bridge Successfully")
+	if _, exists := vsp.networkStore[nfName]; exists {
+		dpuVfs := vsp.networkStore[nfName].vfPort
+		vsp.networkStore[nfName] = mrvlNfPortMap{
+			vfPort:  dpuVfs,
+			inpPort: inpDpInterfaceName,
+			outPort: outDpInterfaceName,
+		}
+		for _, vf := range dpuVfs {
+			if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vf.vfName, inpDpInterfaceName, ""); err != nil {
+				klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+				return nil, err
+			}
+			klog.Info("Flow Rule Added to Bridge Successfully from vfName to inpPort")
+			if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, inpDpInterfaceName, vf.vfName, vf.mac); err != nil {
+				klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+				return nil, err
+			}
+			klog.Info("Flow Rule Added to Bridge Successfully from inpPort to vfName")
+			// Add Hairpinning Flow Rule based on MAC Address
+			if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, outDpInterfaceName, outDpInterfaceName, vf.mac); err != nil {
+				klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+				return nil, err
+			}
+			klog.Infof("Flow Rule Added to Bridge Successfully for Hairpinning outport:%s", outDpInterfaceName)
+		}
+	} else {
+		vsp.networkStore[nfName] = mrvlNfPortMap{
+			inpPort: inpDpInterfaceName,
+			outPort: outDpInterfaceName,
+		}
+		klog.Info("Network Function Store: ", vsp.networkStore)
+	}
+
+	// Add Flow Rule for Out port to RPM Interface & RPM to OurPort
+	DpuRpmInterfaceName, err := mrvlutils.GetNameByDeviceID(DpuRpmDeviceID)
+	if err != nil {
+		klog.Errorf("Error occurred in getting RPM Interface Name: %v", err)
+		return nil, err
+	}
+	if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, outDpInterfaceName, DpuRpmInterfaceName, ""); err != nil {
+		klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+		return nil, err
+	}
+	klog.Info("Flow Rule Added to Bridge Successfully from outPort to RPM Interface")
+	if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, DpuRpmInterfaceName, outDpInterfaceName, ""); err != nil {
+		klog.Errorf("Error occurred in adding Flow Rule: %v", err)
+		return nil, err
+	}
+	klog.Info("Flow Rule Added to Bridge Successfully from RPM Interface to outPort")
 	out := new(pb.Empty)
 	return out, nil
+}
+func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+	klog.Infof("Received DeleteNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
+	vsp.isNF = false
+	inpDpInterfaceName := vsp.deviceStore[in.Input].dpInterfaceName
+	outDpInterfaceName := vsp.deviceStore[in.Output].dpInterfaceName
+	out, err := vsp.DeleteNetworkFunctionPort(inpDpInterfaceName, outDpInterfaceName, NfName)
+	return out, err
 }
 
 // DeleteNetworkFunction function to delete a network function with the given context and NFRequest
 // It will return the Empty and error
-func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
-	klog.Infof("Received DeleteNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
+func (vsp *mrvlVspServer) DeleteNetworkFunctionPort(inpDpInterfaceName string, outDpInterfaceName string, nfName string) (*pb.Empty, error) {
+	dpuVfsName := vsp.networkStore[nfName].vfPort
+	for _, vf := range dpuVfsName {
+		if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, vf.vfName, inpDpInterfaceName, ""); err != nil {
+			klog.Errorf("Error occurred in deleting Flow Rule: %v", err)
+			return nil, err
+		}
+		klog.Infof("Flow Rule Deleted from Bridge Successfully inport:%s", vf.vfName)
+	}
+	if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, inpDpInterfaceName, "", ""); err != nil {
+		klog.Errorf("DNF: Error occurred in deleting Flow Rule: %v", err)
+		return nil, err
+	}
+	klog.Infof("Flow Rule Deleted from Bridge Successfully inport:%s", inpDpInterfaceName)
+	// Delete flow rule for out port to RPM Interface & RPM to OurPort
+	if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, outDpInterfaceName, "", ""); err != nil {
+		klog.Errorf("DNF: Error occurred in deleting Flow Rule: %v", err)
+		return nil, err
+	}
+	klog.Infof("Flow Rule Deleted from Bridge Successfully inport:%s", outDpInterfaceName)
+
+	DpuRpmInterfaceName, err := mrvlutils.GetNameByDeviceID(DpuRpmDeviceID)
+	if err != nil {
+		klog.Errorf("DNF: Error occurred in getting RPM Interface Name: %v", err)
+		return nil, err
+	}
+	if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, DpuRpmInterfaceName, "", ""); err != nil {
+		klog.Errorf("DNF: Error occurred in deleting Flow Rule: %v", err)
+		return nil, err
+	}
+	klog.Infof("flow Rule Deleted from Bridge Successfully inport:%s", DpuRpmInterfaceName)
+	if err := vsp.mrvlDP.DeletePortFromDataPlane(vsp.bridgeName, inpDpInterfaceName); err != nil {
+		klog.Errorf("Error occurred in deleting Port from Bridge: %v", err)
+		return nil, err
+	}
+	klog.Info("Input Port Deleted from Bridge Successfully")
+	if err := vsp.mrvlDP.DeletePortFromDataPlane(vsp.bridgeName, outDpInterfaceName); err != nil {
+		klog.Errorf("Error occurred in deleting Port from Bridge: %v", err)
+		return nil, err
+	}
+	klog.Info("Output Port Deleted from Bridge Successfully")
 	out := new(pb.Empty)
 	return out, nil
 }
@@ -470,6 +692,11 @@ func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
 
 }
 
+func linkHasAddrgenmodeEui64(interfaceName string) bool {
+	out, err := exec.Command("ip", "-d", "link", "show", "dev", interfaceName).Output()
+	return err == nil && strings.Contains(string(out), "addrgenmode eui64")
+}
+
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
 func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
@@ -487,10 +714,22 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 		klog.Errorf("Error setting %s: %v", optimistic_dad_file, err1)
 	}
 
-	// Ensure to set addrgenmode and toggle link state (which can result in creating
-	// the IPv6 link local address. Ignore errors here.
-	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
-	exec.Command("ip", "link", "set", interfaceName, "down").Run()
+	if linkHasAddrgenmodeEui64(interfaceName) {
+		// Kernel may require that the SDP interfaces are up at all times (RHEL-90248).
+		// If the addrgenmode is already eui64, assume we are fine and don't need to reset
+		// it (and don't need to toggle the link state).
+	} else {
+		// Ensure to set addrgenmode and toggle link state (which can result in creating
+		// the IPv6 link local address).
+		err2 := exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
+		if err2 != nil {
+			return fmt.Errorf("Error setting link %s addrgenmode: %v", interfaceName, err2)
+		}
+		err2 = exec.Command("ip", "link", "set", interfaceName, "down").Run()
+		if err2 != nil {
+			return fmt.Errorf("Error setting link %s down after setting addrgenmode: %v", interfaceName, err2)
+		}
+	}
 
 	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
 	if err != nil {
@@ -580,11 +819,13 @@ func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
 	flag.Parse()
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&options)))
 	vsp := &mrvlVspServer{
-		log:         ctrl.Log.WithName("MarvellVsp"),
-		pathManager: *utils.NewPathManager("/"),
-		deviceStore: make(map[string]mrvlDeviceInfo),
-		done:        make(chan error),
-		mrvlDP:      ovsdp.NewOvsDP(),
+		log:          ctrl.Log.WithName("MarvellVsp"),
+		pathManager:  *utils.NewPathManager("/"),
+		deviceStore:  make(map[string]mrvlDeviceInfo),
+		done:         make(chan error),
+		mrvlDP:       ovsdp.NewOvsDP(),
+		networkStore: make(map[string]mrvlNfPortMap),
+		isNF:         isNf,
 	}
 	if DataPlaneType == "debug" {
 		vsp.mrvlDP = debugdp.NewDebugDP()
@@ -598,6 +839,12 @@ func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
 }
 
 func main() {
+	err := mrvlutils.SetupPlatform()
+	if err != nil {
+		klog.Errorf("Failed to set up platform: %v", err)
+		return
+	}
+
 	mrvlVspServer := NewMarvellVspServer()
 	listener, err := mrvlVspServer.Listen()
 

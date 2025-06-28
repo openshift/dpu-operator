@@ -1,0 +1,69 @@
+version: '3'
+
+tasks:
+  deploy-clusters:
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - task: clean-clusters
+      - task: deploy-clusters-both-phase-1
+      - task: deploy-clusters-host-phase-2
+
+  clean-clusters:
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy -f
+
+  deploy-clusters-dpu-phase-all:
+    internal: true
+    deps:
+      - task: prepare-e2e-test
+    vars:
+      CDA_MARVELL_TOOLS_EXTRA_ARGS: "--octep-cp-agent-service-disable"
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        export CDA_MARVELL_TOOLS_EXTRA_ARGS="{{.CDA_MARVELL_TOOLS_EXTRA_ARGS}}";
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
+
+  deploy-clusters-host-phase-1:
+    internal: true
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps pre,masters 
+
+  deploy-clusters-host-phase-2:
+    internal: true
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps workers,post 
+
+  deploy-clusters-both-phase-1:
+    internal: true
+    deps:
+      - task: deploy-clusters-host-phase-1
+      - task: deploy-clusters-dpu-phase-all
+
+
+# The following two targets are useful for manually deploying part of the env
+  deploy-cluster-host:
+    cmds:
+      - task: deploy-clusters-host-phase-1
+      - task: deploy-clusters-host-phase-2
+
+  deploy-cluster-dpu:
+    cmds:
+      - task: deploy-clusters-dpu-phase-all

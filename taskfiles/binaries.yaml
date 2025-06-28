@@ -1,0 +1,33 @@
+version: '3'
+
+tasks:
+  build-bin-manager:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/manager.{{.GOARCH}} cmd/main.go
+
+  build-bin-daemon:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/daemon.{{.GOARCH}} cmd/daemon/daemon.go
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/dpu-cni.{{.GOARCH}} dpu-cni/dpu-cni.go
+
+  build-bin-intel-vsp:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/ipuplugin.{{.GOARCH}} cmd/intelvsp/intelvsp.go
+
+  build-bin-marvell-vsp:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-mrvl.{{.GOARCH}} internal/daemon/vendor-specific-plugins/marvell/main.go
+
+  build-bin-network-resources-injector:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/nri.{{.GOARCH}} cmd/nri/networkresourcesinjector.go

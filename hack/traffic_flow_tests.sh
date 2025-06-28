@@ -30,6 +30,6 @@ envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file
 export TFT_MANIFESTS_OVERRIDES=../hack/cluster-configs/traffic_flow_manifests
 OUTPUT_BASE="./ft-logs/result-$(date '+%Y%m%d-%H%M%S.%4N-')"
 
-./tft.py -v debug --output-base "$OUTPUT_BASE" "$temp_file"
+./tft.py --output-base "$OUTPUT_BASE" "$temp_file"
 
 ./print_results.py "$OUTPUT_BASE"*.json

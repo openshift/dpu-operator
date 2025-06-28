@@ -19,16 +19,16 @@ spec:
         name: manager
         env:
         - name: DPU_DAEMON_IMAGE
-          value: {{ .RegistryURL }}:5000/dpu-daemon:dev
+          value: {{ .RegistryURL }}/dpu-daemon:dev
         - name: IntelVspImage
-          value: {{ .RegistryURL }}:5000/intel-vsp:dev
+          value: {{ .RegistryURL }}/intel-vsp:dev
         - name: IntelVspP4Image
-          value: {{ .RegistryURL }}:5000/intel-vsp-p4:dev
+          value: {{ .RegistryURL }}/intel-vsp-p4:dev
         - name: MarvellVspImage
-          value: {{ .RegistryURL }}:5000/mrvl-vsp:dev
+          value: {{ .RegistryURL }}/mrvl-vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
         - name: NETWORK_RESOURCES_INJECTOR_IMAGE
-          value: {{ .RegistryURL }}:5000/network-resources-injector-image:dev
-        image: {{ .RegistryURL }}:5000/dpu-operator:dev
+          value: {{ .RegistryURL }}/network-resources-injector:dev
+        image: {{ .RegistryURL }}/dpu-operator:dev
         imagePullPolicy: Always
