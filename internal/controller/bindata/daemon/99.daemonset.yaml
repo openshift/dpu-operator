@@ -46,6 +46,8 @@ spec:
           value: {{.IntelVspP4Image}}
         - name: MarvellVspImage
           value: {{.MarvellVspImage}}
+        - name: IntelNetSecVspImage
+          value: {{.IntelNetSecVspImage}}
         volumeMounts:
         - name: devicesock
           mountPath: /var/lib/kubelet/

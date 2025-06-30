@@ -42,7 +42,7 @@ func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
 	}
 }
 
-func (d *IntelDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
+func (d *IntelDetector) IsDPU(platform Platform, pci ghw.PCIDevice, dpuDevices []plugin.DpuIdentifier) (bool, error) {
 	// VFs for the Intel IPU have the same PCIe info as the PF
 	isVF, err := d.isVirtualFunction(pci.Address)
 	if err != nil {
@@ -67,7 +67,12 @@ func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
 	return false, nil
 }
 
-func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
+func (pi *IntelDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
+	// TODO: Implement a way to get the DPU identifier.
+	return "", nil
+}
+
+func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
 	p4Image := os.Getenv(VspP4ImageIntelEnv)
 	if p4Image == "" {
 		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4")
@@ -78,7 +83,7 @@ func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, cl
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
 	template_vars.Command = `[ "/ipuplugin" ]`
 	template_vars.Args = args
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
+	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }
 
 func (d *IntelDetector) GetVendorName() string {

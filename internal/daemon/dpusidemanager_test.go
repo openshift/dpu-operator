@@ -76,7 +76,7 @@ var _ = g.Describe("DPU side manager", Ordered, func() {
 			mockVspDone <- err
 		}()
 
-		dpuPlugin, err := plugin.NewGrpcPlugin(true,
+		dpuPlugin, err := plugin.NewGrpcPlugin(true, "testDpuIdentifier",
 			client,
 			plugin.WithPathManager(pathManager))
 		Expect(err).NotTo(HaveOccurred())
