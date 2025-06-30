@@ -50,10 +50,14 @@ func waitAllNodesDpuAllocatable(client client.Client) {
 
 var _ = g.Describe("DPU side manager", Ordered, func() {
 	var (
-		dpuDaemon   *DpuSideManager
-		config      *rest.Config
-		testCluster testutils.KindCluster
-		client      client.Client
+		dpuDaemon     *DpuSideManager
+		config        *rest.Config
+		testCluster   testutils.KindCluster
+		client        client.Client
+		ctx           context.Context
+		cancel        context.CancelFunc
+		mockVspDone   chan error
+		dpuDaemonDone chan error
 	)
 	g.BeforeEach(func() {
 		testCluster = testutils.KindCluster{Name: "dpu-operator-test-cluster"}
@@ -61,12 +65,15 @@ var _ = g.Describe("DPU side manager", Ordered, func() {
 
 		pathManager := *utils.NewPathManager(testCluster.TempDirPath())
 
+		ctx, cancel = context.WithCancel(context.Background())
+
 		mockVsp := mockvsp.NewMockVsp(mockvsp.WithPathManager(pathManager))
 		mockVspListen, err := mockVsp.Listen()
 		Expect(err).NotTo(HaveOccurred())
+		mockVspDone = make(chan error, 1)
 		go func() {
-			err = mockVsp.Serve(mockVspListen)
-			Expect(err).NotTo(HaveOccurred())
+			err = mockVsp.Serve(ctx, mockVspListen)
+			mockVspDone <- err
 		}()
 
 		dpuPlugin, err := plugin.NewGrpcPlugin(true,
@@ -77,9 +84,10 @@ var _ = g.Describe("DPU side manager", Ordered, func() {
 
 		dpuListen, err := dpuDaemon.Listen()
 		Expect(err).NotTo(HaveOccurred())
+		dpuDaemonDone = make(chan error, 1)
 		go func() {
-			err = dpuDaemon.Serve(dpuListen)
-			Expect(err).NotTo(HaveOccurred())
+			err = dpuDaemon.Serve(ctx, dpuListen)
+			dpuDaemonDone <- err
 		}()
 		client = dpuDaemon.manager.GetClient()
 	})
@@ -88,7 +96,9 @@ var _ = g.Describe("DPU side manager", Ordered, func() {
 		if os.Getenv("FAST_TEST") == "false" {
 			testCluster.EnsureDeleted()
 		}
-		dpuDaemon.Stop()
+		cancel()
+		<-mockVspDone
+		<-dpuDaemonDone
 	})
 
 	g.Context("Device Plugin", func() {
