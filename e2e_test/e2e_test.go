@@ -431,13 +431,10 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				err = dpuSideClient.List(context.TODO(), podList, client.InNamespace(vars.Namespace))
 				Expect(err).NotTo(HaveOccurred())
 
-				Eventually(func() bool {
-					nfPod = testutils.GetPod(dpuSideClient, nfName, vars.Namespace)
-					if nfPod != nil {
-						return nfPod.Spec.Containers[0].Image == imageRef && nfPod.Status.Phase == corev1.PodRunning
-					}
-					return false
-				}, timeout, interval).Should(BeTrue())
+				nfPod = testutils.EventuallyPodIsRunning(dpuSideClient, nfName, vars.Namespace, timeout, interval)
+
+				Expect(nfPod.Spec.Containers[0].Image).To(Equal(imageRef), "Pod should have expected image")
+
 				fmt.Println("Nf pod successfully created")
 			})
 			g.It("Should support pod -> pod with Network-Function deployed", func() {

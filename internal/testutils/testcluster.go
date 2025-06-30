@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/gomega"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,6 +124,27 @@ func PodIsRunning(c client.Client, podName string, podNamespace string) bool {
 		return pod.Status.Phase == corev1.PodRunning
 	}
 	return false
+}
+
+func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) *corev1.Pod {
+	var pod *corev1.Pod
+
+	// Wait for pod to be created
+	Eventually(func() bool {
+		pod = GetPod(c, podName, podNamespace)
+		return pod != nil
+	}, timeout, interval).Should(BeTrue(), "Pod '%s' should be created", podName)
+
+	// Wait for pod to be running
+	Eventually(func() corev1.PodPhase {
+		pod = GetPod(c, podName, podNamespace)
+		if pod != nil {
+			return pod.Status.Phase
+		}
+		return corev1.PodUnknown
+	}, timeout, interval).Should(Equal(corev1.PodRunning), "Pod '%s' should be running", podName)
+
+	return pod
 }
 
 func GetSecondaryNetworkIP(pod *corev1.Pod, netdevName string) (string, error) {
