@@ -12,10 +12,7 @@ vars:
   DPU_OPERATOR_TEMP_DIR: /tmp/dpu-operator-tmp
   DPU_OPERATOR_GO_CACHE: /tmp/dpu-operator-cache
   BINDIR: bin
-  BINDIR_ABS:
-    sh: if [[ "{{.BINDIR}}" = /* ]]; then echo "{{.BINDIR}}"; else echo "$(pwd)/{{.BINDIR}}"; fi
-  REGISTRY:
-    sh: hostname | sed 's/$/:5000/'
+  REGISTRY: default-route-openshift-image-registry.apps.ocpcluster.redhat.com/in-cluster-registry
   ENVTEST_K8S_VERSION: 1.27.1
   KUSTOMIZE_VERSION: v5.6.0
   GINKGO_VERSION:
