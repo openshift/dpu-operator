@@ -15,6 +15,7 @@ service NetworkFunctionService {
 
 message InitRequest {
   bool dpu_mode = 1;
+  string dpu_identifier = 2;
 }
 
 message IpPort {
