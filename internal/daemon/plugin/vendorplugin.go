@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -118,17 +119,32 @@ func (v VspTemplateVars) ToMap() map[string]string {
 }
 
 func (g *GrpcPlugin) Start() (string, int32, error) {
-	err := g.ensureConnected()
-	if err != nil {
-		return "", 0, fmt.Errorf("Failed to ensure GRPC connection on grpcPlugin start: %v", err)
-	}
-	ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode})
+	start := time.Now()
+	timeout := 10 * time.Second
+	interval := 100 * time.Millisecond
 
-	if err != nil {
-		return "", 0, fmt.Errorf("Failed to start serving on grpcPlugin start: %v", err)
-	}
+	for {
+		err := g.ensureConnected()
+		if err != nil {
+			if time.Since(start) >= timeout {
+				return "", 0, fmt.Errorf("Failed to ensure GRPC connection after %v: %v", timeout, err)
+			}
+			time.Sleep(interval)
+			continue
+		}
 
-	return ipPort.Ip, ipPort.Port, nil
+		ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode})
+		if err != nil {
+			if time.Since(start) >= timeout {
+				return "", 0, fmt.Errorf("Failed to start serving after %v: %v", timeout, err)
+			}
+			time.Sleep(interval)
+			continue
+		}
+
+		g.log.Info("Init succeeded", "duration", time.Since(start))
+		return ipPort.Ip, ipPort.Port, nil
+	}
 }
 
 func (g *GrpcPlugin) Close() {

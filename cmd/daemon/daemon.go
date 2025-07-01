@@ -33,7 +33,7 @@ func main() {
 
 	platform := &platform.HardwarePlatform{}
 	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
-	if err := d.ListenAndServe(context.Background()); err != nil {
+	if err := d.PrepareAndServe(context.Background()); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)
 	}
