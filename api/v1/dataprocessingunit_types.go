@@ -31,7 +31,7 @@ type DataProcessingUnitSpec struct {
 	// DpuType is the type of DPU
 	DpuType string `json:"dpuType,omitempty"`
 	// IsDpuSide indicates if this DPU is on the DPU side
-	IsDpuSide bool `json:"isDpuSide,omitempty"`
+	IsDpuSide bool `json:"isDpuSide"`
 }
 
 // DataProcessingUnitStatus defines the observed state of DataProcessingUnit

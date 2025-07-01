@@ -2,6 +2,7 @@ package daemon_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -24,6 +25,22 @@ import (
 
 func createVspTestImages() images.ImageManager {
 	return images.NewDummyImageManager()
+}
+
+func EventuallyNoDpuCR(k8sClient client.Client) {
+	Eventually(func() error {
+		dpuList := &v1.DataProcessingUnitList{}
+		err := k8sClient.List(context.TODO(), dpuList)
+		if err != nil {
+			return err
+		}
+		if len(dpuList.Items) != 0 {
+			klog.Infof("Found %v DPU CRs, still waiting for cleanup", len(dpuList.Items))
+			return fmt.Errorf("Found %v DPU CRs but expecting 0", len(dpuList.Items))
+		}
+		klog.Info("All DPU CRs cleaned up successfully")
+		return nil
+	}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).Should(Succeed())
 }
 
 var _ = g.Describe("Full Daemon", func() {
@@ -52,6 +69,11 @@ var _ = g.Describe("Full Daemon", func() {
 		Expect(err).NotTo(HaveOccurred())
 		ns := testutils.DpuOperatorNamespace()
 		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+
+		// Clean up any existing resources first
+		existingCr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+		testutils.DeleteDpuOperatorCR(k8sClient, existingCr)
+
 		testutils.CreateNamespace(k8sClient, ns)
 		testutils.CreateDpuOperatorCR(k8sClient, cr)
 
@@ -64,6 +86,11 @@ var _ = g.Describe("Full Daemon", func() {
 		Expect(err).NotTo(HaveOccurred())
 		namespace := testutils.DpuOperatorNamespace()
 		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+
+		// Clean up any existing resources first
+		existingDpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		testutils.DeleteDpuOperatorCR(k8sClient, existingDpuOperatorConfig)
+
 		testutils.CreateNamespace(k8sClient, namespace)
 		testutils.CreateDpuOperatorCR(k8sClient, dpuOperatorConfig)
 
@@ -87,10 +114,6 @@ var _ = g.Describe("Full Daemon", func() {
 			if err != nil && err != context.Canceled {
 				Expect(err).NotTo(HaveOccurred())
 			}
-			// Always wait for context cancellation to ensure proper test synchronization
-			// If PrepareAndServe blocked until context cancellation, this returns immediately
-			// If PrepareAndServe failed early, we wait for context cancellation
-			<-ctx.Done()
 		}()
 	})
 
@@ -116,21 +139,48 @@ var _ = g.Describe("Full Daemon", func() {
 	})
 
 	g.AfterEach(func() {
-		klog.Info("Cleaning up")
+		klog.Info("Calling cancel")
 		cancel()
+		klog.Info("Cancel called, waiting for go routines for vsp and daemon to complete")
 
-		// Wait for both goroutines to complete
-		<-mockVspDone
-		<-daemonDone
+		// Wait for goroutines to complete with a timeout
+		timeout := time.After(10 * time.Second)
+		select {
+		case <-mockVspDone:
+			klog.Info("Mock VSP completed")
+		case <-timeout:
+			klog.Error(nil, "Timeout waiting for mock VSP to complete")
+		}
 
-		// Clean up DpuOperatorConfig resources
+		select {
+		case <-daemonDone:
+			klog.Info("Daemon completed")
+		case <-timeout:
+			klog.Error(nil, "Timeout waiting for daemon to complete")
+		}
+		klog.Info("Clean up DpuOperatorConfig resources")
 		namespace := testutils.DpuOperatorNamespace()
 		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		klog.Infof("Deleting DpuOperatorConfig: %s", vars.DpuOperatorConfigName)
 		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
-		
+
 		// Also clean up the original CR
 		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", namespace)
+		klog.Info("Deleting original CR: dpu-operator-config")
 		testutils.DeleteDpuOperatorCR(k8sClient, cr)
+		klog.Infof("Deleting namespace: %s", namespace.Name)
 		testutils.DeleteNamespace(k8sClient, namespace)
+
+		// For fast tests, skip the extensive DPU CR cleanup check
+		if os.Getenv("FAST_TEST") != "true" {
+			klog.Info("Starting EventuallyNoDpuCR check")
+			EventuallyNoDpuCR(k8sClient)
+		} else {
+			klog.Info("Skipping EventuallyNoDpuCR check for fast test")
+		}
+
+		if os.Getenv("FAST_TEST") == "false" {
+			testCluster.EnsureDeleted()
+		}
 	})
 })
