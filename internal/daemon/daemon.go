@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
+	"github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
@@ -13,6 +15,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/afero"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -175,6 +179,13 @@ func (d *Daemon) findNewDpus(previousDpus map[string]platform.DetectedDpu, curre
 			d.log.Info("New DPU detected", "identifier", key, "isDpuPlatform", detectedDpu.IsDpuPlatform)
 			d.detectedDpus[key] = detectedDpu
 			newDpus = append(newDpus, detectedDpu)
+			
+			// Create DPU CR when DPU is detected
+			err := d.createDpuCR(detectedDpu.IsDpuPlatform)
+			if err != nil {
+				d.log.Error(err, "Failed to create DPU CR")
+				// Don't fail the daemon if CR creation fails, just log and continue
+			}
 		} else {
 		}
 	}
@@ -195,6 +206,68 @@ func (d *Daemon) createSideManager(detectedDpu platform.DetectedDpu) (SideManage
 		}
 		return hsm, nil
 	}
+}
+
+func (d *Daemon) createDpuCR(isDpuSide bool) error {
+	// Get hostname to use as CR name
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("Failed to get hostname: %v", err)
+	}
+
+	// Get DPU type from detector
+	dpuType := "unknown"
+	vendorID, _, _, err := d.dpuDetectorManger.GetPcieDevFilter()
+	if err == nil {
+		// Map vendor/product IDs to DPU types
+		switch vendorID {
+		case "8086": // Intel
+			dpuType = "Intel IPU"
+		case "177d": // Marvell
+			dpuType = "Marvell DPU"
+		}
+	}
+
+	// Create DPU CR
+	dpuCR := &v1.DataProcessingUnit{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hostname,
+		},
+		Spec: v1.DataProcessingUnitSpec{
+			DpuType:   dpuType,
+			IsDpuSide: isDpuSide,
+		},
+		Status: v1.DataProcessingUnitStatus{
+			Status: "Detected",
+		},
+	}
+
+	// Check if CR already exists
+	existingCR := &v1.DataProcessingUnit{}
+	err = d.client.Get(context.TODO(), client.ObjectKey{Name: hostname}, existingCR)
+	if err == nil {
+		// CR exists, update it if needed
+		if existingCR.Spec.DpuType != dpuType || existingCR.Spec.IsDpuSide != isDpuSide || existingCR.Status.Status != "Detected" {
+			existingCR.Spec = dpuCR.Spec
+			existingCR.Status = dpuCR.Status
+			err = d.client.Update(context.TODO(), existingCR)
+			if err != nil {
+				return fmt.Errorf("Failed to update DPU CR: %v", err)
+			}
+			d.log.Info("Updated DPU CR", "name", hostname, "dpuType", dpuType, "isDpuSide", isDpuSide)
+		}
+	} else if errors.IsNotFound(err) {
+		// CR doesn't exist, create it
+		err = d.client.Create(context.TODO(), dpuCR)
+		if err != nil {
+			return fmt.Errorf("Failed to create DPU CR: %v", err)
+		}
+		d.log.Info("Created DPU CR", "name", hostname, "dpuType", dpuType, "isDpuSide", isDpuSide)
+	} else {
+		return fmt.Errorf("Failed to check existing DPU CR: %v", err)
+	}
+
+	return nil
 }
 
 func (d *Daemon) prepareCni() error {

@@ -2,6 +2,7 @@ package daemon_test
 
 import (
 	"context"
+	"os"
 	"time"
 
 	g "github.com/onsi/ginkgo/v2"
@@ -9,10 +10,12 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon"
 	mockvsp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/mock-vsp"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
+	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
@@ -31,9 +34,11 @@ var _ = g.Describe("Full Daemon", func() {
 		cancel       context.CancelFunc
 		mockVspDone  chan struct{}
 		daemonDone   chan struct{}
+		k8sClient    client.Client
 	)
 	g.BeforeEach(func() {
 		var ctx context.Context
+		var err error
 		ctx, cancel = context.WithCancel(context.Background())
 
 		// Initialize completion channels
@@ -43,6 +48,12 @@ var _ = g.Describe("Full Daemon", func() {
 		testCluster = &testutils.KindCluster{Name: "dpu-operator-test-cluster"}
 		config := testCluster.EnsureExists()
 		pathManager := utils.NewPathManager(testCluster.TempDirPath())
+		k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+		ns := testutils.DpuOperatorNamespace()
+		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+		testutils.CreateNamespace(k8sClient, ns)
+		testutils.CreateDpuOperatorCR(k8sClient, cr)
 
 		fs := afero.NewMemMapFs()
 		utils.Touch(fs, "/dpu-cni")
@@ -85,8 +96,22 @@ var _ = g.Describe("Full Daemon", func() {
 
 	g.Context("Running on a DPU", func() {
 		g.It("Should have one DPU CR with IsDpuSide set", func() {
-			// Eventually, it should show up as a CR
-			time.Sleep(5 * time.Second)
+			// Wait for DPU CR to be created
+			hostname, err := os.Hostname()
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() error {
+				dpuCR := &v1.DataProcessingUnit{}
+				return k8sClient.Get(context.TODO(), client.ObjectKey{Name: hostname}, dpuCR)
+			}, 10*time.Second, 1*time.Second).Should(Succeed())
+
+			// Verify the DPU CR has correct fields
+			dpuCR := &v1.DataProcessingUnit{}
+			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: hostname}, dpuCR)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dpuCR.Spec.IsDpuSide).To(BeTrue())
+			Expect(dpuCR.Spec.DpuType).To(Equal("Intel IPU"))
+			Expect(dpuCR.Status.Status).To(Equal("Detected"))
 		})
 	})
 
@@ -99,11 +124,13 @@ var _ = g.Describe("Full Daemon", func() {
 		<-daemonDone
 
 		// Clean up DpuOperatorConfig resources
-		k8sClient, err := client.New(testCluster.EnsureExists(), client.Options{})
-		Expect(err).NotTo(HaveOccurred())
 		namespace := testutils.DpuOperatorNamespace()
 		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
 		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
+		
+		// Also clean up the original CR
+		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", namespace)
+		testutils.DeleteDpuOperatorCR(k8sClient, cr)
 		testutils.DeleteNamespace(k8sClient, namespace)
 	})
 })
