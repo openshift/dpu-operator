@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -50,6 +51,8 @@ type GrpcPlugin struct {
 	vsp           VspTemplateVars
 	conn          *grpc.ClientConn
 	pathManager   utils.PathManager
+	initialized   bool
+	initMutex     sync.RWMutex
 }
 
 func NewVspTemplateVars() VspTemplateVars {
@@ -109,6 +112,8 @@ func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
 		ipPort, err := g.client.Init(ctx, &pb.InitRequest{DpuMode: g.dpuMode, DpuIdentifier: string(g.dpuIdentifier)})
 		if err != nil {
 			if strings.Contains(err.Error(), "already initialized") {
+				// VSP was already initialized, mark as initialized and return the error
+				g.SetInitDone(false)
 				return "", 0, err
 			}
 			select {
@@ -118,6 +123,9 @@ func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
 			}
 			continue
 		}
+
+		// Init succeeded, mark as initialized
+		g.SetInitDone(true)
 
 		g.log.Info("GrpcPlugin Start() succeeded", "duration", time.Since(start), "ip", ipPort.Ip, "port", ipPort.Port, "dpuMode",
 			g.dpuMode, "dpuIdentifier", g.dpuIdentifier)
@@ -273,4 +281,18 @@ func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {
 		VfCnt: count,
 	}
 	return g.dsClient.SetNumVfs(context.Background(), c)
+}
+
+// IsInitialized returns true if the VSP has been successfully initialized
+func (g *GrpcPlugin) IsInitialized() bool {
+	g.initMutex.RLock()
+	defer g.initMutex.RUnlock()
+	return g.initialized
+}
+
+// SetInitDone sets the initialization status with proper mutex locking
+func (g *GrpcPlugin) SetInitDone(initialized bool) {
+	g.initMutex.Lock()
+	defer g.initMutex.Unlock()
+	g.initialized = initialized
 }

@@ -5,18 +5,14 @@ import (
 	"fmt"
 
 	"github.com/jaypipes/ghw"
+	"github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
-
-type DetectedDpu struct {
-	IsDpuPlatform bool
-	Plugin        *plugin.GrpcPlugin
-	Identifier    plugin.DpuIdentifier
-}
 
 type DpuDetectorManager struct {
 	platform  Platform
@@ -49,6 +45,9 @@ type VendorDetector interface {
 	GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error)
 
 	GetVendorName() string
+
+	// A unique identifier for when detection happens on the DPU
+	DpuPlatformIdentifier() plugin.DpuIdentifier
 }
 
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
@@ -97,8 +96,13 @@ func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, 
 	return activeDetectors[0], nil
 }
 
-func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client client.Client, pm utils.PathManager) ([]DetectedDpu, error) {
-	var detectedDpus []DetectedDpu
+type DetectedDpuWithPlugin struct {
+	DpuCR  *v1.DataProcessingUnit
+	Plugin *plugin.GrpcPlugin
+}
+
+func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client client.Client, pm utils.PathManager) ([]*DetectedDpuWithPlugin, error) {
+	var detectedDpus []*DetectedDpuWithPlugin
 
 	for _, detector := range d.detectors {
 		dpuPlatform, err := detector.IsDpuPlatform(d.platform)
@@ -107,14 +111,27 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 		}
 
 		if dpuPlatform {
-			vsp, err := detector.VspPlugin(true, imageManager, client, pm, "dpu-platform")
+			identifier := detector.DpuPlatformIdentifier()
+			vsp, err := detector.VspPlugin(true, imageManager, client, pm, identifier)
 			if err != nil {
 				return nil, err
 			}
-			detectedDpus = append(detectedDpus, DetectedDpu{
-				IsDpuPlatform: true,
-				Plugin:        vsp,
-				Identifier:    "",
+
+			dpuCR := &v1.DataProcessingUnit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(identifier),
+				},
+				Spec: v1.DataProcessingUnitSpec{
+					DpuProductName: detector.Name(),
+					IsDpuSide:      true,
+				},
+				Status: v1.DataProcessingUnitStatus{
+					Status: "NotReady",
+				},
+			}
+			detectedDpus = append(detectedDpus, &DetectedDpuWithPlugin{
+				DpuCR:  dpuCR,
+				Plugin: vsp,
 			})
 			continue
 		}
@@ -140,10 +157,22 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 				if err != nil {
 					return nil, err
 				}
-				detectedDpus = append(detectedDpus, DetectedDpu{
-					IsDpuPlatform: false,
-					Plugin:        vsp,
-					Identifier:    identifier,
+
+				dpuCR := &v1.DataProcessingUnit{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: string(identifier),
+					},
+					Spec: v1.DataProcessingUnitSpec{
+						DpuProductName: detector.Name(),
+						IsDpuSide:      false,
+					},
+					Status: v1.DataProcessingUnitStatus{
+						Status: "NotReady",
+					},
+				}
+				detectedDpus = append(detectedDpus, &DetectedDpuWithPlugin{
+					DpuCR:  dpuCR,
+					Plugin: vsp,
 				})
 			}
 		}
