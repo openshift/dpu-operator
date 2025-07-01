@@ -10,7 +10,7 @@ require (
 	github.com/go-task/task/v3 v3.43.3
 	github.com/golang/glog v1.2.4
 	github.com/gorilla/mux v1.8.1
-	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250630214432-c6b7801d9580
+	github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250701073807-9f7fe841a5b7
 	github.com/jaypipes/ghw v0.13.1-0.20241024164530-c1bfc6e6cd6a
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
