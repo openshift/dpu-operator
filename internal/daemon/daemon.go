@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
@@ -29,7 +30,7 @@ type Daemon struct {
 	log               logr.Logger
 	vspImages         map[string]string
 	config            *rest.Config
-	mgr               SideManager
+	managers          []SideManager
 	client            client.Client
 	fs                afero.Fs
 	p                 platform.Platform
@@ -47,44 +48,104 @@ func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Confi
 		config:            config,
 		p:                 p,
 		dpuDetectorManger: platform.NewDpuDetectorManager(p),
+		managers:          make([]SideManager, 0),
 	}
 }
 
-func (d *Daemon) ListenAndServe(ctx context.Context) error {
-	listener, err := d.Listen()
+func (d *Daemon) PrepareAndServe(ctx context.Context) error {
+	err := d.Prepare()
 
 	if err != nil {
 		d.log.Error(err, "Failed to listen")
 		return err
 	}
 
-	return d.Serve(ctx, listener)
+	return d.Serve(ctx)
 }
 
-func (d *Daemon) Listen() (net.Listener, error) {
+func (d *Daemon) Prepare() error {
 	var err error
 	d.client, err = client.New(d.config, client.Options{
 		Scheme: scheme.Scheme,
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create client: %v", err)
+		return fmt.Errorf("Failed to create client: %v", err)
 	}
 
 	err = d.prepareCni()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	d.mgr, err = d.createDaemon()
-	if err != nil {
-		d.log.Error(err, "Failed to start daemon")
-		return nil, err
-	}
-	return d.mgr.Listen()
+	return nil
 }
 
-func (d *Daemon) Serve(ctx context.Context, listener net.Listener) error {
-	return d.mgr.Serve(ctx, listener)
+func (d *Daemon) Serve(ctx context.Context) error {
+	d.log.Info("Starting detection loop")
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var managerDone []chan struct{}
+	errChan := make(chan error)
+	managerCtx, cancelManagers := context.WithCancel(ctx)
+	defer cancelManagers()
+
+	for {
+		select {
+		case <-ticker.C:
+			if len(d.managers) >= 1 {
+				continue
+			}
+			d.log.Info("Scanning for DPUs")
+			sideManager, err := d.createDaemon()
+			if err != nil {
+				d.log.Error(err, "Got error while detecting DPUs")
+				return err
+			}
+			if sideManager != nil {
+				d.managers = append(d.managers, sideManager)
+				done := make(chan struct{})
+				managerDone = append(managerDone, done)
+				go func(mgr SideManager) {
+					defer close(done)
+					listener, err := mgr.Listen()
+					if err != nil {
+						d.log.Error(err, "Failed to listen on sideManager")
+						select {
+						case errChan <- err:
+						default:
+						}
+						return
+					}
+					err = mgr.Serve(managerCtx, listener)
+					if err != nil && managerCtx.Err() == nil {
+						d.log.Error(err, "Failed to serve on sideManager")
+						select {
+						case errChan <- err:
+						default:
+						}
+					}
+				}(sideManager)
+			}
+		case err := <-errChan:
+			d.log.Error(err, "Side manager failed, stopping all managers")
+			cancelManagers()
+			d.log.Info("Waiting for all side managers to stop")
+			for _, done := range managerDone {
+				<-done
+			}
+			d.log.Info("All side managers stopped")
+			return err
+		case <-ctx.Done():
+			d.log.Info("Context cancelled, waiting for all side managers to stop")
+			cancelManagers()
+			for _, done := range managerDone {
+				<-done
+			}
+			d.log.Info("All side managers stopped")
+			return ctx.Err()
+		}
+	}
 }
 
 func (d *Daemon) createDaemon() (SideManager, error) {

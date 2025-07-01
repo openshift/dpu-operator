@@ -64,7 +64,7 @@ var _ = g.Describe("Full Daemon", func() {
 		d = daemon.NewDaemon(fs, fakePlatform, "dpu", config, createVspTestImages(), pathManager)
 		go func() {
 			defer close(daemonDone)
-			d.ListenAndServe(ctx)
+			d.PrepareAndServe(ctx)
 			// Always wait for context cancellation to ensure proper test synchronization
 			// If ListenAndServe blocked until context cancellation, this returns immediately
 			// If ListenAndServe failed early, we wait for context cancellation
