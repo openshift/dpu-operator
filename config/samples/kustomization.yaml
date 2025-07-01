@@ -2,4 +2,5 @@
 resources:
 - config_v1_dpuoperatorconfig.yaml
 - config_v1_servicefunctionchain.yaml
+- config_v1_dataprocessingunit.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
