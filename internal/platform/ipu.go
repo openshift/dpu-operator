@@ -87,7 +87,9 @@ func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
 func (pi *IntelDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
 	// TODO: rethink if it's possible to use something else than a pci address. Serial number doesn't seem to be the
 	// right choice for IPU.
-	identifier := fmt.Sprintf("intel-ipu-%s", pci.Address)
+	// Sanitize PCI address for Kubernetes resource name (replace : with -)
+	sanitizedAddress := strings.ReplaceAll(pci.Address, ":", "-")
+	identifier := fmt.Sprintf("intel-ipu-%s", sanitizedAddress)
 	return plugin.DpuIdentifier(identifier), nil
 }
 
@@ -111,4 +113,8 @@ func (pi *IntelDetector) VspPlugin(dpuMode bool, imageManager images.ImageManage
 
 func (d *IntelDetector) GetVendorName() string {
 	return "intel"
+}
+
+func (d *IntelDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "intel-ipu"
 }

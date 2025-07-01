@@ -2,6 +2,7 @@ package platform
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
@@ -58,7 +59,9 @@ func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
 }
 
 func (pi *MarvellDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
-	identifier := fmt.Sprintf("marvell-dpu-%s", pci.Address)
+	// Sanitize PCI address for Kubernetes resource name (replace : with -)
+	sanitizedAddress := strings.ReplaceAll(pci.Address, ":", "-")
+	identifier := fmt.Sprintf("marvell-dpu-%s", sanitizedAddress)
 	return plugin.DpuIdentifier(identifier), nil
 }
 
@@ -76,4 +79,8 @@ func (pi *MarvellDetector) VspPlugin(dpuMode bool, imageManager images.ImageMana
 // GetVendorName returns the name of the vendor
 func (d *MarvellDetector) GetVendorName() string {
 	return "marvell"
+}
+
+func (d *MarvellDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "marvell-dpu"
 }

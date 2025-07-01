@@ -28,18 +28,28 @@ type DataProcessingUnitSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of DataProcessingUnit. Edit dataprocessingunit_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// DpuProductName is the vendor and model name of the DPU
+	DpuProductName string `json:"dpuProductName,omitempty"`
+	// IsDpuSide indicates if this DPU is on the DPU side
+	IsDpuSide bool `json:"isDpuSide"`
 }
 
 // DataProcessingUnitStatus defines the observed state of DataProcessingUnit
 type DataProcessingUnitStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Status is the status of the DPU
+	Status string `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=dpu
+//+kubebuilder:resource:scope=Cluster
+//+kubebuilder:printcolumn:name="DPU Product",type="string",JSONPath=".spec.dpuProductName"
+//+kubebuilder:printcolumn:name="DPU Side",type="boolean",JSONPath=".spec.isDpuSide"
+//+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status"
 
 // DataProcessingUnit is the Schema for the dataprocessingunits API
 type DataProcessingUnit struct {

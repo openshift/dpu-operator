@@ -12,9 +12,19 @@ spec:
     listKind: DataProcessingUnitList
     plural: dataprocessingunits
     singular: dataprocessingunit
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.dpuProductName
+      name: DPU Product
+      type: string
+    - jsonPath: .spec.isDpuSide
+      name: DPU Side
+      type: boolean
+    - jsonPath: .status.status
+      name: Status
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: DataProcessingUnit is the Schema for the dataprocessingunits
@@ -40,13 +50,21 @@ spec:
           spec:
             description: DataProcessingUnitSpec defines the desired state of DataProcessingUnit
             properties:
-              foo:
-                description: Foo is an example field of DataProcessingUnit. Edit dataprocessingunit_types.go
-                  to remove/update
+              dpuProductName:
+                description: DpuProductName is the vendor and model name of the DPU
                 type: string
+              isDpuSide:
+                description: IsDpuSide indicates if this DPU is on the DPU side
+                type: boolean
+            required:
+            - isDpuSide
             type: object
           status:
             description: DataProcessingUnitStatus defines the observed state of DataProcessingUnit
+            properties:
+              status:
+                description: Status is the status of the DPU
+                type: string
             type: object
         type: object
     served: true
