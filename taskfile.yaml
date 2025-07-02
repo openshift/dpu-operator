@@ -1,0 +1,146 @@
+version: '3'
+
+run: when_changed
+
+env:
+  CGO_ENABLED: "0"
+  GOARCH:   '{{ default "amd64" .GOARCH }}'
+  GOOS:     '{{ default "linux" .GOOS }}'
+  SUBMODULES: '{{ default "true" .SUBMODULES }}'
+
+vars:
+  DPU_OPERATOR_TEMP_DIR: /tmp/dpu-operator-tmp
+  BINDIR: bin
+  REGISTRY:
+    sh: hostname | sed 's/$/:5000/'
+  ENVTEST_K8S_VERSION: 1.27.1
+  KUSTOMIZE_VERSION: v5.6.0
+  GINKGO_VERSION:
+    sh: go list -m -f '{{"{{.Version}}"}}' github.com/onsi/ginkgo/v2 | sed 's/^v//'
+
+includes:
+  images:
+    taskfile: ./taskfiles/images.yaml
+    flatten: true
+  binaries:
+    taskfile: ./taskfiles/binaries.yaml
+    flatten: true
+  clusters:
+    taskfile: ./taskfiles/clusters.yaml
+    flatten: true
+  operator-sdk:
+    taskfile: ./taskfiles/operator-sdk.yaml
+    flatten: true
+  
+tasks:
+  bindir:
+    silent: true
+    cmds:
+      - echo "{{.BINDIR}}"
+
+  push-image-helper:
+    internal: true
+    vars:
+      SOURCE: '{{.SOURCE}}'
+      IMAGE: '{{.IMAGE}}'
+    cmds:
+      - buildah manifest push --all '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
+
+  undeploy-helper:
+    internal: true
+    deps:
+      - task: kustomize
+    vars:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    status:
+      - NS=$(KUBECONFIG={{.KUBECONFIG}} oc get ns openshift-dpu-operator)
+        if [[ -n "$NS" ]]; then false else true fi
+    cmds:
+      - bin/kustomize build config/default | KUBECONFIG={{.KUBECONFIG}} oc delete --ignore-not-found=true -f -
+      - KUBECONFIG={{.KUBECONFIG}} oc wait --for=delete ns openshift-dpu-operator --timeout=300s
+      - echo "Namespace 'openshift-dpu-operator' has been removed."
+
+  undeploy:
+    vars:
+      KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
+      KUBECONFIG_DPU: "/root/kubeconfig.microshift"
+    deps:
+      - task: undeploy-helper
+        vars:
+          KUBECONFIG: '{{.KUBECONFIG_DPU}}'
+      - task: undeploy-helper
+        vars:
+          KUBECONFIG: '{{.KUBECONFIG_HOST}}'
+
+  deploy-prep:
+    internal: true
+    deps:
+      - task: kustomize
+    cmds:
+      - >
+        go run ./tools/config/config.go
+        -registry-url {{.REGISTRY}}
+        -template-file config/dev/local-images-template.yaml
+        -output-file bin/local-images.yaml
+      - cp config/dev/kustomization.yaml bin
+  
+  envtest:
+    status:
+      - test -f {{.BINDIR}}/setup-envtest
+    cmds:
+      - make envtest
+
+  deploy:
+    deps:
+      - task: deploy-prep
+    cmds:
+      - task: undeploy
+        vars:
+          KUBECONFIG_DPU: "/root/kubeconfig.microshift"
+          KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
+      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.microshift" oc apply -f -
+      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
+      - KUBECONFIG="/root/kubeconfig.microshift" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+      - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+
+  e2e-test:
+    deps:
+      - task: kustomize
+    cmds:
+      - task: deploy-clusters
+      - task: fast-e2e-test
+
+  fast-e2e-test:
+    cmds:
+      - task: redeploy
+      - sh hack/setup.sh
+      - task: run-e2e-test
+
+  run-e2e-test:
+    deps:
+      - task: ginkgo
+      - task: envtest
+    cmds:
+      - >
+        FAST_TEST=true
+        REGISTRY={{.REGISTRY}}
+        NF_INGRESS_IP=10.20.30.2
+        EXTERNAL_CLIENT_DEV=eno12409
+        EXTERNAL_CLIENT_IP=10.20.30.100
+        KUBEBUILDER_ASSETS="$({{.BINDIR}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.BINDIR}} -p path)"
+        {{.BINDIR}}/ginkgo -coverprofile cover.out ./e2e_test/...
+      - hack/traffic_flow_tests.sh
+
+  prepare-e2e-test:
+    cmds:
+      - >
+        if [ "{{.SUBMODULES}}" = "true" ]; then
+            hack/prepare-submodules.sh
+        fi
+            hack/prepare-venv.sh
+
+  redeploy:
+    cmds:
+      - task: build-image-all
+      - task: undeploy
+      - task: deploy

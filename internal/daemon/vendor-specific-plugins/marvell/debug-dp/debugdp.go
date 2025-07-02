@@ -39,3 +39,12 @@ func (debugDP *DebugDP) DeleteDataplane(bridgeName string) error {
 	debugDP.log.Info("DeleteDataplane", "bridgeName", bridgeName)
 	return nil
 }
+
+func (debugDP *DebugDP) AddFlowRuleToDataPlane(bridgeName string, inpPort string, outPort string, dstMac string) error {
+	debugDP.log.Info("AddNfRuleToDataPlane", "bridgeName", bridgeName, "inpPort", inpPort, "outPort", outPort)
+	return nil
+}
+func (debugDP *DebugDP) DeleteFlowRuleFromDataPlane(bridgeName string, inPort string, outPort string, dstMac string) error {
+	debugDP.log.Info("DeleteNfRuleFromDataPlane", "bridgeName", bridgeName, "inPort", inPort)
+	return nil
+}
