@@ -1,6 +1,10 @@
 version: '3'
 
 tasks:
+  go-cache:
+    cmds:
+      - mkdir -p {{.DPU_OPERATOR_GO_CACHE}}
+
   helper-buildah:
     internal: true
     deps:

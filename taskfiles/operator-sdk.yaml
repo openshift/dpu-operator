@@ -4,7 +4,7 @@ tasks:
   kustomize:
     cmds:
       - mkdir -p {{.BINDIR}}
-      - GOBIN=$(pwd)/{{.BINDIR}} GOFLAGS='' GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
       - echo "{{.KUSTOMIZE_VERSION}}" > {{.BINDIR}}/kustomize_version
     status:
       - test -d {{.BINDIR}}
@@ -17,4 +17,38 @@ tasks:
       - test -x {{.BINDIR}}/ginkgo
       - ./{{.BINDIR}}/ginkgo version | grep -q "{{.GINKGO_VERSION}}"
     cmds:
-      - GOBIN=$(pwd)/{{.BINDIR}} GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@v{{.GINKGO_VERSION}}
+      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@v{{.GINKGO_VERSION}}
+
+  ## Download operator-sdk locally if necessary.
+  operator-sdk:
+    status:
+      - test -x {{.BINDIR}}/operator-sdk
+      - ./{{.BINDIR}}/operator-sdk version | grep -q {{.OPERATOR_SDK_VERSION}}
+    cmds:
+      - |
+        if ! which operator-sdk > /dev/null 2>&1; then
+          mkdir -p {{.BINDIR}}
+          OS=$(go env GOOS)
+          ARCH=$(go env GOARCH)
+          curl -sSLo {{.BINDIR}}/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/{{.OPERATOR_SDK_VERSION}}/operator-sdk_${OS}_${ARCH}
+          chmod +x {{.BINDIR}}/operator-sdk
+        else
+          ln -sf $(which operator-sdk) {{.BINDIR}}/operator-sdk
+        fi
+
+  ## Download opm locally if necessary.
+  opm:
+    status:
+      - test -x {{.BINDIR}}/opm
+      - ./{{.BINDIR}}/opm version | grep -q {{.OPM_VERSION}}
+    cmds:
+      - |
+        if ! which opm > /dev/null 2>&1; then
+          mkdir -p {{.BINDIR}}
+          OS=$(go env GOOS)
+          ARCH=$(go env GOARCH)
+          curl -sSLo {{.BINDIR}}/opm https://github.com/operator-framework/operator-registry/releases/download/{{.OPM_VERSION}}/${OS}-${ARCH}-opm
+          chmod +x {{.BINDIR}}/opm
+        else
+          ln -sf $(which opm) {{.BINDIR}}/opm
+        fi

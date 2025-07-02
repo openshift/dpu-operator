@@ -1,0 +1,8 @@
+version: '3'
+
+tasks:
+  proto:
+    cmds:
+      - rm -rf dpu-api/gen
+      - mkdir -p dpu-api/gen
+      - cd dpu-api && protoc --go_out=gen --go_opt=paths=source_relative --go-grpc_out=gen --go-grpc_opt=paths=source_relative api.proto
