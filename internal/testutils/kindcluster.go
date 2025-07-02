@@ -96,9 +96,12 @@ func (t *KindCluster) ensureTempDirDeleted() error {
 }
 
 func (t *KindCluster) EnsureExists() *rest.Config {
-	client := t.prepareKindCluster()
-	bootstrapTestEnv(client)
-	return client
+	config := t.prepareKindCluster()
+	bootstrapTestEnv(config)
+	k8sClient, err := client.New(config, client.Options{})
+	Expect(err).NotTo(HaveOccurred())
+	WaitAllNodesReady(k8sClient)
+	return config
 }
 
 func (t *KindCluster) EnsureDeleted() {

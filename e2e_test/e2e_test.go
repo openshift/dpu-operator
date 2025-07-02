@@ -389,12 +389,8 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 		g.It("Should be able to start host workload pods", func() {
 			fmt.Println("Creating workload pods")
-			Eventually(func() bool {
-				return testutils.PodIsRunning(hostSideClient, testPodName, "default")
-			}, testutils.TestAPITimeout*45*2, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
-			Eventually(func() bool {
-				return testutils.PodIsRunning(hostSideClient, testPod2Name, "default")
-			}, testutils.TestAPITimeout*45*2, testutils.TestRetryInterval).Should(BeTrue(), "Pod did not become running in expected time")
+			testutils.EventuallyPodIsRunning(hostSideClient, testPodName, "default", testutils.TestAPITimeout*45*2, testutils.TestRetryInterval)
+			testutils.EventuallyPodIsRunning(hostSideClient, testPod2Name, "default", testutils.TestAPITimeout*45*2, testutils.TestRetryInterval)
 			fmt.Println("Workload pods reached Ready state")
 
 		})

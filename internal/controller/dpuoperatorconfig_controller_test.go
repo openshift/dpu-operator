@@ -18,13 +18,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/rest"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -46,71 +41,6 @@ var (
 	testClusterName            = "dpu-operator-test-cluster"
 	setupLog                   = ctrl.Log.WithName("setup")
 )
-
-func dpuOperatorNameSpace() *corev1.Namespace {
-	namespace := &corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: testNamespace,
-		},
-		Spec:   corev1.NamespaceSpec{},
-		Status: corev1.NamespaceStatus{},
-	}
-	return namespace
-}
-
-func dpuOperatorCR(name string, mode string, ns *corev1.Namespace) *configv1.DpuOperatorConfig {
-	config := &configv1.DpuOperatorConfig{}
-	config.SetNamespace(ns.Name)
-	config.SetName(name)
-	config.Spec = configv1.DpuOperatorConfigSpec{
-		Mode:     mode,
-		LogLevel: 2,
-	}
-	return config
-}
-
-func createNameSpace(client client.Client, ns *v1.Namespace) {
-	// ignore error when creating the namespace since it can already exist
-	client.Create(context.Background(), ns)
-	found := v1.Namespace{}
-	Eventually(func() error {
-		return client.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: ns.GetName()}, &found)
-	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
-}
-
-func deleteNameSpace(client client.Client, ns *v1.Namespace) {
-	client.Delete(context.Background(), ns)
-	found := v1.Namespace{}
-	Eventually(func() error {
-		err := client.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: ns.GetName()}, &found)
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
-}
-
-func createDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
-	err := client.Create(context.Background(), cr)
-	Expect(err).NotTo(HaveOccurred())
-	found := configv1.DpuOperatorConfig{}
-	Eventually(func() error {
-		return client.Get(context.Background(), types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.GetName()}, &found)
-	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
-}
-
-func deleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
-	client.Delete(context.Background(), cr)
-	found := configv1.DpuOperatorConfig{}
-	Eventually(func() error {
-		err := client.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: cr.GetName()}, &found)
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
-}
 
 func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *sync.WaitGroup) ctrl.Manager {
 	var err error
@@ -187,10 +117,10 @@ var _ = Describe("Main Controller", Ordered, func() {
 
 		Context("When DpuOperatorConfig CR exists with host mode", func() {
 			BeforeAll(func() {
-				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
-				createNameSpace(mgr.GetClient(), ns)
-				createDpuOperatorCR(mgr.GetClient(), cr)
+				ns := testutils.DpuOperatorNamespace()
+				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				testutils.CreateNamespace(mgr.GetClient(), ns)
+				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := appsv1.DaemonSet{}
@@ -204,18 +134,18 @@ var _ = Describe("Main Controller", Ordered, func() {
 				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {
-				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
-				deleteDpuOperatorCR(mgr.GetClient(), cr)
+				ns := testutils.DpuOperatorNamespace()
+				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
 			})
 		})
 
 		Context("When DpuOperatorConfig CR is created with dpu mode", func() {
 			BeforeAll(func() {
-				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR("operator-config", "dpu", ns)
-				createNameSpace(mgr.GetClient(), ns)
-				createDpuOperatorCR(mgr.GetClient(), cr)
+				ns := testutils.DpuOperatorNamespace()
+				cr = testutils.DpuOperatorCR("operator-config", "dpu", ns)
+				testutils.CreateNamespace(mgr.GetClient(), ns)
+				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := &appsv1.DaemonSet{}
@@ -231,9 +161,9 @@ var _ = Describe("Main Controller", Ordered, func() {
 				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {
-				ns := dpuOperatorNameSpace()
-				cr = dpuOperatorCR("operator-config", "host", ns)
-				deleteDpuOperatorCR(mgr.GetClient(), cr)
+				ns := testutils.DpuOperatorNamespace()
+				cr = testutils.DpuOperatorCR("operator-config", "host", ns)
+				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
 			})
 		})
 	})
