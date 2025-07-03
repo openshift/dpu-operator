@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"time"
 
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,8 +23,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	configv1 "github.com/openshift/dpu-operator/api/v1"
 )
 
 type Cluster interface {
@@ -93,6 +93,28 @@ func GetDPUNodes(c client.Client) ([]corev1.Node, error) {
 	return nodeList.Items, nil
 }
 
+// TrafficFlowTestsImage returns the appropriate image reference based on USE_LOCAL_REGISTRY
+func TrafficFlowTestsImage() string {
+	localContainer := ContainerImage{
+		Registry: os.Getenv("REGISTRY"),
+		Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+		Tag:      "latest",
+	}
+
+	remoteContainer := ContainerImage{
+		Registry: "ghcr.io",
+		Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+		Tag:      "latest",
+	}
+
+	if val, found := os.LookupEnv("USE_LOCAL_REGISTRY"); !found || val == "true" {
+		err := EnsurePullAndPush(context.TODO(), remoteContainer, localContainer)
+		Expect(err).To(BeNil())
+		return localContainer.FullRef()
+	}
+	return remoteContainer.FullRef()
+}
+
 func NewTestPod(podName string, nodeHostname string) *corev1.Pod {
 	privileged := true
 
@@ -111,11 +133,28 @@ func NewTestPod(podName string, nodeHostname string) *corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:            "appcntr1",
-					Image:           "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest",
+					Image:           TrafficFlowTestsImage(),
 					ImagePullPolicy: corev1.PullAlways,
 					SecurityContext: &corev1.SecurityContext{
 						Privileged: &privileged,
 					},
+				},
+			},
+		},
+	}
+}
+
+func NewTestSfc(sfcName string, nfName string) *configv1.ServiceFunctionChain {
+	return &configv1.ServiceFunctionChain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sfcName,
+			Namespace: vars.Namespace,
+		},
+		Spec: configv1.ServiceFunctionChainSpec{
+			NetworkFunctions: []configv1.NetworkFunction{
+				{
+					Name:  nfName,
+					Image: TrafficFlowTestsImage(),
 				},
 			},
 		},
@@ -132,12 +171,16 @@ func PodIsRunning(c client.Client, podName string, podNamespace string) bool {
 
 func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) *corev1.Pod {
 	var pod *corev1.Pod
+	startTime := time.Now()
 
 	// Wait for pod to be created
 	Eventually(func() bool {
 		pod = GetPod(c, podName, podNamespace)
 		return pod != nil
 	}, timeout, interval).Should(BeTrue(), "Pod '%s' should be created", podName)
+
+	createdTime := time.Now()
+	fmt.Printf("Pod '%s' created after %v\n", podName, createdTime.Sub(startTime))
 
 	// Wait for pod to be running
 	Eventually(func() corev1.PodPhase {
@@ -147,6 +190,9 @@ func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string
 		}
 		return corev1.PodUnknown
 	}, timeout, interval).Should(Equal(corev1.PodRunning), "Pod '%s' should be running", podName)
+
+	runningTime := time.Now()
+	fmt.Printf("Pod '%s' running after %v (startup took %v)\n", podName, runningTime.Sub(startTime), runningTime.Sub(createdTime))
 
 	return pod
 }
