@@ -189,7 +189,9 @@ func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string
 			return pod.Status.Phase
 		}
 		return corev1.PodUnknown
-	}, timeout, interval).Should(Equal(corev1.PodRunning), "Pod '%s' should be running", podName)
+	}, timeout, interval).Should(Equal(corev1.PodRunning), func() string {
+		return LogPodDiagnostics(c, podName, podNamespace)
+	}())
 
 	runningTime := time.Now()
 	fmt.Printf("Pod '%s' running after %v (startup took %v)\n", podName, runningTime.Sub(startTime), runningTime.Sub(createdTime))
@@ -257,6 +259,86 @@ func GetGatewayFromSubnet(subnet string) string {
 
 	gatewayIP := fmt.Sprintf("%s.1", strings.Join(strings.Split(ip.String(), ".")[:3], "."))
 	return gatewayIP
+}
+
+func GetPodEvents(c client.Client, podName string, podNamespace string) string {
+	pod := GetPod(c, podName, podNamespace)
+	if pod == nil {
+		return "Pod not found, cannot retrieve events"
+	}
+
+	eventList := &corev1.EventList{}
+	err := c.List(context.TODO(), eventList,
+		client.InNamespace(podNamespace),
+		client.MatchingFields{"involvedObject.name": podName})
+
+	eventMsg := fmt.Sprintf("Recent events for pod %s (UID: %s):\n", podName, pod.UID)
+
+	if err != nil {
+		eventMsg += fmt.Sprintf("  - Error fetching events: %v\n", err)
+	} else if len(eventList.Items) == 0 {
+		eventMsg += "  - No events found\n"
+	} else {
+		events := eventList.Items
+		start := len(events) - 5
+		if start < 0 {
+			start = 0
+		}
+
+		for i := start; i < len(events); i++ {
+			event := events[i]
+			eventMsg += fmt.Sprintf("  - %s: %s (%s)\n",
+				event.LastTimestamp.Format("15:04:05"),
+				event.Message, event.Reason)
+		}
+	}
+
+	if pod.Spec.NodeName != "" {
+		eventMsg += fmt.Sprintf("  - Scheduled to node: %s\n", pod.Spec.NodeName)
+	} else {
+		eventMsg += "  - Pod not yet scheduled to any node\n"
+	}
+
+	return eventMsg
+}
+
+func LogPodDiagnostics(c client.Client, podName string, podNamespace string) string {
+	pod := GetPod(c, podName, podNamespace)
+	if pod == nil {
+		return fmt.Sprintf("Pod '%s' not found, cannot retrieve diagnostics", podName)
+	}
+
+	msg := fmt.Sprintf("Pod '%s' diagnostics (Phase: %s):\n", podName, pod.Status.Phase)
+
+	if len(pod.Status.Conditions) > 0 {
+		msg += "Pod conditions:\n"
+		for _, condition := range pod.Status.Conditions {
+			msg += fmt.Sprintf("  - %s: %s (reason: %s, message: %s)\n",
+				condition.Type, condition.Status, condition.Reason, condition.Message)
+		}
+	}
+
+	if len(pod.Status.ContainerStatuses) > 0 {
+		msg += "Container statuses:\n"
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			msg += fmt.Sprintf("  - Container '%s': Ready=%t, RestartCount=%d\n",
+				containerStatus.Name, containerStatus.Ready, containerStatus.RestartCount)
+
+			if containerStatus.State.Waiting != nil {
+				msg += fmt.Sprintf("    Waiting: %s - %s\n",
+					containerStatus.State.Waiting.Reason, containerStatus.State.Waiting.Message)
+			}
+			if containerStatus.State.Terminated != nil {
+				msg += fmt.Sprintf("    Terminated: %s - %s (exit code: %d)\n",
+					containerStatus.State.Terminated.Reason, containerStatus.State.Terminated.Message,
+					containerStatus.State.Terminated.ExitCode)
+			}
+		}
+	}
+
+	msg += GetPodEvents(c, podName, podNamespace)
+
+	return msg
 }
 
 func AreIPsInSameSubnet(ip1, ip2, subnet string) bool {
