@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"time"
 
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,8 +23,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	configv1 "github.com/openshift/dpu-operator/api/v1"
 )
 
 type Cluster interface {
@@ -93,6 +93,28 @@ func GetDPUNodes(c client.Client) ([]corev1.Node, error) {
 	return nodeList.Items, nil
 }
 
+// TrafficFlowTestsImage returns the appropriate image reference based on USE_LOCAL_REGISTRY
+func TrafficFlowTestsImage() string {
+	localContainer := ContainerImage{
+		Registry: os.Getenv("REGISTRY"),
+		Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+		Tag:      "latest",
+	}
+
+	remoteContainer := ContainerImage{
+		Registry: "ghcr.io",
+		Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+		Tag:      "latest",
+	}
+
+	if val, found := os.LookupEnv("USE_LOCAL_REGISTRY"); !found || val == "true" {
+		err := EnsurePullAndPush(context.TODO(), remoteContainer, localContainer)
+		Expect(err).To(BeNil())
+		return localContainer.FullRef()
+	}
+	return remoteContainer.FullRef()
+}
+
 func NewTestPod(podName string, nodeHostname string) *corev1.Pod {
 	privileged := true
 
@@ -111,11 +133,28 @@ func NewTestPod(podName string, nodeHostname string) *corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:            "appcntr1",
-					Image:           "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest",
+					Image:           TrafficFlowTestsImage(),
 					ImagePullPolicy: corev1.PullAlways,
 					SecurityContext: &corev1.SecurityContext{
 						Privileged: &privileged,
 					},
+				},
+			},
+		},
+	}
+}
+
+func NewTestSfc(sfcName string, nfName string) *configv1.ServiceFunctionChain {
+	return &configv1.ServiceFunctionChain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sfcName,
+			Namespace: vars.Namespace,
+		},
+		Spec: configv1.ServiceFunctionChainSpec{
+			NetworkFunctions: []configv1.NetworkFunction{
+				{
+					Name:  nfName,
+					Image: TrafficFlowTestsImage(),
 				},
 			},
 		},
@@ -132,12 +171,16 @@ func PodIsRunning(c client.Client, podName string, podNamespace string) bool {
 
 func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) *corev1.Pod {
 	var pod *corev1.Pod
+	startTime := time.Now()
 
 	// Wait for pod to be created
 	Eventually(func() bool {
 		pod = GetPod(c, podName, podNamespace)
 		return pod != nil
 	}, timeout, interval).Should(BeTrue(), "Pod '%s' should be created", podName)
+
+	createdTime := time.Now()
+	fmt.Printf("Pod '%s' created after %v\n", podName, createdTime.Sub(startTime))
 
 	// Wait for pod to be running
 	Eventually(func() corev1.PodPhase {
@@ -146,7 +189,12 @@ func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string
 			return pod.Status.Phase
 		}
 		return corev1.PodUnknown
-	}, timeout, interval).Should(Equal(corev1.PodRunning), "Pod '%s' should be running", podName)
+	}, timeout, interval).Should(Equal(corev1.PodRunning), func() string {
+		return LogPodDiagnostics(c, podName, podNamespace)
+	}())
+
+	runningTime := time.Now()
+	fmt.Printf("Pod '%s' running after %v (startup took %v)\n", podName, runningTime.Sub(startTime), runningTime.Sub(createdTime))
 
 	return pod
 }
@@ -211,6 +259,86 @@ func GetGatewayFromSubnet(subnet string) string {
 
 	gatewayIP := fmt.Sprintf("%s.1", strings.Join(strings.Split(ip.String(), ".")[:3], "."))
 	return gatewayIP
+}
+
+func GetPodEvents(c client.Client, podName string, podNamespace string) string {
+	pod := GetPod(c, podName, podNamespace)
+	if pod == nil {
+		return "Pod not found, cannot retrieve events"
+	}
+
+	eventList := &corev1.EventList{}
+	err := c.List(context.TODO(), eventList,
+		client.InNamespace(podNamespace),
+		client.MatchingFields{"involvedObject.name": podName})
+
+	eventMsg := fmt.Sprintf("Recent events for pod %s (UID: %s):\n", podName, pod.UID)
+
+	if err != nil {
+		eventMsg += fmt.Sprintf("  - Error fetching events: %v\n", err)
+	} else if len(eventList.Items) == 0 {
+		eventMsg += "  - No events found\n"
+	} else {
+		events := eventList.Items
+		start := len(events) - 5
+		if start < 0 {
+			start = 0
+		}
+
+		for i := start; i < len(events); i++ {
+			event := events[i]
+			eventMsg += fmt.Sprintf("  - %s: %s (%s)\n",
+				event.LastTimestamp.Format("15:04:05"),
+				event.Message, event.Reason)
+		}
+	}
+
+	if pod.Spec.NodeName != "" {
+		eventMsg += fmt.Sprintf("  - Scheduled to node: %s\n", pod.Spec.NodeName)
+	} else {
+		eventMsg += "  - Pod not yet scheduled to any node\n"
+	}
+
+	return eventMsg
+}
+
+func LogPodDiagnostics(c client.Client, podName string, podNamespace string) string {
+	pod := GetPod(c, podName, podNamespace)
+	if pod == nil {
+		return fmt.Sprintf("Pod '%s' not found, cannot retrieve diagnostics", podName)
+	}
+
+	msg := fmt.Sprintf("Pod '%s' diagnostics (Phase: %s):\n", podName, pod.Status.Phase)
+
+	if len(pod.Status.Conditions) > 0 {
+		msg += "Pod conditions:\n"
+		for _, condition := range pod.Status.Conditions {
+			msg += fmt.Sprintf("  - %s: %s (reason: %s, message: %s)\n",
+				condition.Type, condition.Status, condition.Reason, condition.Message)
+		}
+	}
+
+	if len(pod.Status.ContainerStatuses) > 0 {
+		msg += "Container statuses:\n"
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			msg += fmt.Sprintf("  - Container '%s': Ready=%t, RestartCount=%d\n",
+				containerStatus.Name, containerStatus.Ready, containerStatus.RestartCount)
+
+			if containerStatus.State.Waiting != nil {
+				msg += fmt.Sprintf("    Waiting: %s - %s\n",
+					containerStatus.State.Waiting.Reason, containerStatus.State.Waiting.Message)
+			}
+			if containerStatus.State.Terminated != nil {
+				msg += fmt.Sprintf("    Terminated: %s - %s (exit code: %d)\n",
+					containerStatus.State.Terminated.Reason, containerStatus.State.Terminated.Message,
+					containerStatus.State.Terminated.ExitCode)
+			}
+		}
+	}
+
+	msg += GetPodEvents(c, podName, podNamespace)
+
+	return msg
 }
 
 func AreIPsInSameSubnet(ip1, ip2, subnet string) bool {

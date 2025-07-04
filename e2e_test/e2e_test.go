@@ -315,24 +315,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 		)
 
 		g.BeforeAll(func() {
-			localContainer := testutils.ContainerImage{
-				Registry: os.Getenv("REGISTRY"),
-				Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
-				Tag:      "latest",
-			}
-
-			remoteContainer := testutils.ContainerImage{
-				Registry: "ghcr.io",
-				Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
-				Tag:      "latest",
-			}
-			if val, found := os.LookupEnv("USE_LOCAL_REGISTRY"); !found || val == "true" {
-				err := testutils.EnsurePullAndPush(context.TODO(), remoteContainer, localContainer)
-				Expect(err).NotTo(HaveOccurred())
-				imageRef = localContainer.FullRef()
-			} else {
-				imageRef = remoteContainer.FullRef()
-			}
+			imageRef = testutils.TrafficFlowTestsImage()
 
 			sfc = &configv1.ServiceFunctionChain{
 				ObjectMeta: metav1.ObjectMeta{
