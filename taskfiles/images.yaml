@@ -70,7 +70,7 @@ tasks:
 
   clean-image:
     internal: true
-    desc: Clean up image
+    desc: Clean up image {{.NAME}}
     vars:
       NAME: '{{.NAME}}'
     cmds:
