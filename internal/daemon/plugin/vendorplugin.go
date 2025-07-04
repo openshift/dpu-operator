@@ -25,14 +25,18 @@ import (
 //go:embed bindata/*
 var binData embed.FS
 
+type DpuIdentifier string
+
 const VspImageIntel string = "IntelVspImage"
 const VspImageMarvell string = "MarvellVspImage"
+const VspImageIntelNetSec string = "IntelNetSecVspImage"
 
 const VspImageP4Intel string = "IntelVspP4Image"
 
 var VspImages = []string{
 	VspImageIntel,
 	VspImageMarvell,
+	VspImageIntelNetSec,
 	// TODO: Add future supported vendor plugins here
 }
 
@@ -78,16 +82,17 @@ type VendorPlugin interface {
 }
 
 type GrpcPlugin struct {
-	log         logr.Logger
-	client      pb.LifeCycleServiceClient
-	k8sClient   client.Client
-	opiClient   opi.BridgePortServiceClient
-	nfclient    pb.NetworkFunctionServiceClient
-	dsClient    pb.DeviceServiceClient
-	dpuMode     bool
-	vsp         VspTemplateVars
-	conn        *grpc.ClientConn
-	pathManager utils.PathManager
+	log           logr.Logger
+	client        pb.LifeCycleServiceClient
+	k8sClient     client.Client
+	opiClient     opi.BridgePortServiceClient
+	nfclient      pb.NetworkFunctionServiceClient
+	dsClient      pb.DeviceServiceClient
+	dpuMode       bool
+	dpuIdentifier DpuIdentifier
+	vsp           VspTemplateVars
+	conn          *grpc.ClientConn
+	pathManager   utils.PathManager
 }
 
 func NewVspTemplateVars() VspTemplateVars {
@@ -127,22 +132,23 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 		err := g.ensureConnected()
 		if err != nil {
 			if time.Since(start) >= timeout {
-				return "", 0, fmt.Errorf("Failed to ensure GRPC connection after %v: %v", timeout, err)
+				return "", 0, fmt.Errorf("failed to ensure GRPC connection after %v: %v", timeout, err)
 			}
 			time.Sleep(interval)
 			continue
 		}
 
-		ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode})
+		ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode, DpuIdentifier: string(g.dpuIdentifier)})
 		if err != nil {
 			if time.Since(start) >= timeout {
-				return "", 0, fmt.Errorf("Failed to start serving after %v: %v", timeout, err)
+				return "", 0, fmt.Errorf("failed to start serving after %v: %v", timeout, err)
 			}
 			time.Sleep(interval)
 			continue
 		}
 
-		g.log.Info("Init succeeded", "duration", time.Since(start))
+		g.log.Info("GrpcPlugin Start() succeeded", "duration", time.Since(start), "ip", ipPort.Ip, "port", ipPort.Port, "dpuMode",
+			g.dpuMode, "dpuIdentifier", g.dpuIdentifier)
 		return ipPort.Ip, ipPort.Port, nil
 	}
 }
@@ -196,13 +202,14 @@ func (gp *GrpcPlugin) deployVsp() error {
 	return nil
 }
 
-func NewGrpcPlugin(dpuMode bool, client client.Client, opts ...func(*GrpcPlugin)) (*GrpcPlugin, error) {
+func NewGrpcPlugin(dpuMode bool, dpuIdentifier DpuIdentifier, client client.Client, opts ...func(*GrpcPlugin)) (*GrpcPlugin, error) {
 	gp := &GrpcPlugin{
-		dpuMode:     dpuMode,
-		vsp:         VspTemplateVars{},
-		k8sClient:   client,
-		log:         ctrl.Log.WithName("GrpcPlugin"),
-		pathManager: *utils.NewPathManager("/"),
+		dpuMode:       dpuMode,
+		dpuIdentifier: dpuIdentifier,
+		vsp:           VspTemplateVars{},
+		k8sClient:     client,
+		log:           ctrl.Log.WithName("GrpcPlugin"),
+		pathManager:   *utils.NewPathManager("/"),
 	}
 
 	for _, opt := range opts {

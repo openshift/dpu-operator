@@ -28,9 +28,7 @@ func (d *MarvellDetector) Name() string {
 	return d.name
 }
 
-// IsDPU checks if the PCI device Attached to the host is a Marvell DPU
-// It returns true if device has Marvell DPU
-func (pi *MarvellDetector) IsDPU(pci ghw.PCIDevice) (bool, error) {
+func (pi *MarvellDetector) IsDPU(platform Platform, pci ghw.PCIDevice, dpuDevices []plugin.DpuIdentifier) (bool, error) {
 	if pci.Vendor.ID == MrvlVendorID &&
 		pci.Product.ID == MrvlHostDeviceID {
 		return true, nil
@@ -56,11 +54,16 @@ func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
 	return false, nil
 }
 
-func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager) (*plugin.GrpcPlugin, error) {
+func (pi *MarvellDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
+	// TODO: Implement a way to get the DPU identifier.
+	return "", nil
+}
+
+func (pi *MarvellDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
 	template_vars := plugin.NewVspTemplateVars()
 	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageMarvell]
 	template_vars.Command = `[ "/vsp-mrvl" ]`
-	return plugin.NewGrpcPlugin(dpuMode, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
+	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }
 
 // GetVendorName returns the name of the vendor

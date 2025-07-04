@@ -26,6 +26,12 @@ tasks:
     cmds:
       - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-mrvl.{{.GOARCH}} internal/daemon/vendor-specific-plugins/marvell/main.go
 
+  build-bin-intel-netsec-vsp:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-intel-netsec.{{.GOARCH}} internal/daemon/vendor-specific-plugins/intel-netsec/main.go
+
   build-bin-network-resources-injector:
     vars:
       GOARCH: '{{.GOARCH}}'

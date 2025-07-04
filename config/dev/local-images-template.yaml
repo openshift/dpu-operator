@@ -26,6 +26,8 @@ spec:
           value: {{ .RegistryURL }}/intel-vsp-p4:dev
         - name: MarvellVspImage
           value: {{ .RegistryURL }}/mrvl-vsp:dev
+        - name: IntelNetSecVspImage
+          value: {{ .RegistryURL }}/intel-netsec-vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
         - name: NETWORK_RESOURCES_INJECTOR_IMAGE
