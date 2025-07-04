@@ -237,6 +237,35 @@ tasks:
         vars:
           NAME: mrvl-cpagent
 
+  build-image-intel-netsec-vsp:
+    deps:
+      - task: build-bin-intel-netsec-vsp
+        vars:
+          GOARCH: arm64
+      - task: build-bin-intel-netsec-vsp
+        vars:
+          GOARCH: amd64
+      - task: clean-image-layer
+        vars:
+          NAME: intel-netsec-vsp
+    cmds:
+      - task: build-image
+        vars:
+          NAME: intel-netsec-vsp
+          DOCKERFILE: Dockerfile.IntelNetSecVSP.rhel
+          PLATFORM: amd64
+      - task: build-image
+        vars:
+          NAME: intel-netsec-vsp
+          DOCKERFILE: Dockerfile.IntelNetSecVSP.rhel
+          PLATFORM: arm64
+
+  clean-image-intel-netsec-vsp:
+    cmds:
+      - task: clean-image
+        vars:
+          NAME: intel-netsec-vsp
+
   build-image-intel-vsp:
     deps:
       - task: build-bin-intel-vsp
@@ -322,6 +351,7 @@ tasks:
       - task: clean-image-intel-vsp-p4
       - task: clean-image-marvell-vsp
       - task: clean-image-marvell-cpagent
+      - task: clean-image-intel-netsec-vsp
       - task: clean-image-network-resources-injector
 
   build-image-all:
@@ -332,6 +362,7 @@ tasks:
       - build-bin-daemon
       - build-bin-intel-vsp
       - build-bin-marvell-vsp
+      - build-bin-intel-netsec-vsp
       - build-bin-network-resources-injector
     cmds: # can't run in parallel since multiple concurrent pulls are not supported 
       - task: build-image-manager
@@ -339,12 +370,12 @@ tasks:
       - task: build-image-intel-vsp
       - task: build-image-intel-vsp-p4
       - task: build-image-marvell-vsp
+      - task: build-image-intel-netsec-vsp
       - task: build-image-marvell-cpagent
       - task: build-image-network-resources-injector
       - task: push-image-all
 
   push-image-all:
-    internal: true
     deps:
       - task: push-image-helper
         vars:
@@ -370,6 +401,10 @@ tasks:
         vars:
           SOURCE: 'localhost/intel-vsp-p4:dev'
           IMAGE: '{{.REGISTRY}}/intel-vsp-p4:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/intel-netsec-vsp:dev'
+          IMAGE: '{{.REGISTRY}}/intel-netsec-vsp:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/network-resources-injector:dev'
