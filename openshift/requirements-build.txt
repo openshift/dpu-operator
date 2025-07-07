@@ -8,6 +8,7 @@ wheel==0.45.1
     # via -r ./requirements-pre-build.in
 flit-core==3.10.1
     # via -r ./requirements-build.in
+cython==3.0.0
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==75.6.0
