@@ -8,6 +8,7 @@ PIP_OPTS="--no-cache-dir"
 if [ -d ${REMOTE_SOURCES_DIR}/cachito-gomod-with-deps ]; then
     source ${REMOTE_SOURCES_DIR}/cachito-gomod-with-deps/cachito.env
     cd ${REMOTE_SOURCES_DIR}/cachito-gomod-with-deps/app/openshift
+    export GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=16
 else
     cd  ${REMOTE_SOURCES_DIR}
 fi
