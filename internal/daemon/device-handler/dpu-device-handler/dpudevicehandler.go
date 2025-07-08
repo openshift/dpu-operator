@@ -101,14 +101,19 @@ func (d *dpuDeviceHandler) SetupDevices() error {
 
 	numVfs, err := d.vsp.SetNumVfs(8)
 	if err != nil {
-		return fmt.Errorf("Failed to set sriov numVfs: %v", err)
+		// Currently NF devices do not require any setup outside the VSP
+		// ignore the error if we are in DPU mode.
+		if d.dpuMode {
+			d.log.Info("Failed to set sriov numVFs, but ignoring error in DPU mode", "error", err)
+		} else {
+			return fmt.Errorf("failed to set sriov numVfs: %v", err)
+		}
+	} else {
+		if numVfs.VfCnt == 0 {
+			return fmt.Errorf("SetNumVfs ran, but numVfs == %d", numVfs.VfCnt)
+		}
+		d.log.Info("Num VFs set by VSP", "vf_count", numVfs.VfCnt)
 	}
-
-	if numVfs.VfCnt == 0 {
-		return fmt.Errorf("SetNumVfs ran, but numVfs == 0")
-	}
-
-	d.log.Info("Num VFs set by VSP", "vf_count", numVfs.VfCnt)
 
 	return nil
 }

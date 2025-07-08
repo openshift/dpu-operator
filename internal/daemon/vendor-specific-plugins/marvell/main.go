@@ -6,20 +6,20 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	vspnetutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/common"
 	debugdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/debug-dp"
 	mrvlutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/mrvl-utils"
 	ovsdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/ovs-dp"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
@@ -87,6 +87,7 @@ type mrvlVspServer struct {
 	grpcServer    *grpc.Server
 	wg            sync.WaitGroup
 	done          chan error
+	fs            afero.Fs
 	startedWg     sync.WaitGroup
 	pathManager   utils.PathManager
 	version       string
@@ -672,7 +673,7 @@ func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
 		return pb.IpPort{}, err
 	}
 	klog.Infof("Interface Name: %s", ifName)
-	err = enableIPV6LinkLocal(ifName, addr)
+	err = vspnetutils.EnableIPV6LinkLocal(vsp.fs, ifName, addr)
 	addr = IPv6AddrDpu
 	if err != nil {
 		klog.Errorf("Error occurred in enabling IPv6 Link local Address: %v", err)
@@ -690,57 +691,6 @@ func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
 		Port: DefaultPort,
 	}, nil
 
-}
-
-func linkHasAddrgenmodeEui64(interfaceName string) bool {
-	out, err := exec.Command("ip", "-d", "link", "show", "dev", interfaceName).Output()
-	return err == nil && strings.Contains(string(out), "addrgenmode eui64")
-}
-
-// enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
-// It will return the error
-func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
-	// Tell NetworkManager to not manage our interface.
-	err1 := exec.Command("nsenter", "-t", "1", "-m", "-u", "-n", "-i", "--", "nmcli", "device", "set", interfaceName, "managed", "no").Run()
-	if err1 != nil {
-		// This error may be fine. Maybe our host doesn't even run
-		// NetworkManager. Ignore.
-		klog.Infof("nmcli device set %s managed no failed with error %v", interfaceName, err1)
-	}
-
-	optimistic_dad_file := "/proc/sys/net/ipv6/conf/" + interfaceName + "/optimistic_dad"
-	err1 = os.WriteFile(optimistic_dad_file, []byte("1"), os.ModeAppend)
-	if err1 != nil {
-		klog.Errorf("Error setting %s: %v", optimistic_dad_file, err1)
-	}
-
-	if linkHasAddrgenmodeEui64(interfaceName) {
-		// Kernel may require that the SDP interfaces are up at all times (RHEL-90248).
-		// If the addrgenmode is already eui64, assume we are fine and don't need to reset
-		// it (and don't need to toggle the link state).
-	} else {
-		// Ensure to set addrgenmode and toggle link state (which can result in creating
-		// the IPv6 link local address).
-		err2 := exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
-		if err2 != nil {
-			return fmt.Errorf("Error setting link %s addrgenmode: %v", interfaceName, err2)
-		}
-		err2 = exec.Command("ip", "link", "set", interfaceName, "down").Run()
-		if err2 != nil {
-			return fmt.Errorf("Error setting link %s down after setting addrgenmode: %v", interfaceName, err2)
-		}
-	}
-
-	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
-	if err != nil {
-		return fmt.Errorf("Error setting link %s up: %v", interfaceName, err)
-	}
-
-	err = exec.Command("ip", "addr", "replace", ipv6Addr+"/64", "dev", interfaceName, "optimistic").Run()
-	if err != nil {
-		return fmt.Errorf("Error configuring IPv6 address %s/64 on link %s: %v", ipv6Addr, interfaceName, err)
-	}
-	return nil
 }
 
 // Listen function to listen on the UNIX domain socket
@@ -823,6 +773,7 @@ func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
 		pathManager:  *utils.NewPathManager("/"),
 		deviceStore:  make(map[string]mrvlDeviceInfo),
 		done:         make(chan error),
+		fs:           afero.NewOsFs(),
 		mrvlDP:       ovsdp.NewOvsDP(),
 		networkStore: make(map[string]mrvlNfPortMap),
 		isNF:         isNf,
