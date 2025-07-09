@@ -30,7 +30,7 @@ type SfcReconciler struct {
 }
 
 func networkFunctionPod(name string, image string) *corev1.Pod {
-	falseVar := false
+	trueVar := true
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -59,7 +59,7 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: &falseVar,
+						Privileged: &trueVar,
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 							Add:  []corev1.Capability{"NET_RAW", "NET_ADMIN"},
