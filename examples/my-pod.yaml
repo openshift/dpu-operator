@@ -14,7 +14,7 @@ spec:
     command: ['/bin/sh', '-c', 'sleep infinity']
     imagePullPolicy: Always
     securityContext:
-      priviledged: true
+      privileged: true
       runAsNonRoot: false
       runAsUser: 0
       seccompProfile:
