@@ -20,6 +20,8 @@ import (
 var ()
 
 type SideManager interface {
+	StartVsp() error
+	SetupDevices() error
 	Listen() (net.Listener, error)
 	Serve(ctx context.Context, listen net.Listener) error
 }
@@ -108,6 +110,24 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				managerDone = append(managerDone, done)
 				go func(mgr SideManager) {
 					defer close(done)
+					err := mgr.StartVsp()
+					if err != nil {
+						d.log.Error(err, "Failed to start VSP in sideManager")
+						select {
+						case errChan <- err:
+						default:
+						}
+						return
+					}
+					err = mgr.SetupDevices()
+					if err != nil {
+						d.log.Error(err, "Failed to setup devices in sideManager")
+						select {
+						case errChan <- err:
+						default:
+						}
+						return
+					}
 					listener, err := mgr.Listen()
 					if err != nil {
 						d.log.Error(err, "Failed to listen on sideManager")
@@ -155,9 +175,17 @@ func (d *Daemon) createDaemon() (SideManager, error) {
 	}
 	if plugin != nil {
 		if dpuMode {
-			return NewDpuSideManger(plugin, d.config, WithPathManager(*d.pm)), nil
+			dsm, err := NewDpuSideManager(plugin, d.config, WithPathManager(*d.pm))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create DpuSideManager: %v", err)
+			}
+			return dsm, nil
 		} else {
-			return NewHostSideManager(plugin, WithPathManager2(d.pm)), nil
+			hsm, err := NewHostSideManager(plugin, WithPathManager2(d.pm))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create HostSideManager: %v", err)
+			}
+			return hsm, nil
 		}
 	}
 	return nil, nil

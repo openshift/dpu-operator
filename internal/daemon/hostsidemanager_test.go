@@ -213,7 +213,12 @@ var _ = g.Describe("Host Daemon", func() {
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
+		hostDaemon, err = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
+		Expect(err).NotTo(HaveOccurred())
+		err = hostDaemon.StartVsp()
+		Expect(err).NotTo(HaveOccurred())
+		err = hostDaemon.SetupDevices()
+		Expect(err).NotTo(HaveOccurred())
 
 		ctx, cancel = context.WithCancel(context.Background())
 		fakeDpuDaemonDone = make(chan error, 1)

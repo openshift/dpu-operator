@@ -38,6 +38,7 @@ type dpServer struct {
 }
 
 type DevicePlugin interface {
+	SetupDevices() error
 	ListenAndServe() error
 	Serve(lis net.Listener) error
 	Listen() (net.Listener, error)
@@ -198,6 +199,14 @@ func (dp *dpServer) Serve(lis net.Listener) error {
 
 	if err != nil {
 		return fmt.Errorf("serving Device Plugin incoming requests failed: %v", err)
+	}
+	return nil
+}
+
+func (dp *dpServer) SetupDevices() error {
+	dp.log.Info("Device Plugin server is setting up devices...")
+	if err := dp.deviceHandler.SetupDevices(); err != nil {
+		return fmt.Errorf("failed to setup devices: %v", err)
 	}
 	return nil
 }

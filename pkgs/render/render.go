@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -77,6 +78,18 @@ func applyFromBinData(logger logr.Logger, filePath string, data map[string]strin
 	}
 	logger.Info("Preparing CR", "kind", obj.GetKind())
 	if err := apply.ApplyObject(context.TODO(), client, obj); err != nil {
+		// When resources (for example the VSP) is deployed multiple times in the case of 1 cluster,
+		// we want to ignore already exists errors. Also handle conflict errors when resources are
+		// created concurrently by multiple daemons (e.g. errors which occur when the resource has been modified since last read)
+		if apierrors.IsAlreadyExists(err) {
+			logger.Info("Resource already exists, skipping creation", "kind", obj.GetKind(), "name", obj.GetName())
+			return nil
+		}
+
+		if apierrors.IsConflict(err) {
+			logger.Info("Resource conflict detected, skipping update", "kind", obj.GetKind(), "name", obj.GetName())
+			return nil
+		}
 		return fmt.Errorf("failed to apply object %v with err: %v", obj, err)
 	}
 	return nil
