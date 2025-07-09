@@ -38,7 +38,7 @@ tasks:
   bindir:
     silent: true
     cmds:
-      - echo "{{.BINDIR}}"
+      - echo "{{.BINDIR_ABS}}"
 
   push-image-helper:
     internal: true
