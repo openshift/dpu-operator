@@ -24,6 +24,8 @@ const (
 	SysBusPci       string = "/sys/bus/pci/devices"
 )
 
+var ErrNoSuchDevice = errors.New("no such device")
+
 // GetAllVfsByDeviceID returns the list of all VFs associated with the given device ID
 func GetAllVfsByDeviceID(deviceID string) ([]string, error) {
 	pci, err := ghw.PCI()
@@ -37,7 +39,7 @@ func GetAllVfsByDeviceID(deviceID string) ([]string, error) {
 		}
 	}
 	if len(targetAddresses) == 0 {
-		return nil, errors.New("no devices found with given Vendor ID and Device ID")
+		return nil, fmt.Errorf("No devices for PCI ID [%s:%s] found: %w", MrvlVendorID, deviceID, ErrNoSuchDevice)
 	}
 	return targetAddresses, nil
 }
