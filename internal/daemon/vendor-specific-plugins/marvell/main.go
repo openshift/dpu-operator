@@ -235,49 +235,71 @@ func (vsp *mrvlVspServer) GetDeviceHealth(secInterfaceName string) string {
 	}
 }
 
-// Init function to initialize the Marvell VSP Server with the given context and InitRequest
-// It will return the IpPort and error
-func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
-	klog.Infof("Received Init() request: DpuMode: %v", in.DpuMode)
-	vsp.isDPUMode = in.DpuMode
-	ipPort, err := vsp.configureIP(in.DpuMode)
-	if vsp.deviceStore == nil {
-		vsp.deviceStore = make(map[string]mrvlDeviceInfo)
+func (vsp *mrvlVspServer) reloadVFs() error {
+
+	vfsPci, err := mrvlutils.GetAllVfsByDeviceID(HostVFDeviceID)
+	if err != nil && !errors.Is(err, mrvlutils.ErrNoSuchDevice) {
+		return err
+	}
+
+	vsp.deviceStore = make(map[string]mrvlDeviceInfo)
+	for _, vfpci := range vfsPci {
+		health := vsp.GetDeviceHealth(vfpci)
+		vsp.deviceStore[vfpci] = mrvlDeviceInfo{
+			pciAddress: vfpci,
+			health:     health,
+			portType:   "sriov",
+		}
+	}
+	return nil
+}
+
+func (vsp *mrvlVspServer) doInit(dpuMode bool) (*pb.IpPort, error) {
+	vsp.isDPUMode = dpuMode
+	vsp.deviceStore = make(map[string]mrvlDeviceInfo)
+	ipPort, err := vsp.configureIP(dpuMode)
+	if err != nil {
+		return nil, err
 	}
 	if vsp.isDPUMode {
 		err := vsp.ConfigureNetworkInterface()
 		if err != nil {
 			klog.Errorf("Error occurred in configuring Network Interface: %v", err)
 			vsp.Stop()
-			return &pb.IpPort{}, err
+			return nil, err
 		}
 		// Initialize Marvell Data Path
 		vsp.bridgeName = "br-mrv0" // TODO: example name discuss on it
 		if err := vsp.mrvlDP.InitDataPlane(vsp.bridgeName); err != nil {
 			klog.Errorf("Error occurred in initializing Data Path: %v", err)
 			vsp.Stop()
-			return &pb.IpPort{}, err
+			return nil, err
 		}
 
 	} else {
-		vsp.portType = "sriov"
-		VfsPCI, err := mrvlutils.GetAllVfsByDeviceID(HostVFDeviceID)
+		_, err := mrvlutils.GetAllVfsByDeviceID(HostDeviceID)
 		if err != nil {
 			return nil, err
 		}
-		for _, vfpci := range VfsPCI {
-			health := vsp.GetDeviceHealth(vfpci)
-			vsp.deviceStore[vfpci] = mrvlDeviceInfo{
-				pciAddress: vfpci,
-				health:     health,
-				portType:   "sriov",
-			}
+		err = vsp.reloadVFs()
+		if err != nil {
+			return nil, err
 		}
+		vsp.portType = "sriov"
 	}
 	return &pb.IpPort{
 		Ip:   ipPort.Ip,
 		Port: ipPort.Port,
-	}, err
+	}, nil
+}
+
+// Init function to initialize the Marvell VSP Server with the given context and InitRequest
+// It will return the IpPort and error
+func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
+	klog.Infof("Received Init() request: DpuMode: %v", in.DpuMode)
+	result, err := vsp.doInit(in.DpuMode)
+	klog.Infof("Received Init() request done: DpuMode: %v, IpPort: %v, err: %v", in.DpuMode, result, err)
+	return result, err
 }
 
 // getVFName function to get the VF Name of the given BridgePortName on DPU
@@ -649,12 +671,21 @@ func (vsp *mrvlVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) (*pb.Vf
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("echo %d > /sys/bus/pci/devices/%s/sriov_numvfs", vfcnt, pciAddress))
 	_, err = cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set sriov_numvfs to %v: %v", vfcnt, err)
 	}
-	out := &pb.VfCount{
+
+	err = vsp.reloadVFs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load VFs after creating them: %v", err)
+	}
+
+	if len(vsp.deviceStore) != int(vfcnt) {
+		return nil, fmt.Errorf("failed to load expected number %v of VFs but got %v", vfcnt, vsp.deviceStore)
+	}
+
+	return &pb.VfCount{
 		VfCnt: vfcnt,
-	}
-	return out, nil
+	}, nil
 }
 
 func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
