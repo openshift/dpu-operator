@@ -171,27 +171,50 @@ func PodIsRunning(c client.Client, podName string, podNamespace string) bool {
 
 func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) *corev1.Pod {
 	var pod *corev1.Pod
+
+	onFailure := func() {
+		fmt.Println(LogPodDiagnostics(c, podName, podNamespace))
+	}
+
 	startTime := time.Now()
 
-	// Wait for pod to be created
-	Eventually(func() bool {
-		pod = GetPod(c, podName, podNamespace)
-		return pod != nil
-	}, timeout, interval).Should(BeTrue(), "Pod '%s' should be created", podName)
+	AssertEventually(
+		func() error {
+			pod = GetPod(c, podName, podNamespace)
+			if pod == nil {
+				return fmt.Errorf("Pod %s in %s does not exist", podName, podNamespace)
+			}
+			return nil
+		},
+		timeout,
+		interval,
+		5*timeout,
+		fmt.Sprintf("have pod %v in %v", podName, podNamespace),
+		onFailure,
+		onFailure)
 
 	createdTime := time.Now()
+
 	fmt.Printf("Pod '%s' created after %v\n", podName, createdTime.Sub(startTime))
 
 	// Wait for pod to be running
-	Eventually(func() corev1.PodPhase {
-		pod = GetPod(c, podName, podNamespace)
-		if pod != nil {
-			return pod.Status.Phase
-		}
-		return corev1.PodUnknown
-	}, timeout, interval).Should(Equal(corev1.PodRunning), func() string {
-		return LogPodDiagnostics(c, podName, podNamespace)
-	}())
+	AssertEventually(
+		func() error {
+			pod = GetPod(c, podName, podNamespace)
+			if pod == nil {
+				return fmt.Errorf("Pod %s in %s does not exist", podName, podNamespace)
+			}
+			if pod.Status.Phase != corev1.PodRunning {
+				return fmt.Errorf("Pod %s in %s is not running but in state %s", podName, podNamespace, pod.Status.Phase)
+			}
+			return nil
+		}, timeout,
+		interval,
+		5*timeout,
+		fmt.Sprintf("have pod %v in %v running", podName, podNamespace),
+		onFailure,
+		onFailure,
+	)
 
 	runningTime := time.Now()
 	fmt.Printf("Pod '%s' running after %v (startup took %v)\n", podName, runningTime.Sub(startTime), runningTime.Sub(createdTime))
