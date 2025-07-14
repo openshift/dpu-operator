@@ -49,7 +49,7 @@ var _ webhook.CustomValidator = &DpuOperatorConfig{}
 
 func (r *DpuOperatorConfig) validateDpuOperatorConfig() (admission.Warnings, error) {
 	if r.Name != vars.DpuOperatorConfigName {
-		return nil, fmt.Errorf("DpuOperatorConfig must have standard name \"" + vars.DpuOperatorConfigName + "\"")
+		return nil, fmt.Errorf("DpuOperatorConfig must have standard name \"%s\"", vars.DpuOperatorConfigName)
 	}
 
 	mode := r.Spec.Mode
