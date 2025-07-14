@@ -1,6 +1,6 @@
 module github.com/openshift/dpu-operator
 
-go 1.23.6
+go 1.24.3
 
 require (
 	github.com/containernetworking/cni v1.2.3
