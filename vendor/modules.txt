@@ -866,10 +866,10 @@ github.com/openshift/client-go/operator/informers/externalversions/operator/v1al
 github.com/openshift/client-go/operator/listers/operator/v1
 github.com/openshift/client-go/operator/listers/operator/v1alpha1
 # github.com/openshift/dpu-operator/api v0.0.0-20250219232844-d9d4ba9f399c => ./api
-## explicit; go 1.23.6
+## explicit; go 1.24.3
 github.com/openshift/dpu-operator/api/v1
 # github.com/openshift/dpu-operator/dpu-api v0.0.0-20241023094403-a185e0f16e84 => ./dpu-api
-## explicit; go 1.23.6
+## explicit; go 1.24.3
 github.com/openshift/dpu-operator/dpu-api/gen
 # github.com/openshift/library-go v0.0.0-20231020125025-211b32f1a1f2
 ## explicit; go 1.20

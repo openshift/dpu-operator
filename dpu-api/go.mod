@@ -1,6 +1,6 @@
 module github.com/openshift/dpu-operator/dpu-api
 
-go 1.23.6
+go 1.24.3
 
 require (
 	google.golang.org/grpc v1.58.3

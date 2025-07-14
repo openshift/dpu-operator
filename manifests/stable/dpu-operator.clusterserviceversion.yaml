@@ -38,7 +38,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-03-24T23:12:31Z"
+    createdAt: "2025-07-09T11:00:12Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -52,7 +52,7 @@ metadata:
     operatorframework.io/suggested-namespace: openshift-dpu-operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: dpu-operator.v4.19.0
+  name: dpu-operator.v4.20.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -166,6 +166,7 @@ spec:
           - customresourcedefinitions
           verbs:
           - get
+          - list
         - apiGroups:
           - apps
           resources:
@@ -362,10 +363,10 @@ spec:
                 - /manager
                 env:
                 - name: DPU_DAEMON_IMAGE
-                  value: quay.io/openshift/origin-dpu-daemon:4.19
+                  value: quay.io/openshift/origin-dpu-daemon:4.20
                 - name: NETWORK_RESOURCES_INJECTOR_IMAGE
                   value: quay.io/openshift/sriov-dp-admission-controller:latest
-                image: quay.io/openshift/origin-dpu-operator:4.19
+                image: quay.io/openshift/origin-dpu-operator:4.20
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -473,7 +474,7 @@ spec:
   provider:
     name: Red Hat
     url: www.redhat.com
-  version: 4.19.0
+  version: 4.20.0
   webhookdefinitions:
   - admissionReviewVersions:
     - v1
