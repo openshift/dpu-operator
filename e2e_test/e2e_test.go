@@ -35,10 +35,11 @@ var (
 	cfg     *rest.Config
 	testEnv *envtest.Environment
 	// TODO: reduce to 2 seconds
-	timeout  = 1 * time.Minute
-	interval = 1 * time.Second
-	nfName   = "test-nf"
-	sfcName  = "sfc-test"
+	timeout                 = 1 * time.Minute
+	timeout_sfc_pod_running = 2 * time.Minute
+	interval                = 1 * time.Second
+	nfName                  = "test-nf"
+	sfcName                 = "sfc-test"
 )
 
 func pingTest(srcClientSet kubernetes.Interface, srcRestConfig *rest.Config, srcPod *corev1.Pod, destIP, srcName, destName string) {
@@ -410,7 +411,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				err = dpuSideClient.List(context.TODO(), podList, client.InNamespace(vars.Namespace))
 				Expect(err).NotTo(HaveOccurred())
 
-				nfPod = testutils.EventuallyPodIsRunning(dpuSideClient, nfName, vars.Namespace, timeout, interval)
+				nfPod = testutils.EventuallyPodIsRunning(dpuSideClient, nfName, vars.Namespace, timeout_sfc_pod_running, interval)
 
 				Expect(nfPod.Spec.Containers[0].Image).To(Equal(imageRef), "Pod should have expected image")
 
