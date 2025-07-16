@@ -41,8 +41,16 @@ validate_venv() {
         # Verify each package in requirements is installed
         while IFS= read -r requirement; do
             if [[ -n "$requirement" ]]; then
-                # Extract package name (handle various requirement formats)
-                local pkg_name=$(echo "$requirement" | sed 's/[<>=!].*//' | sed 's/\[.*\]//')
+                local pkg_name
+                # Extract package name from lines in "requirements.txt"
+                #
+                # For URLs, we take the "filename" minus the version suffix.
+                # We also strip version checks and extras ([]).
+                pkg_name="$(printf '%s' "$requirement" \
+                    | sed -e 's#^\(https://\|git+https://\).*/\([^-/@]\+\)[@-][^/]\+$#\2#' \
+                          -e 's/[<>=!].*//' \
+                          -e 's/\[.*\]//' \
+                )"
                 if ! "$venv_path/bin/pip" show "$pkg_name" >/dev/null 2>&1; then
                     echo "Required package '$pkg_name' is not installed"
                     return 1
