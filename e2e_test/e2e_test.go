@@ -39,11 +39,12 @@ var (
 
 const (
 	// TODO: reduce to 2 seconds
-	timeout                 = 1 * time.Minute
-	timeout_sfc_pod_running = 2 * time.Minute
-	interval                = 1 * time.Second
-	nfName                  = "test-nf"
-	sfcName                 = "sfc-test"
+	timeout                  = 1 * time.Minute
+	timeout_sfc_pod_running  = 2 * time.Minute
+	timeout_sfc_pod_stopping = 2 * time.Minute
+	interval                 = 1 * time.Second
+	nfName                   = "test-nf"
+	sfcName                  = "sfc-test"
 )
 
 func getMaxDpuResources(cli client.Client) int {
@@ -480,7 +481,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 				Eventually(func() bool {
 					return testutils.GetPod(dpuSideClient, nfName, vars.Namespace) == nil
-				}, timeout, interval).Should(BeTrue())
+				}, timeout_sfc_pod_stopping, interval).Should(BeTrue())
 			})
 		})
 
@@ -527,7 +528,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				Eventually(func() bool {
 					return testutils.GetPod(dpuSideClient, sfc.Spec.NetworkFunctions[0].Name, sfc.ObjectMeta.Namespace) == nil
-				}, timeout, interval).Should(BeTrue())
+				}, timeout_sfc_pod_stopping, interval).Should(BeTrue())
 
 				g.By("Should unblock the last SFC's POD to get it running")
 				sfc = sfcNew(sfcNum, imageRef)
@@ -541,12 +542,15 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 				}
 
 				g.By("Should end up with no SFCs or SFC Pods")
+				timeout_for_all_pods_deleted := time.Now().Add(timeout_sfc_pod_stopping)
 				for i := 0; i < sfcNum+1; i++ {
 					sfc = sfcNew(i, imageRef)
 					Expect(testutils.SfcGet(dpuSideClient, sfc.Spec.NetworkFunctions[0].Name, sfc.ObjectMeta.Namespace)).To(BeNil())
 					Eventually(func() bool {
 						return testutils.GetPod(dpuSideClient, sfc.Spec.NetworkFunctions[0].Name, sfc.ObjectMeta.Namespace) == nil
-					}, 2*timeout, interval).Should(BeTrue())
+					},
+						timeout_for_all_pods_deleted.Sub(time.Now()),
+						interval).Should(BeTrue())
 				}
 			})
 		})
