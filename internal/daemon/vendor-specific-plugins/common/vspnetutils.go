@@ -1,6 +1,7 @@
 package vspnetutils
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,8 +11,30 @@ import (
 
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/spf13/afero"
+	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
 )
+
+const (
+	NetSysDir            = "/sys/class/net"
+	pcidevPrefix         = "device"
+	netDevVfDevicePrefix = "virtfn"
+)
+
+type VEthPairDeviceInfo struct {
+	IfName    string // Interface Name of the veth
+	PeerName  string // Interface Name of the peer veth
+	IfMac     string // MAC address of the veth interface
+	PeerIfMAC string // MAC address of the Peer veth interface
+}
+
+type VfDeviceInfo struct {
+	PfInterfaceName string // Name of the PF interface
+	Id              int    // VF ID starting from 0
+	PciAddress      string // PCI address of the VF
+	Vlan            int    // VLAN ID of the VF (0 is not vlan tagged)
+	Allocated       bool   // Indicates if the VF is allocated or not
+}
 
 // SetSriovNumVfs sets the number of virtual functions (VFs) for a given PCI address.
 func SetSriovNumVfs(fs afero.Fs, pciAddr string, numVfs int) error {
@@ -109,4 +132,129 @@ func GetNetDevNameFromPCIeAddr(platform platform.Platform, pcieAddress string) (
 	}
 
 	return "", fmt.Errorf("network device not found for PCI address %s", pcieAddress)
+}
+
+func CreateNfVethPair(idx int) (*VEthPairDeviceInfo, error) {
+	//nfInterfaceName is the name of the interface on the Network Function attached to the container
+	//dpInterfaceName is the name of the interface on the Data Plane OvS side
+	nfInterfaceName := fmt.Sprintf("nf_if%d", idx)
+	dpInterfaceName := fmt.Sprintf("dp_if%d", idx)
+
+	return CreateVethPair(nfInterfaceName, dpInterfaceName)
+}
+
+// CreateVethPair function to create a veth pair with the given index and InterfaceInfo
+func CreateVethPair(ifname string, peername string) (*VEthPairDeviceInfo, error) {
+	deviceInfo := VEthPairDeviceInfo{
+		IfName:    ifname,
+		PeerName:  peername,
+		IfMac:     "",
+		PeerIfMAC: "",
+	}
+
+	// Destroy existing veth pair if it exists
+	// This is to ensure that we do not have any stale veth pairs lying around.
+	// Error is fine if there is no existing veth pair.
+	_ = DestroyVethPair(&deviceInfo)
+
+	vethLink := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{Name: deviceInfo.IfName},
+		PeerName:  deviceInfo.PeerName,
+	}
+	if err := netlink.LinkAdd(vethLink); err != nil {
+		klog.Errorf("Error occurred in creating veth pair: %v", err)
+		return nil, err
+	}
+
+	ifLink, err := netlink.LinkByName(deviceInfo.IfName)
+	if err != nil {
+		klog.Errorf("Error occurred in getting Link By Name of VEth Link: %v", err)
+		return nil, err
+	}
+	peerLink, err := netlink.LinkByName(deviceInfo.PeerName)
+	if err != nil {
+		klog.Errorf("Error occurred in getting Link By Name of VEth Peer Link: %v", err)
+		return nil, err
+	}
+
+	if err := netlink.LinkSetUp(ifLink); err != nil {
+		klog.Errorf("Error occurred in setting up NF link: %v", err)
+		errOnDestroy := DestroyVethPair(&deviceInfo)
+		if errOnDestroy != nil {
+			klog.Errorf("Error occurred in destroying existing veth pair: %v", err)
+			err = errors.Join(errOnDestroy, err)
+		}
+		return nil, err
+	}
+
+	if err := netlink.LinkSetUp(peerLink); err != nil {
+		klog.Errorf("Error occurred in setting up DP link: %v", err)
+		errOnDestroy := DestroyVethPair(&deviceInfo)
+		if errOnDestroy != nil {
+			klog.Errorf("Error occurred in destroying existing veth pair: %v", err)
+			err = errors.Join(errOnDestroy, err)
+		}
+		return nil, err
+	}
+
+	deviceInfo.IfMac = ifLink.Attrs().HardwareAddr.String()
+	deviceInfo.PeerIfMAC = peerLink.Attrs().HardwareAddr.String()
+
+	return &deviceInfo, nil
+}
+
+// DestroyVethPair function to clean all the veth pairs created
+// This function shall not log errors, but return it since it can
+// be called to opportunistically clean up veth pairs.
+func DestroyVethPair(dev *VEthPairDeviceInfo) error {
+	nfLink, err := netlink.LinkByName(dev.IfName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.LinkDel(nfLink); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetSriovVlanId sets the VLAN ID for a specific virtual function (VF)
+// As per ip-link (8) VLAN is special where it disable VLAN tagging and filtering
+// Also incoming traffic will be filtered for the specific VLAN ID and will
+// have all VLAN tags stripped before being passed to the VF.
+func LinkSetVfVlanByName(ifname string, vfId int, vlanId int) error {
+	link, err := netlink.LinkByName(ifname)
+	if err != nil {
+		klog.Errorf("Failed to get link by name '%s': %v", ifname, err)
+		return err
+	}
+
+	// This is the equivalent of "ip link set dev <PF> vf <ID> vlan <VLAN>"
+	if err := netlink.LinkSetVfVlan(link, vfId, vlanId); err != nil {
+		klog.Errorf("Failed to set VLAN %d on VF %d of device '%s': %v", vlanId, vfId, ifname, err)
+		return err
+	}
+
+	return nil
+}
+
+// netDevDeviceDir returns the device directory for a given network device name.
+func readPCIsymbolicLink(fs afero.Fs, symbolicLink string) (string, error) {
+	pciDevDir, err := fs.(afero.Symlinker).ReadlinkIfPossible(symbolicLink)
+	if len(pciDevDir) <= 3 {
+		return "", fmt.Errorf("could not find PCI Address")
+	}
+	return pciDevDir[3:], err
+}
+
+// VfPCIAddressFromVfIndex retrieves the PCI address for a virtual function (VF) based on its the PF and VF index.
+func VfPCIAddressFromVfIndex(fs afero.Fs, pfName string, vfId int) (string, error) {
+	symbolicLink := filepath.Join(NetSysDir, pfName, pcidevPrefix, fmt.Sprintf("%s%v",
+		netDevVfDevicePrefix, vfId))
+	pciAddress, err := readPCIsymbolicLink(fs, symbolicLink)
+	if err != nil {
+		err = fmt.Errorf("%v for VF %s%v of PF %s", err, netDevVfDevicePrefix, vfId, pfName)
+		return "", err
+	}
+	return pciAddress, err
 }
