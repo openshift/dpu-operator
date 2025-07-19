@@ -86,12 +86,6 @@ func (d *dpuDeviceHandler) SetupDevices() error {
 
 	defer close(d.setupDevicesDone)
 
-	// Currently NF devices do not require any setup outside the VSP
-	if d.dpuMode {
-		d.log.Info(("Dpu mode detected, skipping devHandler devices setup"))
-		return nil
-	}
-
 	numVfs, err := d.vsp.SetNumVfs(8)
 	if err != nil {
 		// Currently NF devices do not require any setup outside the VSP
