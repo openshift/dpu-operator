@@ -28,12 +28,16 @@ type VEthPairDeviceInfo struct {
 	PeerIfMAC string // MAC address of the Peer veth interface
 }
 
-type VfDeviceInfo struct {
+type VfDeviceKey struct {
 	PfInterfaceName string // Name of the PF interface
 	Id              int    // VF ID starting from 0
-	PciAddress      string // PCI address of the VF
-	Vlan            int    // VLAN ID of the VF (0 is not vlan tagged)
-	Allocated       bool   // Indicates if the VF is allocated or not
+}
+
+type VfDeviceInfo struct {
+	VfKey      VfDeviceKey
+	PciAddress string // PCI address of the VF
+	Vlan       int    // VLAN ID of the VF (0 is not vlan tagged)
+	Allocated  bool   // Indicates if the VF is allocated or not
 }
 
 // SetSriovNumVfs sets the number of virtual functions (VFs) for a given PCI address.
@@ -218,26 +222,6 @@ func DestroyVethPair(dev *VEthPairDeviceInfo) error {
 	return nil
 }
 
-// SetSriovVlanId sets the VLAN ID for a specific virtual function (VF)
-// As per ip-link (8) VLAN is special where it disable VLAN tagging and filtering
-// Also incoming traffic will be filtered for the specific VLAN ID and will
-// have all VLAN tags stripped before being passed to the VF.
-func LinkSetVfVlanByName(ifname string, vfId int, vlanId int) error {
-	link, err := netlink.LinkByName(ifname)
-	if err != nil {
-		klog.Errorf("Failed to get link by name '%s': %v", ifname, err)
-		return err
-	}
-
-	// This is the equivalent of "ip link set dev <PF> vf <ID> vlan <VLAN>"
-	if err := netlink.LinkSetVfVlan(link, vfId, vlanId); err != nil {
-		klog.Errorf("Failed to set VLAN %d on VF %d of device '%s': %v", vlanId, vfId, ifname, err)
-		return err
-	}
-
-	return nil
-}
-
 // netDevDeviceDir returns the device directory for a given network device name.
 func readPCIsymbolicLink(fs afero.Fs, symbolicLink string) (string, error) {
 	pciDevDir, err := fs.(afero.Symlinker).ReadlinkIfPossible(symbolicLink)
@@ -257,4 +241,28 @@ func VfPCIAddressFromVfIndex(fs afero.Fs, pfName string, vfId int) (string, erro
 		return "", err
 	}
 	return pciAddress, err
+}
+
+// TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
+func CreateOvSBridge(bridgeName string) error {
+	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-br", bridgeName)
+	return cmd.Run()
+}
+
+// TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
+func DeleteOvSBridge(bridgeName string) error {
+	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-br", bridgeName)
+	return cmd.Run()
+}
+
+// TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
+func AddInterfaceToOvSBridge(bridgeName string, ifname string) error {
+	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-port", bridgeName, ifname)
+	return cmd.Run()
+}
+
+// TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
+func DeleteInterfaceFromOvSBridge(bridgeName string, ifname string) error {
+	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, ifname)
+	return cmd.Run()
 }
