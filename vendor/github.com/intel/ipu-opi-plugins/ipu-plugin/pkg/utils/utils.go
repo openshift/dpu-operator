@@ -73,6 +73,17 @@ func ExecOsCommand(cmdBin string, params ...string) error {
 	return nil
 }
 
+func ExtractVsiVportInfo(macAddr string) (int, int, error) {
+	macAddrByte, err := GetMacAsByteArray(macAddr)
+	if err != nil {
+		log.Info("ExtractVsiVportInfo failed.", macAddr)
+		return 0, 0, err
+	}
+	vfVsi := int(macAddrByte[1])
+	vfVport := GetVportForVsi(vfVsi)
+	return vfVsi, vfVport, nil
+}
+
 func GetVsiVportInfo(macAddr string) (int, int, error) {
 	vsi, err := ImcQueryfindVsiGivenMacAddr(types.IpuMode, macAddr)
 	if err != nil {
@@ -491,9 +502,9 @@ func CopyBinary(imcPath string, vspPath string, sftpClient *sftp.Client) error {
 }
 
 func RestoreRHPrimaryNetwork() {
-        remoteCliCmd := "set -o pipefail && /work/scripts/post_init_app.sh"
+	remoteCliCmd := "set -o pipefail && /work/scripts/post_init_app.sh"
 	_, err := RunCliCmdOnImc(remoteCliCmd, "")
-        if err != nil {
-               log.Info("RunCliCmdOnImc: Warning!. Unable to restore primary network access for to this IPU-ACC")
-        }
+	if err != nil {
+		log.Info("RunCliCmdOnImc: Warning!. Unable to restore primary network access for to this IPU-ACC")
+	}
 }
