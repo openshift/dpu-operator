@@ -6,6 +6,7 @@ clusters:
     version: "4.19.0-nightly"
     network_api_port: "{{api_network()}}"
     postconfig:
+    - name: "image_registry"
     - name: "dpu_operator_host"
       dpu_operator_path: "../../"
     - name: "monitoring_config"

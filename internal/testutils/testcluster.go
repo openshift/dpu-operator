@@ -110,7 +110,7 @@ func GetDPUNodes(c client.Client) ([]corev1.Node, error) {
 func TrafficFlowTestsImage() string {
 	localContainer := ContainerImage{
 		Registry: os.Getenv("REGISTRY"),
-		Name:     "ovn-kubernetes/kubernetes-traffic-flow-tests",
+		Name:     "kubernetes-traffic-flow-tests",
 		Tag:      "latest",
 	}
 
@@ -125,6 +125,7 @@ func TrafficFlowTestsImage() string {
 		Expect(err).To(BeNil())
 		return localContainer.FullRef()
 	}
+
 	return remoteContainer.FullRef()
 }
 

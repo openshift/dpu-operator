@@ -14,8 +14,11 @@ vars:
   BINDIR: bin
   BINDIR_ABS:
     sh: if [[ "{{.BINDIR}}" = /* ]]; then echo "{{.BINDIR}}"; else echo "$(pwd)/{{.BINDIR}}"; fi
-  REGISTRY:
-    sh: hostname | sed 's/$/:5000/'
+  HOST_CLUSTER_DOMAIN: '{{ default "ocpcluster.redhat.com" .HOST_CLUSTER_DOMAIN }}'
+  DPU_CLUSTER_IP: '{{ default "172.16.3.16" .DPU_CLUSTER_IP }}'
+  REGISTRY_HOST: '{{ default (printf "default-route-openshift-image-registry.apps.%s/in-cluster-registry" .HOST_CLUSTER_DOMAIN) .REGISTRY_HOST }}'
+  REGISTRY_DPU: '{{ default (printf "default-route-openshift-image-registry.apps.%s.nip.io/in-cluster-registry" .DPU_CLUSTER_IP) .REGISTRY_DPU }}'
+  REGISTRY: '{{.REGISTRY_HOST}}'
   ENVTEST_K8S_VERSION: 1.27.1
   KUSTOMIZE_VERSION: v5.6.0
   GINKGO_VERSION:
@@ -48,13 +51,52 @@ tasks:
     cmds:
       - echo "{{.BINDIR_ABS}}"
 
+  show-registry-config:
+    desc: "Show current registry configuration"
+    cmds:
+      - 'echo "Host Registry: {{.REGISTRY_HOST}}"'
+      - 'echo "DPU Registry:  {{.REGISTRY_DPU}}"'
+      - 'echo "Default Registry: {{.REGISTRY}}"'
+
+  verify-registry-routes:
+    desc: "Verify registry routes match actual cluster routes (requires running clusters)"
+    cmds:
+      - |
+        echo "Verifying registry routes..."
+        echo "Expected host registry: {{.REGISTRY_HOST}}"
+        if oc get route default-route -n openshift-image-registry --kubeconfig /root/kubeconfig.ocpcluster &>/dev/null; then
+          ACTUAL_HOST=$(oc get route default-route -n openshift-image-registry --template='{{`{{ .spec.host }}`}}' --kubeconfig /root/kubeconfig.ocpcluster)
+          echo "Actual host registry:   $ACTUAL_HOST"
+          if [ "{{.REGISTRY_HOST}}" = "$ACTUAL_HOST" ]; then
+            echo "Host registry matches"
+          else
+            echo "Host registry mismatch - consider setting HOST_CLUSTER_DOMAIN environment variable"
+          fi
+        else
+          echo "Host cluster not available or registry route not found"
+        fi
+        
+        echo ""
+        echo "Expected DPU registry: {{.REGISTRY_DPU}}"
+        if oc get route default-route -n openshift-image-registry --kubeconfig /root/kubeconfig.microshift &>/dev/null; then
+          ACTUAL_DPU=$(oc get route default-route -n openshift-image-registry --template='{{`{{ .spec.host }}`}}' --kubeconfig /root/kubeconfig.microshift)
+          echo "Actual DPU registry:    $ACTUAL_DPU"
+          if [ "{{.REGISTRY_DPU}}" = "$ACTUAL_DPU" ]; then
+            echo "DPU registry matches"
+          else
+            echo "DPU registry mismatch - consider setting DPU_CLUSTER_IP environment variable"
+          fi
+        else
+          echo "DPU cluster not available or registry route not found"
+        fi
+
   push-image-helper:
     internal: true
     vars:
       SOURCE: '{{.SOURCE}}'
       IMAGE: '{{.IMAGE}}'
     cmds:
-      - buildah manifest push --all '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
+      - buildah manifest push --all --retry 3 --retry-delay 10s '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
 
   undeploy-helper:
     internal: true
@@ -95,12 +137,23 @@ tasks:
     deps:
       - task: kustomize
     cmds:
+      - mkdir -p bin/host bin/dpu
       - >
         go run ./tools/config/config.go
-        -registry-url {{.REGISTRY}}
+        -registry-url {{.REGISTRY_HOST}}
         -template-file config/dev/local-images-template.yaml
-        -output-file bin/local-images.yaml
-      - cp config/dev/kustomization.yaml bin
+        -output-file bin/host/local-images.yaml
+      - >
+        go run ./tools/config/config.go
+        -registry-url {{.REGISTRY_DPU}}
+        -template-file config/dev/local-images-template.yaml
+        -output-file bin/dpu/local-images.yaml
+      - cp config/dev/kustomization.yaml bin/host/
+      - cp config/dev/kustomization.yaml bin/dpu/
+      - sed -i 's/local-images-template.yaml/local-images.yaml/' bin/host/kustomization.yaml
+      - sed -i 's/local-images-template.yaml/local-images.yaml/' bin/dpu/kustomization.yaml
+      - sed -i 's|../config/default|../../config/default|' bin/host/kustomization.yaml
+      - sed -i 's|../config/default|../../config/default|' bin/dpu/kustomization.yaml
   
   ## Download envtest-setup locally if necessary
   envtest:
@@ -118,8 +171,8 @@ tasks:
         vars:
           KUBECONFIG_DPU: "/root/kubeconfig.microshift"
           KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
-      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.microshift" oc apply -f -
-      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
+      - bin/kustomize build bin/dpu | KUBECONFIG="/root/kubeconfig.microshift" oc apply -f -
+      - bin/kustomize build bin/host | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
       - KUBECONFIG="/root/kubeconfig.microshift" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
       - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
@@ -130,16 +183,21 @@ tasks:
       - task: undeploy-1c
         vars:
           KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
-      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
+      - bin/kustomize build bin/host | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
       - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
-  prepare-e2e-test:
+  ensure-test-images-in-both-registries:
+    desc: "Ensure test images are available in both registries"
     cmds:
-      - >
-        if [ "{{.SUBMODULES}}" = "true" ]; then
-            hack/prepare-submodules.sh
-        fi
-            hack/prepare-venv.sh
+      - |
+        echo "Ensuring test images are available in both registries..."
+        skopeo copy \
+          docker://ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest \
+          docker://{{.REGISTRY_HOST}}/kubernetes-traffic-flow-tests:latest
+        skopeo copy \
+          docker://ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest \
+          docker://{{.REGISTRY_DPU}}/kubernetes-traffic-flow-tests:latest
+        echo "Test images copied to both registries"
 
   e2e-test:
     deps:
@@ -159,6 +217,7 @@ tasks:
       - task: ginkgo
       - task: envtest
     cmds:
+      - task: ensure-test-images-in-both-registries
       - >
         FAST_TEST=true
         REGISTRY={{.REGISTRY}}
