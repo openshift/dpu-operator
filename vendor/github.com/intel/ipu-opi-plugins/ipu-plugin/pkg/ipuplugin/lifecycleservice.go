@@ -64,10 +64,10 @@ var PeerToPeerP4RulesAdded = false
 
 // Reserved ACC interfaces(using vport_id or last digit of interface name, like 4 represents-> enp0s1f0d4)
 const (
-	PHY_PORT0_PRIMARY_INTF_INDEX    = 1
-	PHY_PORT0_SECONDARY_INTF_INDEX  = 4
-	NF_IN_PR_INTF_INDEX             = 9
-	NF_OUT_PR_INTF_INDEX            = 10
+	PHY_PORT0_PRIMARY_INTF_INDEX   = 1
+	PHY_PORT0_SECONDARY_INTF_INDEX = 4
+	NF_IN_PR_INTF_INDEX            = 9
+	NF_OUT_PR_INTF_INDEX           = 10
 )
 
 // TODO: GetFilteredPFs can be used to fill the array.
