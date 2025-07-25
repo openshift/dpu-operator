@@ -243,6 +243,20 @@ func VfPCIAddressFromVfIndex(fs afero.Fs, pfName string, vfId int) (string, erro
 	return pciAddress, err
 }
 
+// SetHwModeVepa sets the hardware mode of the specified interface to "vepa".
+// In vepa mode, Data sent between HW ports is sent on the wire to the external switch.
+// No bridging happens in hardware.
+func SetPfHwModeVepa(pfName string) error {
+	cmd := exec.Command("bridge", "link", "set", "dev", pfName, "hwmode", "vepa")
+
+	// Run the command and capture any output or errors
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Failed to set hwmode to vepa on %s: %v\nOutput: %s", pfName, err, string(output))
+	}
+	return err
+}
+
 // TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
 func CreateOvSBridge(bridgeName string) error {
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-br", bridgeName)

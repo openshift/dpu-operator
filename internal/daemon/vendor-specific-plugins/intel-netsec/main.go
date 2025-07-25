@@ -429,6 +429,17 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
 		return err
 	}
 
+	// WORKAROUND: Set the PF hardware mode to VEPA (Virtual Ethernet Port Aggregator)
+	// Only needed on the host because the NetSec Accelerator will switch packets, but the
+	// host will not switch packets.
+	if !vsp.isDPUMode {
+		err = vspnetutils.SetPfHwModeVepa(ifName)
+		if err != nil {
+			vsp.log.Error(err, "Error setting PF hardware mode to VEPA", "IfName", ifName)
+			return err
+		}
+	}
+
 	// Map each VF ID to the corresponding VLAN ID.
 	for vfID := 0; vfID < numVfs; vfID++ {
 		vlan := vfID + VlanOffset
@@ -459,6 +470,7 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
 			return err
 		}
 
+		// WORKAROUND: For now we want VFs to be trusted for promiscuous mode.
 		// This is the equivalent of "ip link set dev <PF> vf <ID> trust <VLAN>"
 		if err := netlink.LinkSetVfTrust(link, vfID, true); err != nil {
 			vsp.log.Error(err, "Failed to set trust on for VF", "VfID", vfID, "InterfaceName", ifName)
