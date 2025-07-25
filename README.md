@@ -48,12 +48,34 @@ The build target will use previously built images if they are available to speed
 task clean-image-all
 ```
 
-6. **Alternative: Remote Registry**
+6. **Registry Configuration**
 
-Alternatively, if you set up a registry remotely, define the `REGISTERY` variable. Note that you need to do this for the build step and the push/run step:
+The DPU operator now uses in-cluster registries by default with predictable URLs based on your cluster configuration:
+
+- **Host Registry**: `default-route-openshift-image-registry.apps.ocpcluster.redhat.com`
+- **DPU Registry**: `default-route-openshift-image-registry.apps.172.16.3.16.nip.io`
+
+You can check the current configuration:
+```sh
+task show-registry-config
+```
+
+To verify the configuration matches your actual clusters (when they're running):
+```sh
+task verify-registry-routes
+```
+
+**Custom Registry Configuration**: If your cluster domains or IPs differ, you can override them:
 
 ```sh
-REGISTERY=... task ...
+# Override cluster domain (affects host registry)
+HOST_CLUSTER_DOMAIN=mycluster.example.com task build-image-all
+
+# Override DPU IP (affects DPU registry)  
+DPU_CLUSTER_IP=10.1.2.3 task build-image-all
+
+# Override registry URLs directly
+REGISTRY_HOST=my-host-registry.com REGISTRY_DPU=my-dpu-registry.com task build-image-all
 ```
 
 7. **Alternative: Deploy only one of the cluster**
