@@ -272,7 +272,7 @@ tasks:
       - task: build-image
         vars:
           NAME: intel-vsp-p4
-          DOCKERFILE: Dockerfile.IntelVSPP4.rhel
+          DOCKERFILE: Dockerfile.IntelP4.rhel
           PLATFORM: arm64
 
   clean-image-intel-vsp-p4:
