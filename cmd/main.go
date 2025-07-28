@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -41,6 +42,20 @@ import (
 var (
 	setupLog = ctrl.Log.WithName("setup")
 )
+
+func createImagesFromEnv() (map[string]string, error) {
+	imagesMap := make(map[string]string)
+
+	for _, imageName := range plugin.AllImages {
+		value := os.Getenv(imageName)
+		if value == "" {
+			return nil, fmt.Errorf("required environment variable %s is not set", imageName)
+		}
+		imagesMap[imageName] = value
+	}
+
+	return imagesMap, nil
+}
 
 func main() {
 	var metricsAddr string
@@ -89,22 +104,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	vspImages := plugin.CreateVspImagesMap(true, setupLog)
-	vspExtraData := plugin.CreateVspExtraDataMap(true, setupLog)
-
-	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
-	if dpuDaemonImage == "" {
-		setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
+	images, err := createImagesFromEnv()
+	if err != nil {
+		setupLog.Error(err, "Failed to create images map")
 		os.Exit(1)
 	}
 
-	networkResourcesInjectorImage := os.Getenv("NETWORK_RESOURCES_INJECTOR_IMAGE")
-	if networkResourcesInjectorImage == "" {
-		setupLog.Error(err, "Failed to set NETWORK_RESOURCES_INJECTOR_IMAGE env var")
-		os.Exit(1)
-	}
-
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, vspExtraData, networkResourcesInjectorImage)
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), images)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)

@@ -30,18 +30,18 @@ type DpuIdentifier string
 const VspImageIntel string = "IntelVspImage"
 const VspImageMarvell string = "MarvellVspImage"
 const VspImageIntelNetSec string = "IntelNetSecVspImage"
-
 const VspImageP4Intel string = "IntelVspP4Image"
+const DpuOperatorDaemonImage string = "DpuOperatorDaemonImage"
+const NRIWebhookImage string = "NRIWebhookImage"
 
-var VspImages = []string{
+var AllImages = []string{
 	VspImageIntel,
 	VspImageMarvell,
 	VspImageIntelNetSec,
-	// TODO: Add future supported vendor plugins here
-}
-
-var VspExtraData = []string{
 	VspImageP4Intel,
+	DpuOperatorDaemonImage,
+	NRIWebhookImage,
+	// TODO: Add any new container images here
 }
 
 func CreateVspMap(fromEnv bool, logger logr.Logger, VspInfoList []string) map[string]string {
@@ -60,14 +60,6 @@ func CreateVspMap(fromEnv bool, logger logr.Logger, VspInfoList []string) map[st
 	}
 
 	return vspInfoMap
-}
-
-func CreateVspExtraDataMap(fromEnv bool, logger logr.Logger) map[string]string {
-	return CreateVspMap(fromEnv, logger, VspExtraData)
-}
-
-func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
-	return CreateVspMap(fromEnv, logger, VspImages)
 }
 
 type VendorPlugin interface {

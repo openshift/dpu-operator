@@ -40,23 +40,17 @@ var binData embed.FS
 type DpuOperatorConfigReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
-	dpuDaemonImage  string
-	vspImages       map[string]string
-	vspExtraData    map[string]string
+	images          map[string]string
 	imagePullPolicy string
-	nriWebhookImage string
 	pathManager     utils.PathManager
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string, vspExtraData map[string]string, nriWebhookImage string) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, images map[string]string) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
 		Client:          client,
 		Scheme:          scheme,
-		dpuDaemonImage:  dpuDaemonImage,
-		vspImages:       vspImages,
-		vspExtraData:    vspExtraData,
+		images:          images,
 		imagePullPolicy: "IfNotPresent",
-		nriWebhookImage: nriWebhookImage,
 	}
 }
 
@@ -150,19 +144,14 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 
 	// All the CRs will be in the same namespace as the operator config
 	data := map[string]string{
-		"Namespace":              vars.Namespace,
-		"ImagePullPolicy":        r.imagePullPolicy,
-		"Mode":                   "auto",
-		"DpuOperatorDaemonImage": r.dpuDaemonImage,
-		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
-		"NRIWebhookImage":        r.nriWebhookImage,
-		"CniDir":                 p,
+		"Namespace":       vars.Namespace,
+		"ImagePullPolicy": r.imagePullPolicy,
+		"Mode":            "auto",
+		"ResourceName":    "openshift.io/dpu", // FIXME: Hardcode for now
+		"CniDir":          p,
 	}
 
-	for key, value := range r.vspImages {
-		data[key] = value
-	}
-	for key, value := range r.vspExtraData {
+	for key, value := range r.images {
 		data[key] = value
 	}
 
@@ -175,7 +164,7 @@ func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.L
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-	logger.Info("Ensuring DPU DaemonSet", "image", r.dpuDaemonImage)
+	logger.Info("Ensuring DPU DaemonSet", "image", r.images["DpuOperatorDaemonImage"])
 	return r.createAndApplyAllFromBinData(logger, "daemon", cfg)
 }
 

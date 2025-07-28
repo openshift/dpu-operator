@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 
@@ -55,7 +54,15 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), "mock-image", plugin.CreateVspImagesMap(false, setupLog), plugin.CreateVspExtraDataMap(false, setupLog), "mock-webhook-image")
+	mockImages := map[string]string{
+		"IntelVspImage":          "mock-intel-image",
+		"MarvellVspImage":        "mock-marvell-image",
+		"IntelNetSecVspImage":    "mock-intel-netsec-image",
+		"IntelVspP4Image":        "mock-intel-p4-image",
+		"DpuOperatorDaemonImage": "mock-daemon-image",
+		"NRIWebhookImage":        "mock-webhook-image",
+	}
+	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), mockImages)
 	err = b.SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
