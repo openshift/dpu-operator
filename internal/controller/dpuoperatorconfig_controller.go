@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
@@ -40,23 +41,17 @@ var binData embed.FS
 type DpuOperatorConfigReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
-	dpuDaemonImage  string
-	vspImages       map[string]string
-	vspExtraData    map[string]string
+	imageManager    images.ImageManager
 	imagePullPolicy string
-	nriWebhookImage string
 	pathManager     utils.PathManager
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, dpuDaemonImage string, vspImages map[string]string, vspExtraData map[string]string, nriWebhookImage string) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, imageManager images.ImageManager) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
 		Client:          client,
 		Scheme:          scheme,
-		dpuDaemonImage:  dpuDaemonImage,
-		vspImages:       vspImages,
-		vspExtraData:    vspExtraData,
+		imageManager:    imageManager,
 		imagePullPolicy: "IfNotPresent",
-		nriWebhookImage: nriWebhookImage,
 	}
 }
 
@@ -150,32 +145,28 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 
 	// All the CRs will be in the same namespace as the operator config
 	data := map[string]string{
-		"Namespace":              vars.Namespace,
-		"ImagePullPolicy":        r.imagePullPolicy,
-		"Mode":                   "auto",
-		"DpuOperatorDaemonImage": r.dpuDaemonImage,
-		"ResourceName":           "openshift.io/dpu", // FIXME: Hardcode for now
-		"NRIWebhookImage":        r.nriWebhookImage,
-		"CniDir":                 p,
-	}
-
-	for key, value := range r.vspImages {
-		data[key] = value
-	}
-	for key, value := range r.vspExtraData {
-		data[key] = value
+		"Namespace":       vars.Namespace,
+		"ImagePullPolicy": r.imagePullPolicy,
+		"Mode":            "auto",
+		"ResourceName":    "openshift.io/dpu", // FIXME: Hardcode for now
+		"CniDir":          p,
 	}
 
 	return data
 }
 
 func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
-	return render.ApplyAllFromBinData(logger, binDataPath, r.yamlVars(), binData, r.Client, cfg, r.Scheme)
+	mergedData := images.MergeVarsWithImages(r.imageManager, r.yamlVars())
+	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg, r.Scheme)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-	logger.Info("Ensuring DPU DaemonSet", "image", r.dpuDaemonImage)
+	daemonImage, err := r.imageManager.GetImage(images.DpuOperatorDaemonImage)
+	if err != nil {
+		return err
+	}
+	logger.Info("Ensuring DPU DaemonSet", "image", daemonImage)
 	return r.createAndApplyAllFromBinData(logger, "daemon", cfg)
 }
 

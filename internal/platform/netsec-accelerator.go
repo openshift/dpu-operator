@@ -3,6 +3,7 @@ package platform
 import (
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
@@ -73,9 +74,13 @@ func (pi *NetsecAcceleratorDetector) GetDpuIdentifier(platform Platform, pci *gh
 	return plugin.DpuIdentifier(serial), err
 }
 
-func (pi *NetsecAcceleratorDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
+func (pi *NetsecAcceleratorDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
 	template_vars := plugin.NewVspTemplateVars()
-	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntelNetSec]
+	vspImage, err := imageManager.GetImage(images.VspImageIntelNetSec)
+	if err != nil {
+		return nil, errors.Errorf("Error getting Intel NetSec VSP image: %v", err)
+	}
+	template_vars.VendorSpecificPluginImage = vspImage
 	template_vars.Command = `[ "/vsp-intel-netsec" ]`
 	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
 }

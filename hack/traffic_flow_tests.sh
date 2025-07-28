@@ -2,7 +2,7 @@
 
 set -e
 
-bash hack/prepare-venv.sh
+# bash hack/prepare-venv.sh
 
 cd kubernetes-traffic-flow-tests
 source /tmp/tft-venv/bin/activate

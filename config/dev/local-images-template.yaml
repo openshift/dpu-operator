@@ -18,7 +18,7 @@ spec:
       - command:
         name: manager
         env:
-        - name: DPU_DAEMON_IMAGE
+        - name: DpuOperatorDaemonImage
           value: {{ .RegistryURL }}/dpu-daemon:dev
         - name: IntelVspImage
           value: {{ .RegistryURL }}/intel-vsp:dev
@@ -30,7 +30,7 @@ spec:
           value: {{ .RegistryURL }}/intel-netsec-vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always
-        - name: NETWORK_RESOURCES_INJECTOR_IMAGE
+        - name: NRIWebhookImage
           value: {{ .RegistryURL }}/network-resources-injector:dev
         image: {{ .RegistryURL }}/dpu-operator:dev
         imagePullPolicy: Always
