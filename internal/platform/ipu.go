@@ -73,7 +73,7 @@ func (pi *IntelDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice)
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
-	p4Image := os.Getenv(VspP4ImageIntelEnv)
+	p4Image := vspImages[plugin.VspImageP4Intel]
 	if p4Image == "" {
 		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4")
 	}

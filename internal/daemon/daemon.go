@@ -37,6 +37,7 @@ type Daemon struct {
 	fs                afero.Fs
 	p                 platform.Platform
 	dpuDetectorManger *platform.DpuDetectorManager
+	detectedDpus      map[string]platform.DetectedDpu
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
@@ -51,6 +52,7 @@ func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Confi
 		p:                 p,
 		dpuDetectorManger: platform.NewDpuDetectorManager(p),
 		managers:          make([]SideManager, 0),
+		detectedDpus:      make(map[string]platform.DetectedDpu),
 	}
 }
 
@@ -95,21 +97,27 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			if len(d.managers) >= 1 {
-				continue
-			}
 			d.log.Info("Scanning for DPUs")
-			sideManager, err := d.createDaemon()
+			newDpus, err := d.detectAndUpdateDpus()
 			if err != nil {
 				d.log.Error(err, "Got error while detecting DPUs")
 				return err
 			}
-			if sideManager != nil {
-				d.managers = append(d.managers, sideManager)
+
+			if len(newDpus) > 0 {
+				err = d.createSideManagers(newDpus)
+				if err != nil {
+					d.log.Error(err, "Got error while creating side managers")
+					return err
+				}
+			}
+
+			for i := len(managerDone); i < len(d.managers); i++ {
+				sideManager := d.managers[i]
 				done := make(chan struct{})
 				managerDone = append(managerDone, done)
-				go func(mgr SideManager) {
-					defer close(done)
+				go func(mgr SideManager, doneChannel chan struct{}) {
+					defer close(doneChannel)
 					err := mgr.StartVsp()
 					if err != nil {
 						d.log.Error(err, "Failed to start VSP in sideManager")
@@ -145,7 +153,7 @@ func (d *Daemon) Serve(ctx context.Context) error {
 						default:
 						}
 					}
-				}(sideManager)
+				}(sideManager, done)
 			}
 		case err := <-errChan:
 			d.log.Error(err, "Side manager failed, stopping all managers")
@@ -168,27 +176,52 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	}
 }
 
-func (d *Daemon) createDaemon() (SideManager, error) {
-	dpuMode, plugin, err := d.dpuDetectorManger.Detect(d.vspImages, d.client, *d.pm)
+func (d *Daemon) detectAndUpdateDpus() ([]platform.DetectedDpu, error) {
+	detectedDpus, err := d.dpuDetectorManger.DetectAll(d.vspImages, d.client, *d.pm)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to detect DPUs: %v", err)
 	}
-	if plugin != nil {
-		if dpuMode {
-			dsm, err := NewDpuSideManager(plugin, d.config, WithPathManager(*d.pm))
-			if err != nil {
-				return nil, fmt.Errorf("failed to create DpuSideManager: %v", err)
-			}
-			return dsm, nil
-		} else {
-			hsm, err := NewHostSideManager(plugin, WithPathManager2(d.pm))
-			if err != nil {
-				return nil, fmt.Errorf("failed to create HostSideManager: %v", err)
-			}
-			return hsm, nil
+
+	if len(detectedDpus) > 1 {
+		return nil, fmt.Errorf("Detected %d DPUs, but only one is currently supported", len(detectedDpus))
+	}
+
+	var newDpus []platform.DetectedDpu
+	for _, detectedDpu := range detectedDpus {
+		key := string(detectedDpu.Identifier)
+		if detectedDpu.IsDpuPlatform {
+			key = "dpu-platform"
+		}
+
+		if _, exists := d.detectedDpus[key]; !exists {
+			d.log.Info("New DPU detected", "identifier", key, "isDpuPlatform", detectedDpu.IsDpuPlatform)
+			d.detectedDpus[key] = detectedDpu
+			newDpus = append(newDpus, detectedDpu)
 		}
 	}
-	return nil, nil
+
+	return newDpus, nil
+}
+
+func (d *Daemon) createSideManagers(newDpus []platform.DetectedDpu) error {
+	for _, detectedDpu := range newDpus {
+		var sideManager SideManager
+		if detectedDpu.IsDpuPlatform {
+			dsm, err := NewDpuSideManager(detectedDpu.Plugin, d.config, WithPathManager(*d.pm))
+			if err != nil {
+				return fmt.Errorf("failed to create DpuSideManager: %v", err)
+			}
+			sideManager = dsm
+		} else {
+			hsm, err := NewHostSideManager(detectedDpu.Plugin, WithPathManager2(d.pm))
+			if err != nil {
+				return fmt.Errorf("failed to create HostSideManager: %v", err)
+			}
+			sideManager = hsm
+		}
+		d.managers = append(d.managers, sideManager)
+	}
+	return nil
 }
 
 func (d *Daemon) prepareCni() error {
