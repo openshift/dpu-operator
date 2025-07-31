@@ -180,7 +180,7 @@ tasks:
   build-cpagent-service:
     internal: true
     vars:
-      IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
+      IMAGE: '{{.REGISTRY_HOST}}/mrvl-cpagent:dev'
       CPIMAGE: "Environment=IMAGE='{{.IMAGE}}'"
       CPFILE: 'internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent.service'
     cmds:
@@ -376,37 +376,71 @@ tasks:
       - task: push-image-all
 
   push-image-all:
-    deps:
+    cmds: # pushing images in parallel overwhelm the image registry and cause 503 errors
+      # Push to host registry
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/dpu-operator:dev'
-          IMAGE: '{{.REGISTRY}}/dpu-operator:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/dpu-operator:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/dpu-daemon:dev'
-          IMAGE: '{{.REGISTRY}}/dpu-daemon:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/dpu-daemon:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/mrvl-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/mrvl-vsp:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/mrvl-vsp:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/mrvl-cpagent:dev'
-          IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/mrvl-cpagent:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/intel-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/intel-vsp:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/intel-vsp:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/intel-vsp-p4:dev'
-          IMAGE: '{{.REGISTRY}}/intel-vsp-p4:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/intel-vsp-p4:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/intel-netsec-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/intel-netsec-vsp:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/intel-netsec-vsp:dev'
       - task: push-image-helper
         vars:
           SOURCE: 'localhost/network-resources-injector:dev'
-          IMAGE: '{{.REGISTRY}}/network-resources-injector:dev'
+          IMAGE: '{{.REGISTRY_HOST}}/network-resources-injector:dev'
+      # Push to DPU registry
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/dpu-operator:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/dpu-operator:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/dpu-daemon:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/dpu-daemon:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/mrvl-vsp:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/mrvl-vsp:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/mrvl-cpagent:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/mrvl-cpagent:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/intel-vsp:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/intel-vsp:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/intel-vsp-p4:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/intel-vsp-p4:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/intel-netsec-vsp:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/intel-netsec-vsp:dev'
+      - task: push-image-helper
+        vars:
+          SOURCE: 'localhost/network-resources-injector:dev'
+          IMAGE: '{{.REGISTRY_DPU}}/network-resources-injector:dev'
 
