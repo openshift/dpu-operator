@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/jaypipes/ghw"
@@ -15,6 +16,7 @@ type Platform interface {
 	NetDevs() ([]*ghw.NIC, error)
 	Product() (*ghw.ProductInfo, error)
 	ReadDeviceSerialNumber(pciDevice *ghw.PCIDevice) (string, error)
+	PciToName(pciDevice *ghw.PCIDevice) ([]string, error)
 }
 
 type HardwarePlatform struct{}
@@ -37,6 +39,33 @@ func (hp *HardwarePlatform) NetDevs() ([]*ghw.NIC, error) {
 		return nil, err
 	}
 	return netInfo.NICs, nil
+}
+
+func (hp *HardwarePlatform) PciToName(pciDevice *ghw.PCIDevice) ([]string, error) {
+	if pciDevice == nil || pciDevice.Address == "" {
+		return nil, fmt.Errorf("invalid PCI device")
+	}
+
+	entries, err := os.ReadDir("/sys/class/net")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read /sys/class/net: %w", err)
+	}
+
+	var ifaces []string
+	for _, entry := range entries {
+		devicePath := fmt.Sprintf("/sys/class/net/%s/device", entry.Name())
+		target, err := os.Readlink(devicePath)
+		if err != nil {
+			continue // likely virtual interface
+		}
+
+		pciAddr := target[strings.LastIndex(target, "/")+1:]
+		if pciAddr == pciDevice.Address {
+			ifaces = append(ifaces, entry.Name())
+		}
+	}
+
+	return ifaces, nil
 }
 
 func (hp *HardwarePlatform) Product() (*ghw.ProductInfo, error) {
@@ -126,4 +155,8 @@ func (p *FakePlatform) RemoveAllPciDevices() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.devices = make([]*ghw.PCIDevice, 0)
+}
+
+func (hp *FakePlatform) PciToName(pciDevice *ghw.PCIDevice) ([]string, error) {
+	return nil, fmt.Errorf("Not implemented")
 }

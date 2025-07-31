@@ -43,6 +43,21 @@ func (d *IntelDetector) isVirtualFunction(device string) (bool, error) {
 	}
 }
 
+func (d *IntelDetector) getNetDevName(platform Platform, pciAddress string) (string, error) {
+	netDevs, err := platform.NetDevs()
+	if err != nil {
+		return "", fmt.Errorf("Error getting network devices: %v", err)
+	}
+
+	for _, nic := range netDevs {
+		if nic.PCIAddress != nil && *nic.PCIAddress == pciAddress {
+			return nic.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("No network device found for PCI address %s", pciAddress)
+}
+
 func (d *IntelDetector) IsDPU(platform Platform, pci ghw.PCIDevice, dpuDevices []plugin.DpuIdentifier) (bool, error) {
 	// VFs for the Intel IPU have the same PCIe info as the PF
 	isVF, err := d.isVirtualFunction(pci.Address)
@@ -50,10 +65,27 @@ func (d *IntelDetector) IsDPU(platform Platform, pci ghw.PCIDevice, dpuDevices [
 		return false, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
 	}
 
-	return !isVF &&
-		pci.Class.Name == "Network controller" &&
-		pci.Vendor.Name == "Intel Corporation" &&
-		pci.Product.Name == "Infrastructure Data Path Function", nil
+	// Check basic PCI device properties
+	if isVF ||
+		pci.Class.Name != "Network controller" ||
+		pci.Vendor.Name != "Intel Corporation" ||
+		pci.Product.Name != "Infrastructure Data Path Function" {
+		return false, nil
+	}
+
+	netDevNames, err := platform.PciToName(&pci)
+	if err != nil {
+		return false, fmt.Errorf("Error getting network device name for PCI address %s: %v", pci.Address, err)
+	}
+
+	// Check if any of them ends with "d2"
+	for _, name := range netDevNames {
+		if strings.HasSuffix(name, "d2") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
@@ -69,8 +101,8 @@ func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
 }
 
 func (pi *IntelDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
-	// TODO: Implement a way to get the DPU identifier.
-	return "", nil
+	identifier := fmt.Sprintf("intel-ipu-%s", pci.Address)
+	return plugin.DpuIdentifier(identifier), nil
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {

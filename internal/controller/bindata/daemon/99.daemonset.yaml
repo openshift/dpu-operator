@@ -62,6 +62,8 @@ spec:
           mountPropagation: Bidirectional
         - name: proc
           mountPath: /proc
+        - name: sys
+          mountPath: /sys
         args:
         - --mode
         - {{.Mode}}
@@ -81,3 +83,6 @@ spec:
         - name: proc
           hostPath:
             path: /proc/
+        - name: sys
+          hostPath:
+            path: /sys/
