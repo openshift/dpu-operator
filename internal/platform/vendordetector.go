@@ -6,6 +6,7 @@ import (
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
@@ -25,10 +26,10 @@ type VendorDetector interface {
 
 	// Returns a VSP plugin for the detected DPU platform.
 	// dpuMode - If true, the plugin is created for DPU mode, otherwise for host mode.
-	// vspImages - A map of VSP images to use for the plugin.
+	// imageManager - The image manager to retrieve VSP images.
 	// client - The Kubernetes client used to deploy the VSP.
 	// dpuPciDevice - The PCI device of the DPU, if available. This is used to identify the DPU device for the plugin.
-	VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error)
+	VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error)
 
 	// Returns true if the device is a DPU detected by the detector, otherwise false.
 	// platform - The platform of the host system (host with DPU).
@@ -90,7 +91,7 @@ func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, 
 	return activeDetectors[0], nil
 }
 
-func (d *DpuDetectorManager) Detect(vspImages map[string]string, client client.Client, pm utils.PathManager) (bool, *plugin.GrpcPlugin, error) {
+func (d *DpuDetectorManager) Detect(imageManager images.ImageManager, client client.Client, pm utils.PathManager) (bool, *plugin.GrpcPlugin, error) {
 	for _, detector := range d.detectors {
 		dpuPlatform, err := detector.IsDpuPlatform(d.platform)
 		if err != nil {
@@ -98,7 +99,7 @@ func (d *DpuDetectorManager) Detect(vspImages map[string]string, client client.C
 		}
 
 		if dpuPlatform {
-			vsp, err := detector.VspPlugin(true, vspImages, client, pm, "")
+			vsp, err := detector.VspPlugin(true, imageManager, client, pm, "")
 			if err != nil {
 				return true, nil, err
 			}
@@ -122,7 +123,7 @@ func (d *DpuDetectorManager) Detect(vspImages map[string]string, client client.C
 					return false, nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
 				}
 				dpuDevices = append(dpuDevices, identifier)
-				vsp, err := detector.VspPlugin(false, vspImages, client, pm, identifier)
+				vsp, err := detector.VspPlugin(false, imageManager, client, pm, identifier)
 				if err != nil {
 					return true, nil, err
 				}

@@ -33,7 +33,7 @@ import (
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/controller"
-	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	//+kubebuilder:scaffold:imports
 )
@@ -89,22 +89,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	vspImages := plugin.CreateVspImagesMap(true, setupLog)
-	vspExtraData := plugin.CreateVspExtraDataMap(true, setupLog)
+	imageManager := images.NewEnvImageManager()
 
-	dpuDaemonImage := os.Getenv("DPU_DAEMON_IMAGE")
-	if dpuDaemonImage == "" {
-		setupLog.Error(err, "Failed to set DPU_DAEMON_IMAGE env var")
-		os.Exit(1)
-	}
-
-	networkResourcesInjectorImage := os.Getenv("NETWORK_RESOURCES_INJECTOR_IMAGE")
-	if networkResourcesInjectorImage == "" {
-		setupLog.Error(err, "Failed to set NETWORK_RESOURCES_INJECTOR_IMAGE env var")
-		os.Exit(1)
-	}
-
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), dpuDaemonImage, vspImages, vspExtraData, networkResourcesInjectorImage)
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), imageManager)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)

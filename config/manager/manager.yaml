@@ -76,9 +76,9 @@ spec:
         - --metrics-bind-address=:10443
         - --leader-elect
         env:
-        - name: DPU_DAEMON_IMAGE
+        - name: DpuOperatorDaemonImage
           value: quay.io/openshift/origin-dpu-daemon:4.20
-        - name: NETWORK_RESOURCES_INJECTOR_IMAGE
+        - name: NRIWebhookImage
           value: quay.io/openshift/sriov-dp-admission-controller:latest
         #TODO: We will need pointers to all supported VSP images so we can dynamically detect the correct vendor to support at runtime
         # - name: IntelVspImage

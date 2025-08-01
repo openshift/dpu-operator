@@ -10,17 +10,15 @@ import (
 
 	"github.com/openshift/dpu-operator/internal/daemon"
 	mockvsp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/mock-vsp"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/spf13/afero"
 )
 
-func createVspTestImages() map[string]string {
-	vspImages := make(map[string]string)
-	vspImages["IntelVspImage"] = "Intel-image"
-	vspImages["MarvellVspImage"] = "Marvell-image"
-	return vspImages
+func createVspTestImages() images.ImageManager {
+	return images.NewDummyImageManager()
 }
 
 var _ = g.Describe("Full Daemon", func() {

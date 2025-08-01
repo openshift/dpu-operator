@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -26,49 +25,6 @@ import (
 var binData embed.FS
 
 type DpuIdentifier string
-
-const VspImageIntel string = "IntelVspImage"
-const VspImageMarvell string = "MarvellVspImage"
-const VspImageIntelNetSec string = "IntelNetSecVspImage"
-
-const VspImageP4Intel string = "IntelVspP4Image"
-
-var VspImages = []string{
-	VspImageIntel,
-	VspImageMarvell,
-	VspImageIntelNetSec,
-	// TODO: Add future supported vendor plugins here
-}
-
-var VspExtraData = []string{
-	VspImageP4Intel,
-}
-
-func CreateVspMap(fromEnv bool, logger logr.Logger, VspInfoList []string) map[string]string {
-	vspInfoMap := make(map[string]string)
-
-	for _, vspInfoMapName := range VspInfoList {
-		var value string
-
-		if fromEnv {
-			value = os.Getenv(vspInfoMapName)
-			if value == "" {
-				logger.Info("VspInfoMap env var not set", "VspInfoMap", vspInfoMapName)
-			}
-		}
-		vspInfoMap[vspInfoMapName] = value
-	}
-
-	return vspInfoMap
-}
-
-func CreateVspExtraDataMap(fromEnv bool, logger logr.Logger) map[string]string {
-	return CreateVspMap(fromEnv, logger, VspExtraData)
-}
-
-func CreateVspImagesMap(fromEnv bool, logger logr.Logger) map[string]string {
-	return CreateVspMap(fromEnv, logger, VspImages)
-}
 
 type VendorPlugin interface {
 	Start() (string, int32, error)

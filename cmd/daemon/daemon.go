@@ -8,7 +8,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/platform"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/spf13/afero"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,10 +29,10 @@ func main() {
 	log := ctrl.Log.WithName("Daemon Init")
 	log.Info("Daemon init")
 
-	vspImages := plugin.CreateVspImagesMap(true, log)
+	imageManager := images.NewEnvImageManager()
 
 	platform := &platform.HardwarePlatform{}
-	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), vspImages, utils.NewPathManager("/"))
+	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), imageManager, utils.NewPathManager("/"))
 	if err := d.PrepareAndServe(context.Background()); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)

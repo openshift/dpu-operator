@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -24,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 
@@ -55,7 +55,8 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), "mock-image", plugin.CreateVspImagesMap(false, setupLog), plugin.CreateVspExtraDataMap(false, setupLog), "mock-webhook-image")
+	mockImageManager := images.NewDummyImageManager()
+	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), mockImageManager)
 	err = b.SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 

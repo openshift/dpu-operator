@@ -8,6 +8,7 @@ import (
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,15 +73,19 @@ func (pi *IntelDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice)
 	return "", nil
 }
 
-func (pi *IntelDetector) VspPlugin(dpuMode bool, vspImages map[string]string, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
-	p4Image := os.Getenv(VspP4ImageIntelEnv)
-	if p4Image == "" {
-		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4")
+func (pi *IntelDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
+	p4Image, err := imageManager.GetImage(images.VspImageP4Intel)
+	if err != nil {
+		return nil, errors.Errorf("Error getting vsp-p4 image: Can't start Intel vsp without vsp-p4: %v", err)
 	}
 	args := fmt.Sprintf(`[ "-v=debug", "--p4rtName=%s.%s.svc.cluster.local", "--p4Image=%s" ]`,
 		VspP4ServiceName, vars.Namespace, p4Image)
 	template_vars := plugin.NewVspTemplateVars()
-	template_vars.VendorSpecificPluginImage = vspImages[plugin.VspImageIntel]
+	vspImage, err := imageManager.GetImage(images.VspImageIntel)
+	if err != nil {
+		return nil, errors.Errorf("Error getting Intel VSP image: %v", err)
+	}
+	template_vars.VendorSpecificPluginImage = vspImage
 	template_vars.Command = `[ "/ipuplugin" ]`
 	template_vars.Args = args
 	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))

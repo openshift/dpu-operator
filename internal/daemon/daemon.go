@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
@@ -30,7 +31,7 @@ type Daemon struct {
 	mode              string
 	pm                *utils.PathManager
 	log               logr.Logger
-	vspImages         map[string]string
+	imageManager      images.ImageManager
 	config            *rest.Config
 	managers          []SideManager
 	client            client.Client
@@ -39,14 +40,14 @@ type Daemon struct {
 	dpuDetectorManger *platform.DpuDetectorManager
 }
 
-func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, vspImages map[string]string, pathManager *utils.PathManager) Daemon {
+func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		fs:                fs,
 		mode:              mode,
 		pm:                pathManager,
 		log:               log,
-		vspImages:         vspImages,
+		imageManager:      imageManager,
 		config:            config,
 		p:                 p,
 		dpuDetectorManger: platform.NewDpuDetectorManager(p),
@@ -169,7 +170,7 @@ func (d *Daemon) Serve(ctx context.Context) error {
 }
 
 func (d *Daemon) createDaemon() (SideManager, error) {
-	dpuMode, plugin, err := d.dpuDetectorManger.Detect(d.vspImages, d.client, *d.pm)
+	dpuMode, plugin, err := d.dpuDetectorManger.Detect(d.imageManager, d.client, *d.pm)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to detect DPUs: %v", err)
 	}
