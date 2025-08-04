@@ -15,6 +15,7 @@ RUN \
         \
         export OCTEP_PATH="/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
         \
+        \
         ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target.25.03.0/ /workspace/pcie_ep_octeon_target && \
         \
         cd "/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
@@ -23,6 +24,19 @@ RUN \
         cd "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent" && \
         make CFLAGS="$(pkg-config --cflags libconfig) -I$OCTEP_PATH/include" \
              LDFLAGS="$(pkg-config --libs libconfig) -L$OCTEP_PATH/bin/lib" && \
+        \
+        cp bin/bin/octep_cp_agent /cpagent-bin/octep_cp_agent.25.03.0 && \
+        \
+        \
+        ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target/ /workspace/pcie_ep_octeon_target && \
+        \
+        cd "/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        make CFLAGS="-DUSE_PEM_AND_DPI_PF=1" && \
+        \
+        cd "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent" && \
+        make CFLAGS="$(pkg-config --cflags libconfig) -I$OCTEP_PATH/include" \
+             LDFLAGS="$(pkg-config --libs libconfig) -L$OCTEP_PATH/bin/lib" && \
+        \
         cp bin/bin/octep_cp_agent /cpagent-bin/ && \
         \
         cp cn106xx.cfg /cpagent-bin/ && \
