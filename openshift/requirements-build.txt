@@ -11,6 +11,6 @@ flit-core==3.10.1
 cython==3.0.0
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==75.6.0
+setuptools==78.1.1
     # via
     #   -r ./requirements-build.in
