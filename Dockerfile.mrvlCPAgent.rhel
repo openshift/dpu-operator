@@ -3,26 +3,31 @@ ARG TARGETOS
 ARG TARGETARCH
 
 RUN dnf update -y && dnf install gawk gcc g++ libconfig-devel -y
-RUN dnf clean all && rm -rf /var/cache/dnf
 
 WORKDIR /workspace
 COPY . .
 
-RUN if [ "$TARGETARCH" = "arm64" ] ; then \
-	ln -s internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target/ /workspace/pcie_ep_octeon_target && \
-        cd /workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib && \
-        export CFLAGS="$CFLAGS -Wno-error=unused-result -DUSE_PEM_AND_DPI_PF=1" && make ; \
-    fi
-
-WORKDIR "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent"
-RUN mkdir -p /cpagent-bin/
-RUN if [ "$TARGETARCH" = "arm64" ] ; then \
+RUN \
+    set -x && \
+    mkdir -p /cpagent-bin/ && \
+    \
+    if [ "$TARGETARCH" = "arm64" ] ; then \
+        \
         export OCTEP_PATH="/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
-        export CFLAGS="$CFLAGS -I$OCTEP_PATH/include" && \
-        export LDFLAGS="-L$OCTEP_PATH" && \
-        make && \
+        \
+        ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target/ /workspace/pcie_ep_octeon_target && \
+        \
+        cd "/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        make CFLAGS="-DUSE_PEM_AND_DPI_PF=1" && \
+        \
+        cd "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent" && \
+        make CFLAGS="$(pkg-config --cflags libconfig) -I$OCTEP_PATH/include" \
+             LDFLAGS="$(pkg-config --libs libconfig) -L$OCTEP_PATH/bin/lib" && \
         cp bin/bin/octep_cp_agent /cpagent-bin/ && \
-        cp cn106xx.cfg /cpagent-bin/ ; \
+        \
+        cp cn106xx.cfg /cpagent-bin/ && \
+        \
+        echo "build completed" ; \
     fi
 
 # Build
