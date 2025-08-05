@@ -15,7 +15,7 @@ RUN \
         \
         export OCTEP_PATH="/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
         \
-        ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target/ /workspace/pcie_ep_octeon_target && \
+        ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target.25.03.0/ /workspace/pcie_ep_octeon_target && \
         \
         cd "/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
         make CFLAGS="-DUSE_PEM_AND_DPI_PF=1" && \
