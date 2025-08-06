@@ -84,6 +84,11 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 	timeout := 10 * time.Second
 	interval := 100 * time.Millisecond
 
+	err := g.deployVsp()
+	if err != nil {
+		return "", 0, err
+	}
+
 	for {
 		err := g.ensureConnected()
 		if err != nil {
@@ -129,7 +134,7 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
 	return func(d *GrpcPlugin) {
 		d.vsp = template_vars
-		d.log.Info("Deploying with VSP", "vsp", d.vsp.VendorSpecificPluginImage)
+		d.log.Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
 	}
 }
 
@@ -170,11 +175,6 @@ func NewGrpcPlugin(dpuMode bool, dpuIdentifier DpuIdentifier, client client.Clie
 
 	for _, opt := range opts {
 		opt(gp)
-	}
-
-	err := gp.deployVsp()
-	if err != nil {
-		return nil, err
 	}
 
 	return gp, nil
