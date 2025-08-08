@@ -115,5 +115,14 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+        volumeMounts:
+        - name: host-run
+          mountPath: /host-run
+          readOnly: true
+      volumes:
+      - name: host-run
+        hostPath:
+          path: /run
+          type: DirectoryOrCreate
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

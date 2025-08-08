@@ -38,18 +38,20 @@ func (p *PathManager) CniPath() string {
 	return "/var/lib/cni/bin/dpu-cni"
 }
 
-func (p *PathManager) CniHostDir(flavour Flavour) (string, error) {
-	// Some k8s cluster flavours use /var/lib (in the case of RHCOS based)
-	// and some use /opt (in the case of RHEL based)
-	switch flavour {
-	case MicroShiftFlavour:
-		return p.wrap("/opt/cni"), nil
-	case OpenShiftFlavour:
+func (p *PathManager) CniHostDir(clusterFlavour Flavour, filesystemMode FilesystemMode) (string, error) {
+	// Decision logic based on both cluster type and filesystem characteristics
+	switch {
+	// MicroShift with ImageMode gets special treatment - uses /run/cni
+	case clusterFlavour == MicroShiftFlavour && filesystemMode == ImageMode:
+		return p.wrap("/run/cni"), nil
+	// OpenShift typically uses /var/lib/cni regardless of filesystem mode since nodes are always coreos based
+	case clusterFlavour == OpenShiftFlavour:
 		return p.wrap("/var/lib/cni"), nil
-	case KindFlavour:
+	// MicroShift with PackageMode and Kind use /opt/cni
+	case (clusterFlavour == MicroShiftFlavour && filesystemMode == PackageMode) || clusterFlavour == KindFlavour:
 		return p.wrap("/opt/cni"), nil
 	default:
-		return "", fmt.Errorf("unknown flavour")
+		return "", fmt.Errorf("unknown combination of cluster flavour (%s) and filesystem mode (%s)", clusterFlavour, filesystemMode)
 	}
 }
 

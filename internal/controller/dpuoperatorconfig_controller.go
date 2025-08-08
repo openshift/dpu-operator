@@ -138,8 +138,19 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 		return nil
 	}
 	logger.Info("Detected Kuberentes flavour", "flavour", flavour)
-	p, err := r.pathManager.CniHostDir(flavour)
+
+	logger.Info("Detecting filesystem deployment mode")
+	fmd := utils.NewFilesystemModeDetector()
+	filesystemMode, err := fmd.DetectMode()
 	if err != nil {
+		logger.Error(err, "Failed to detect filesystem mode")
+		return nil
+	}
+	logger.Info("Detected filesystem deployment mode", "mode", filesystemMode)
+
+	p, err := r.pathManager.CniHostDir(flavour, filesystemMode)
+	if err != nil {
+		logger.Error(err, "Failed to determine CNI host directory", "flavour", flavour, "filesystemMode", filesystemMode)
 		return nil
 	}
 
