@@ -119,10 +119,10 @@ func WithClient(client *rest.Config) func(*HostSideManager) {
 	}
 }
 
-func (d *HostSideManager) StartVsp() error {
-	addr, port, err := d.vsp.Start()
+func (d *HostSideManager) StartVsp(ctx context.Context) error {
+	addr, port, err := d.vsp.Start(ctx)
 	if err != nil {
-		return fmt.Errorf("failed calling VSP Start(): %v", err)
+		return fmt.Errorf("failed calling VSP Start() from HostSideManager: %v", err)
 	}
 	d.addr = addr
 	d.port = port
