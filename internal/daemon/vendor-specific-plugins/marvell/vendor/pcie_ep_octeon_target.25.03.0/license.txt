@@ -1,0 +1,23 @@
+Pcie_ep_octeontx License Summary
+================================
+
+Pcie_ep_octeontx project contains applications developed by Marvell and other
+open source projects to enable using Octeon in endpoint mode.This file gives a
+short overview of the various components and pointers to their exact license
+information.In the event of a conflict, the license header of a specific file
+takes precedence over this file. This is just a summary file.
+
+Pcie_ep_octeontx components
+===========================
+
+Component:      target-apps
+License:        BSD-3-Clause (SPDX-License-Identifier: BSD-3-Clause)
+License Text:   https://spdx.org/licenses/BSD-3-Clause.html#licenseText
+Project URL:    N/A
+Directories:    target/apps
+
+Component:      target-libs
+License:        BSD-3-Clause (SPDX-License-Identifier: BSD-3-Clause)
+License Text:   https://spdx.org/licenses/BSD-3-Clause.html#licenseText
+Project URL:    N/A
+Directories:    target/libs/octep_cp_lib

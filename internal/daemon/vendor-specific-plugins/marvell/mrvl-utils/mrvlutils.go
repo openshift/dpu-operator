@@ -21,6 +21,7 @@ const (
 	MrvlHostSDPPFId        = "b900" // device ID for Host SDP Interface
 	MrvlDPIPFId            = "a080" // device ID for Marvell OCTEON(CN10K) DPI PF
 	MrvlPEMPFId            = "a06c" // device ID for Marvell OCTEON(CN10K) PEM PF
+	MrvlRVUPF2Id           = "a0ef"
 	SysBusPci       string = "/sys/bus/pci/devices"
 )
 

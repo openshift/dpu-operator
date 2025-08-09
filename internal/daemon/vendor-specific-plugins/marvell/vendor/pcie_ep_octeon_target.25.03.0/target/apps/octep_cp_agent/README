@@ -112,11 +112,7 @@ the following steps has to be followed to run the application.
   #Below shows the usual DPI PF device in lspci command
   0000:06:00.0 System peripheral [0880]: Cavium, Inc. Device [177d:a080]
 
-  #Below shows the usual second SDP RVU PF device in lspci command, which maps the
-  # SDP misc and OEI registers in its BAR2
-  0002:19:00.0 Ethernet controller [0200]: Cavium, Inc. Device [177d:a0ef] (rev 51)
-
-  #Bind PEM PF and SDP RVU PF to vfio-pci driver
+  #Bind PEM PF and DPI PF to vfio-pci driver
   modprobe vfio-pci
   echo "177d a06c" > /sys/bus/pci/drivers/vfio-pci/new_id
   echo "177d a080" > /sys/bus/pci/drivers/vfio-pci/new_id
@@ -134,12 +130,8 @@ the following steps has to be followed to run the application.
 
   echo "<PEM/DPI BDF>" > /sys/bus/pci/drivers/<driver>/unbind
 
-
-  #Run the application. Here is the example for cn106xx cards, using sdp_rvu_pf and pem_dev as args
-  ./octep_cp_agent /usr/bin/cn106xx.cfg -- --sdp_rvu_pf 0002:19:00.0 --pem_dev 0001:00:10.0
-
-  #You can also pass the DPI PF argument to initialize DPI in the octep_cp_agent
-  ./octep_cp_agent /usr/bin/cn106xx.cfg -- --sdp_rvu_pf 0002:19:00.0 --pem_dev 0001:00:10.0 --dpi_dev 0000:06:00.0
+  #Run the application. Here is the example for cn106xx cards
+  ./octep_cp_agent /usr/bin/cn106xx.cfg -- --dpi_dev 0000:06:00.0 --pem_dev 0001:00:10.0
 
 ```
 

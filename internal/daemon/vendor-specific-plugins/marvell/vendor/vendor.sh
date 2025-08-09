@@ -2,7 +2,7 @@
 
 set -ex
 
-OCTEON_GITSHA="aa84a2331f76b68583e7b5861f17f5f3cef0fbd0"
+OCTEON_GITSHA="35c9be07d2eefe1c909efefc9faa495db965a58e"
 
 die() {
     printf "%s\n" "$*"
