@@ -5,6 +5,7 @@ clusters:
     network_api_port: "{{secondary_network_port()}}"
     kind: "iso"
     install_iso: "{{iso_server()}}/RHEL-9.6.0-20250416.8-aarch64-dvd1-w-kickstart.iso"
+    kubeconfig: "/root/kubeconfig.microshift"
     masters:
     - name: "{{worker_number(0)}}-acc"
       node: "localhost"
@@ -26,5 +27,7 @@ clusters:
       organization_id: "{{organization_id()}}"
       activation_key: "{{activation_key()}}"
     - name: "microshift"
+    - name: "image_registry"
+      registry_type: "microshift"
     - name: "dpu_operator_dpu"
       dpu_operator_path: "../../"
