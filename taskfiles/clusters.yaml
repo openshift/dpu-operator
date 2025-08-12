@@ -26,7 +26,7 @@ tasks:
       - >
         cd cluster-deployment-automation;
         source /tmp/cda-venv/bin/activate;
-        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
+        ./cda.py -v debug --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
 
   deploy-clusters-host-phase-1:
     internal: true
@@ -36,7 +36,7 @@ tasks:
       - >
         cd cluster-deployment-automation;
         source /tmp/cda-venv/bin/activate;
-        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps pre,masters 
+        ./cda.py -v debug --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps pre,masters 
 
   deploy-clusters-host-phase-2:
     internal: true
@@ -46,7 +46,7 @@ tasks:
       - >
         cd cluster-deployment-automation;
         source /tmp/cda-venv/bin/activate;
-        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps workers,post 
+        ./cda.py -v debug --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps workers,post 
 
   deploy-clusters-both-phase-1:
     internal: true
