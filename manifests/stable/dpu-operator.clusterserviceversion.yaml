@@ -38,7 +38,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-07-09T11:00:12Z"
+    createdAt: "2025-08-12T16:13:00Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -403,6 +403,9 @@ spec:
                 - mountPath: /tmp/k8s-webhook-server/serving-certs
                   name: cert
                   readOnly: true
+                - mountPath: /host-run
+                  name: host-run
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
                 seccompProfile:
@@ -414,6 +417,10 @@ spec:
                 secret:
                   defaultMode: 420
                   secretName: webhook-server-cert
+              - hostPath:
+                  path: /run
+                  type: DirectoryOrCreate
+                name: host-run
       permissions:
       - rules:
         - apiGroups:
