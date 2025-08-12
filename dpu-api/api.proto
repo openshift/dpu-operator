@@ -13,6 +13,11 @@ service NetworkFunctionService {
   rpc DeleteNetworkFunction(NFRequest) returns (Empty);
 }
 
+service ManualOperationService {
+  rpc ManualRebootDpuFunction(ManualOperationRequest)  returns (ManualOperationResponse);
+  rpc ManualUpgradeSdkFunction(ManualOperationRequest) returns (ManualOperationResponse);
+}
+
 message InitRequest {
   bool dpu_mode = 1;
   string dpu_identifier = 2;
@@ -51,4 +56,16 @@ message Device {
 
 message DeviceListResponse {
   map<string, Device> devices = 1;
+}
+
+message ManualOperationRequest{
+  string nodeName = 1;
+  string pciAddress = 2;
+  string sdkImagePath = 3;
+
+}
+
+message ManualOperationResponse{
+  string status = 1;
+  string message = 2;
 }
