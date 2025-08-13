@@ -77,9 +77,17 @@ spec:
         - --leader-elect
         env:
         - name: DpuOperatorDaemonImage
-          value: quay.io/openshift/origin-dpu-daemon:4.20
+          value: quay.io/openshift/origin-dpu-daemon:latest
         - name: NRIWebhookImage
           value: quay.io/openshift/sriov-dp-admission-controller:latest
+        - name: IntelVspImage
+          value: quay.io/openshift/dpu-intel-vsp:latest
+        - name: IntelVspP4Image
+          value: quay.io/openshift/dpu-intel-vsp-p4:latest
+        - name: MarvellVspImage
+          value: quay.io/openshift/dpu-marvell-vsp:latest
+        - name: IntelNetSecVspImage
+          value: quay.io/openshift/dpu-intel-netsec-vsp:latest
         #TODO: We will need pointers to all supported VSP images so we can dynamically detect the correct vendor to support at runtime
         # - name: IntelVspImage
         #   value: quay.io/openshift/origin-intel-vsp-image:4.16
