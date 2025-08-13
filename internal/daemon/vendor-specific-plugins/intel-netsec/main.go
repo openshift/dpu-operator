@@ -98,14 +98,14 @@ func (vsp *intelNetSecVspServer) configureCommChannelIPs(dpuMode bool) (pb.IpPor
 	var err error
 	if dpuMode {
 		// All NetSec DPU devices have the same internal PCIe Addresses. Netdev names can change with each RHEL release.
-		ifName, err = vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, IntelNetSecDpuBackplanef2PCIeAddress)
+		ifName, err = vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuBackplanef2PCIeAddress)
 		if err != nil {
 			vsp.log.Error(err, "Error getting netdev name from PCIe address in DPU mode", "PCIeAddress", IntelNetSecDpuBackplanef2PCIeAddress)
 			return pb.IpPort{}, err
 		}
 		addr = IPv6AddrDpu
 	} else {
-		ifName, err = vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, vsp.dpuPcieAddress)
+		ifName, err = vsp.platform.GetNetDevNameFromPCIeAddr(vsp.dpuPcieAddress)
 		if err != nil {
 			vsp.log.Error(err, "Error getting netdev name from PCIe address in Host mode", "PCIeAddress", vsp.dpuPcieAddress)
 			return pb.IpPort{}, err
@@ -184,7 +184,7 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 	// 1. IntelNetSecDpuSFPf0PCIeAddress can be used for the cluster network.
 	// 2. IntelNetSecDpuSFPf1PCIeAddress we use the second 25Gbe interface for now.
 	// With 1) you can't have the same interface on 2 bridges.
-	sfpPortIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, IntelNetSecDpuSFPf1PCIeAddress)
+	sfpPortIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuSFPf1PCIeAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
 		return err
@@ -322,7 +322,7 @@ func (vsp *intelNetSecVspServer) getConnectedVf(OPIBridgePortName string) (*vspn
 		return nil, err
 	}
 
-	pfIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, backPlanePcieAddr)
+	pfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(backPlanePcieAddr)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", backPlanePcieAddr)
 		return nil, err
@@ -353,7 +353,7 @@ func (vsp *intelNetSecVspServer) CreateBridgePort(ctx context.Context, in *opi.C
 		return nil, err
 	}
 
-	vfIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, vfDevice.PciAddress)
+	vfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
@@ -379,7 +379,7 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 		return nil, err
 	}
 
-	vfIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, vfDevice.PciAddress)
+	vfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
@@ -423,7 +423,7 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
 		pcieAddr = vsp.dpuPcieAddress
 	}
 
-	ifName, err = vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, pcieAddr)
+	ifName, err = vsp.platform.GetNetDevNameFromPCIeAddr(pcieAddr)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
 		return err

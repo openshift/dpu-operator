@@ -50,10 +50,26 @@ func (d *IntelDetector) IsDPU(platform Platform, pci ghw.PCIDevice, dpuDevices [
 		return false, fmt.Errorf("Error determining if device %s is a VF or PF: %v", pci.Address, err)
 	}
 
-	return !isVF &&
-		pci.Class.Name == "Network controller" &&
-		pci.Vendor.Name == "Intel Corporation" &&
-		pci.Product.Name == "Infrastructure Data Path Function", nil
+	// Check basic PCI device properties
+	if isVF ||
+		pci.Class.Name != "Network controller" ||
+		pci.Vendor.Name != "Intel Corporation" ||
+		pci.Product.Name != "Infrastructure Data Path Function" {
+		return false, nil
+	}
+
+	netdevNames, err := platform.GetNetDevNameFromPCIeAddr(pci.Address)
+	if err != nil {
+		return false, fmt.Errorf("Error getting network device name for PCI address %s: %v", pci.Address, err)
+	}
+
+	for _, netdevName := range netdevNames {
+		if strings.HasSuffix(netdevName, "d2") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
@@ -69,8 +85,10 @@ func (pi *IntelDetector) IsDpuPlatform(platform Platform) (bool, error) {
 }
 
 func (pi *IntelDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
-	// TODO: Implement a way to get the DPU identifier.
-	return "", nil
+	// TODO: rethink if it's possible to use something else than a pci address. Serial number doesn't seem to be the
+	// right choice for IPU.
+	identifier := fmt.Sprintf("intel-ipu-%s", pci.Address)
+	return plugin.DpuIdentifier(identifier), nil
 }
 
 func (pi *IntelDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
