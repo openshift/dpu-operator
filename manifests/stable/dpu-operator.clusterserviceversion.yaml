@@ -410,6 +410,10 @@ spec:
                   value: quay.io/openshift/dpu-daemon:latest
                 - name: NRIWebhookImage
                   value: quay.io/openshift/dpu-network-resources-injector:latest
+                - name: IntelVspImage
+                  value: quay.io/openshift/dpu-intel-ipu-vsp:latest
+                - name: IntelVspP4Image
+                  value: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
                 image: quay.io/openshift/dpu-operator:latest
                 livenessProbe:
                   httpGet:

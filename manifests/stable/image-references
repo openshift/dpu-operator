@@ -18,3 +18,11 @@ spec:
   #  from:
   #    kind: DockerImage
   #    name: quay.io/openshift/dpu-network-resources-injector:latest
+  - name: dpu-intel-ipu-vsp
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-intel-ipu-vsp:latest
+  - name: dpu-intel-ipu-p4sdk
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
