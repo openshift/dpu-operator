@@ -414,6 +414,10 @@ spec:
                   value: quay.io/openshift/dpu-intel-ipu-vsp:latest
                 - name: IntelVspP4Image
                   value: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
+                - name: MarvellVspImage
+                  value: quay.io/openshift/dpu-marvell-vsp:latest
+                - name: IntelNetSecVspImage
+                  value: quay.io/openshift/dpu-intel-netsec-vsp:latest
                 image: quay.io/openshift/dpu-operator:latest
                 livenessProbe:
                   httpGet:

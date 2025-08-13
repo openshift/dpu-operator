@@ -26,3 +26,11 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
+  #- name: dpu-marvell-vsp
+  #  from:
+  #    kind: DockerImage
+  #    name: quay.io/openshift/dpu-marvell-vsp:latest
+  #- name: dpu-intel-netsec-vsp
+  #  from:
+  #    kind: DockerImage
+  #    name: quay.io/openshift/dpu-intel-netsec-vsp:latest
