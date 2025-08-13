@@ -27,10 +27,6 @@ import (
 
 // DpuOperatorConfigSpec defines the desired state of DpuOperatorConfig
 type DpuOperatorConfigSpec struct {
-	// Mode can be "host" or "dpu" and it defines on which side we are
-	// TODO: add support for auto
-	Mode string `json:"mode,omitempty"`
-
 	// Set log level of the operator. Edit dpuoperatorconfig_types.go to remove/update
 	LogLevel int `json:"logLevel,omitempty"`
 }

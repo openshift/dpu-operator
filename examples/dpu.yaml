@@ -3,4 +3,6 @@ kind: DpuOperatorConfig
 metadata:
   name: dpu-operator-config
 spec:
-  mode: dpu
+  # The operator automatically detects whether it's running on host or DPU
+  # No manual mode configuration is required
+  logLevel: 0
