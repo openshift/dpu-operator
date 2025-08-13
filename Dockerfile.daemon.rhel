@@ -25,7 +25,7 @@ COPY --from=builder /workspace/bin/daemon.${TARGETARCH} daemon
 COPY --from=builder /workspace/bin/dpu-cni.${TARGETARCH} dpu-cni
 
 # Install the hwdata package to include pci.ids to ensure jaypipes/ghw can run offline
-RUN yum install -y hwdata && yum clean all
+RUN yum install -y hwdata ethtool && yum clean all
 
 USER 65532:65532
 
