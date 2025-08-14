@@ -38,7 +38,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-14T16:20:27Z"
+    createdAt: "2025-08-14T16:21:10Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -373,6 +373,8 @@ spec:
                   value: quay.io/openshift/dpu-intel-vsp-p4:latest
                 - name: MarvellVspImage
                   value: quay.io/openshift/dpu-marvell-vsp:latest
+                - name: MarvellVspCpAgentImage
+                  value: quay.io/openshift/dpu-marvell-vsp-cp-agent:latest
                 - name: IntelNetSecVspImage
                   value: quay.io/openshift/dpu-intel-netsec-vsp:latest
                 image: quay.io/openshift/origin-dpu-operator:4.20
