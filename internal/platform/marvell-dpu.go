@@ -1,6 +1,8 @@
 package platform
 
 import (
+	"fmt"
+
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/images"
@@ -56,8 +58,8 @@ func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
 }
 
 func (pi *MarvellDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
-	// TODO: Implement a way to get the DPU identifier.
-	return "", nil
+	identifier := fmt.Sprintf("marvell-dpu-%s", pci.Address)
+	return plugin.DpuIdentifier(identifier), nil
 }
 
 func (pi *MarvellDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {

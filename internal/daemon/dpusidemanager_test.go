@@ -82,7 +82,7 @@ var _ = g.Describe("DPU side manager", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		dpuDaemon, err = NewDpuSideManager(dpuPlugin, config, WithPathManager(pathManager))
 		Expect(err).NotTo(HaveOccurred())
-		err = dpuDaemon.StartVsp()
+		err = dpuDaemon.StartVsp(context.Background())
 		Expect(err).NotTo(HaveOccurred())
 		err = dpuDaemon.SetupDevices()
 		Expect(err).NotTo(HaveOccurred())
