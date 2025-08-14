@@ -86,6 +86,8 @@ spec:
           value: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
         - name: MarvellVspImage
           value: quay.io/openshift/dpu-marvell-vsp:latest
+        - name: MarvellVspCpAgentImage
+          value: quay.io/openshift/dpu-marvell-cp-agent:latest
         - name: IntelNetSecVspImage
           value: quay.io/openshift/dpu-intel-netsec-vsp:latest
         #TODO: We will need pointers to all supported VSP images so we can dynamically detect the correct vendor to support at runtime
