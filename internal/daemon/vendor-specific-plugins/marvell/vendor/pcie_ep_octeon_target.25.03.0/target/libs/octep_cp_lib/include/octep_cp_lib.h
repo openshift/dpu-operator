@@ -359,7 +359,6 @@ int octep_cp_lib_uninit_pem(int dom_idx);
  */
 int octep_cp_lib_uninit();
 #if USE_PEM_AND_DPI_PF
-int cnxk_vfio_parse_sdp_rvu_pf_dev(const char *dev);
 int cnxk_vfio_parse_dpi_dev(const char *dev);
 int cnxk_vfio_parse_pem_dev(const char *dev);
 uint64_t cnxk_pem_get_mbox_memory(int pem);

@@ -12,7 +12,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <linux/vfio.h>
-#include <stdbool.h>
 
 #include "octep_cp_lib.h"
 #include "cp_log.h"
@@ -24,8 +23,7 @@
 
 #define PEM_BAR0_START(pem_idx) (0x8E0000000000ULL | ((uint64_t)pem_idx << 36))
 #define PEM_BAR4_START(pem_idx) (0x8E0F00000000ULL | ((uint64_t)pem_idx << 36))
-#define DPI_BAR0_START(dpi_idx) (0x86E000000000ULL | ((uint64_t)dpi_idx << 36))
-#define SDP_RVU_PF_BAR2_START(pf_idx) (0x86E080000000 | ((uint64_t)pf_idx << 22))
+#define DPI_BAR0_START(dpi_idx) (0x86e000000000ULL | ((uint64_t)dpi_idx << 36))
 
 #define DPI_DMA_CONTROL_DMA_ENB(x)      (((x) & 0x3fULL) << 48)
 
@@ -91,7 +89,6 @@ struct octep_dpi_dev_info {
 	int device_fd;
 	int iommu;
 	char dev_bdf[DEVICE_BDF_STRLEN];
-	bool iommu_model_set;
 
 	/* VFIO region info */
 	struct vfio_region_info region[VFIO_PCI_NUM_REGIONS];
@@ -115,22 +112,8 @@ struct octep_pem_dev_info {
 	void *mbox_mem;
 };
 
-struct octep_sdp_rvu_pf_dev_info {
-	/* SDP RVU PF device info */
-	int group_fd;
-	int device_fd;
-	int iommu;
-	char dev_bdf[DEVICE_BDF_STRLEN];
-
-	/* VFIO region info */
-	struct vfio_region_info region[VFIO_PCI_NUM_REGIONS];
-	/* mmapped address of regions */
-	void *mapped_region[VFIO_PCI_NUM_REGIONS];
-};
-
 struct octep_dpi_dev_info dpi_dev;
 struct octep_pem_dev_info pem_devs[OCTEP_CP_DOM_MAX];
-struct octep_sdp_rvu_pf_dev_info sdp_dev;
 int vfio_container;
 
 /* Close the VFIO container used to access DPI and PEM devices */
@@ -176,7 +159,6 @@ void *cnxk_pem_map_reg(int pem_idx, unsigned long long addr)
 {
 	uint64_t bar_offset;
 	int is_pem_reg = 0;
-	int is_sdp_reg = 0;
 	int bar_idx;
 
 	if ((addr & PEM_BAR4_START(pem_idx)) == PEM_BAR4_START(pem_idx)) {
@@ -187,13 +169,6 @@ void *cnxk_pem_map_reg(int pem_idx, unsigned long long addr)
 		is_pem_reg = 1;
 		bar_idx = 0;
 		bar_offset = addr - PEM_BAR0_START(pem_idx);
-	} else if ((addr & SDP_RVU_PF_BAR2_START(0)) == SDP_RVU_PF_BAR2_START(0)) {
-		is_sdp_reg = 1;
-		bar_idx = 2;
-		/* Use pf_idx = 1, since misc and other registers such as OEI are
-		 * present in the second SDP RVU PF
-		 */
-		bar_offset = addr - SDP_RVU_PF_BAR2_START(1);
 	} else if ((addr & DPI_BAR0_START(0)) == DPI_BAR0_START(0)) {
 		bar_idx = 0;
 		bar_offset = addr - DPI_BAR0_START(0);
@@ -212,16 +187,6 @@ void *cnxk_pem_map_reg(int pem_idx, unsigned long long addr)
 		}
 
 		return (pem_devs[0].mapped_region[bar_idx] + bar_offset);
-	}
-
-	if (is_sdp_reg) {
-		if (sdp_dev.region[bar_idx].size <= bar_offset) {
-			CP_LIB_LOG(ERR, CNXK,
-					"sdp_map_reg: addr=0x%llx (offset=0x%llx) is beyond BAR-%d size of 0x%lx\n",
-					addr, bar_offset, bar_idx, sdp_dev.region[bar_idx].size);
-			return NULL;
-		}
-		return (sdp_dev.mapped_region[2] + bar_offset);
 	}
 
 	if (dpi_dev.region[bar_idx].size <= bar_offset) {
@@ -645,7 +610,6 @@ static int cnxk_dpi_init(void)
 		CP_LIB_LOG(ERR, CNXK, "Failed to set IOMMU model; ret=%d\n", ret);
 		goto close_group;
 	}
-	dpi_dev.iommu_model_set = true;
 
 	/* Get a file descriptor for the device */
 	device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, dpi_dev.dev_bdf);
@@ -727,124 +691,6 @@ close_group:
 	return -1;
 }
 
-static int cnxk_sdp_rvu_pf_init(void)
-{
-	struct vfio_group_status group_status = { .argsz = sizeof(group_status) };
-	struct vfio_device_info device_info = { .argsz = sizeof(device_info) };
-	struct vfio_region_info reg = { .argsz = sizeof(reg) };
-	int group, device, ret;
-	char filepath[FILENAME_MAX];
-	void *mem;
-
-	CP_LIB_LOG(INFO, CNXK, "Initializing SDP RVU PF ...\n");
-
-	/* Open the group */
-	snprintf(filepath, sizeof(filepath), "%s%d", "/dev/vfio/", sdp_dev.iommu);
-	group = open(filepath, O_RDWR);
-	if (group < 0) {
-		CP_LIB_LOG(ERR, CNXK,
-			   "failed to open SDP RVU PF VFIO group at %s; reason: %s\n",
-			   filepath, strerror(errno));
-		return -1;
-	}
-	sdp_dev.group_fd = group;
-
-	ret = ioctl(group, VFIO_GROUP_GET_STATUS, &group_status);
-	if (ret == -1) {
-		CP_LIB_LOG(ERR, CNXK,
-			   "Failed to get VFIO group status for SDP RVU PF; err=%d\n", ret);
-		goto close_group;
-		return ret;
-	}
-
-	if (!(group_status.flags & VFIO_GROUP_FLAGS_VIABLE)) {
-		CP_LIB_LOG(ERR, CNXK,
-			   "VFIO Group is not viable; check if SDP RVU PF device bound to vfio driver\n");
-		goto close_group;
-	}
-
-	/* Add the group to the container */
-	ret = ioctl(group, VFIO_GROUP_SET_CONTAINER, &vfio_container);
-	if (ret == -1) {
-		CP_LIB_LOG(ERR, CNXK,
-			   "Failed to add SDP RVU PF VFIO group to the container; ret=%d\n", ret);
-		goto close_group;
-	}
-
-	/* To be done only once; duplicate calls will fail.
-	 * Here a duplicate call might imply the ioctl being
-	 * called during DPI config init
-	 */
-	ret = ioctl(vfio_container, VFIO_SET_IOMMU, VFIO_TYPE1_IOMMU);
-	if (ret == -1 && !dpi_dev.iommu_model_set) {
-		CP_LIB_LOG(ERR, CNXK, "Failed to set IOMMU model; ret=%d\n", ret);
-		goto close_group;
-	}
-	/* Get a file descriptor for the device */
-	device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, sdp_dev.dev_bdf);
-	if (device == -1) {
-		CP_LIB_LOG(ERR, CNXK, "Failed to get SDP RVU PF device VFIO FD; ret=%d\n", device);
-		goto close_group;
-	}
-	sdp_dev.device_fd = device;
-
-	/* Test and setup the device */
-	ret = ioctl(device, VFIO_DEVICE_GET_INFO, &device_info);
-	if (ret == -1) {
-		CP_LIB_LOG(ERR, CNXK, "Failed to get SDP RVU PF VFIO device info; ret=%d\n", ret);
-		goto close_group;
-	}
-
-	reg.index = 2;
-	ret = ioctl(device, VFIO_DEVICE_GET_REGION_INFO, &reg);
-	if (ret == -1) {
-		CP_LIB_LOG(ERR, CNXK,
-			   "Failed to get SDP RVU PF device info for region-%d; ret=%d\n",
-			   reg.index, ret);
-		goto fail;
-	} else {
-		mem = mmap(NULL, reg.size, PROT_READ | PROT_WRITE, MAP_SHARED, device, reg.offset);
-		if (mem == MAP_FAILED) {
-			CP_LIB_LOG(ERR, CNXK, "failed to mmap SDP RVU PF region-%d, offset=%d\n",
-				   reg.index, reg.offset);
-			/* FIXME: replace with uninit_dpi or uninit_pem_dpi */
-			goto fail;
-		}
-		CP_LIB_LOG(DEBUG, CNXK, "mapped SDP RVU PF device region-%d; size=0x%llx.\n",
-			   reg.index, reg.size);
-		sdp_dev.mapped_region[2] = mem;
-		sdp_dev.region[2] = reg;
-	}
-
-	return 0;
-fail:
-	CP_LIB_LOG(ERR, CNXK, "SDP RVU PF init failed !!\n");
-	close(sdp_dev.device_fd);
-	sdp_dev.device_fd = 0;
-
-close_group:
-	close(group);
-	return -1;
-}
-
-static void cnxk_sdp_rvu_pf_uninit(void)
-{
-	int i;
-
-	if (sdp_dev.device_fd)
-		close(sdp_dev.device_fd);
-	if (sdp_dev.group_fd) {
-		close(sdp_dev.group_fd);
-		sdp_dev.group_fd = 0;
-	}
-
-	for (i = 0; i < VFIO_PCI_NUM_REGIONS; i++) {
-		if (!sdp_dev.mapped_region[i])
-			continue;
-		munmap(sdp_dev.mapped_region[i], sdp_dev.region[i].size);
-	}
-}
-
 int cnxk_vfio_global_init(void)
 {
 	int ret;
@@ -856,20 +702,6 @@ int cnxk_vfio_global_init(void)
 	/* Initialize DPI */
 	if (cnxk_dpi_init()) {
 		ret = -ENODEV;
-		/* Let init passthrough even if DPI PF is not initialised
-		 * assuming the DPI driver takes care of it
-		 * TODO: Remove DPI init in full
-		 */
-		CP_LIB_LOG(INFO, CNXK,
-			   "DPI init failed, proceed assuming DPI driver is present\n");
-#if 0
-		goto destroy_container;
-#endif
-	}
-
-	if (cnxk_sdp_rvu_pf_init()) {
-		ret = -ENODEV;
-		cnxk_dpi_uninit();
 		goto destroy_container;
 	}
 	return 0;
@@ -882,7 +714,6 @@ destroy_container:
 void cnxk_vfio_global_uninit(void)
 {
 	cnxk_dpi_uninit();
-	cnxk_sdp_rvu_pf_uninit();
 	cnxk_destroy_vfio_container();
 }
 
@@ -954,32 +785,5 @@ int cnxk_vfio_parse_pem_dev(const char *dev)
 	}
 
 	CP_LIB_LOG(INFO, CNXK, "PEM: device = %s; IOMMU group = %d\n", dev, pem_dev->iommu);
-	return 0;
-}
-
-int cnxk_vfio_parse_sdp_rvu_pf_dev(const char *dev)
-{
-	char filepath[FILENAME_MAX];
-	struct stat sb;
-
-	snprintf(filepath, sizeof(filepath), "%s%s", "/sys/bus/pci/devices/", dev);
-	if (stat(filepath, &sb) || !S_ISDIR(sb.st_mode)) {
-		CP_LIB_LOG(ERR, LIB, "Invalid DPI device BDF %s\n", dev);
-		return -1;
-	}
-	strncpy(sdp_dev.dev_bdf, dev, sizeof(sdp_dev.dev_bdf) - 1);
-
-	/* get IOMMU group of the SDP RVU PF device */
-	snprintf(filepath, sizeof(filepath), "%s%s/%s",
-		 "/sys/bus/pci/devices/", dev, "iommu_group");
-	sdp_dev.iommu = get_pci_iommu_group(filepath);
-	if (sdp_dev.iommu < 0) {
-		CP_LIB_LOG(ERR, LIB,
-				"Failed to find IOMMU group of DPI device at %s\n",
-				dev);
-		return -1;
-	}
-
-	CP_LIB_LOG(INFO, CNXK, "SDP RVU PF: device = %s; IOMMU group = %d\n", dev, sdp_dev.iommu);
 	return 0;
 }
