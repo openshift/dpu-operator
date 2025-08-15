@@ -17,13 +17,7 @@ package ipuplugin
 import (
 	"context"
 	"fmt"
-	"net"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
-	"time"
-
+	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/firewall"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
@@ -34,6 +28,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"net"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
 )
 
 const (
@@ -153,6 +153,12 @@ func (s *server) Run() error {
 	}
 
 	if s.mode == types.IpuMode {
+		// Configure ACC firewall settings to allow microshift, dpu-operator, ACC-IMC internal traffics.
+		log.Info("Configure firewalld on ACC")
+		if err := firewall.Configure(); err != nil {
+			log.Error(err, "firewall setup failed: %v", err)
+		}
+
 		log.Info("Starting infrapod")
 		if s.p4Image != "" {
 			log.Infof("Using P4 image as : %s\n", s.p4Image)
@@ -271,6 +277,15 @@ func (s *server) Stop() {
 		s.listener.Close()
 		_ = s.cleanUp()
 	}
+
+	if s.mode == types.IpuMode {
+		//Reset firewall to its default settings.
+		log.Info("Stop firewalld on ACC")
+		if err := firewall.CleanUp(); err != nil {
+			log.Error(err, "firewall cleanup failed: %v", err)
+		}
+	}
+
 	s.log.Info("IPU plugin has stopped")
 }
 
