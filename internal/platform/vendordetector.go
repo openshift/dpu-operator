@@ -49,6 +49,9 @@ type VendorDetector interface {
 	GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error)
 
 	GetVendorName() string
+
+	// A unique identifier for when detection happens on the DPU
+	DpuPlatformIdentifier() plugin.DpuIdentifier
 }
 
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
@@ -114,7 +117,7 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 			detectedDpus = append(detectedDpus, DetectedDpu{
 				IsDpuPlatform: true,
 				Plugin:        vsp,
-				Identifier:    "",
+				Identifier:    detector.DpuPlatformIdentifier(),
 			})
 			continue
 		}

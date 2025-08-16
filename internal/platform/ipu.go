@@ -112,3 +112,7 @@ func (pi *IntelDetector) VspPlugin(dpuMode bool, imageManager images.ImageManage
 func (d *IntelDetector) GetVendorName() string {
 	return "intel"
 }
+
+func (d *IntelDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "intel-ipu"
+}

@@ -149,6 +149,12 @@ func (p *FakePlatform) RemoveAllPciDevices() {
 	p.devices = make([]*ghw.PCIDevice, 0)
 }
 
-func (hp *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error) {
+func (p *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error) {
 	return nil, fmt.Errorf("Not implemented")
+}
+
+func (p *FakePlatform) AddPciDevice(dev *ghw.PCIDevice) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.devices = append(p.devices, dev)
 }

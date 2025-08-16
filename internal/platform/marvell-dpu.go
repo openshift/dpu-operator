@@ -77,3 +77,7 @@ func (pi *MarvellDetector) VspPlugin(dpuMode bool, imageManager images.ImageMana
 func (d *MarvellDetector) GetVendorName() string {
 	return "marvell"
 }
+
+func (d *MarvellDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "marvell-dpu"
+}
