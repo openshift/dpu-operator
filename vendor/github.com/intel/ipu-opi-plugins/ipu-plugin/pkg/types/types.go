@@ -23,8 +23,8 @@ import (
 type BridgeType int
 
 type BridgePortInfo struct {
-	PbBrPort      *pb.BridgePort
-	PortInterface string
+	PbBrPort *pb.BridgePort
+	PortId   uint //For example, if ACC interface name is enp0s1f0d4, PortId(vportId) will be 4.
 }
 
 const (
@@ -32,6 +32,8 @@ const (
 	LinuxBridge
 	HostMode = "host"
 	IpuMode  = "ipu"
+	HostVfPr = "HostVfPr" // PR(port representator on ACC) for Host VF
+	NfPr     = "NfPr"     // PR(port representator on ACC) for Network Function
 )
 
 func (b BridgeType) String() string {
