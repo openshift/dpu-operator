@@ -1,0 +1,185 @@
+Marvell Control Plane App Documentation {#MarvellDocumentation}
+===========================================
+
+```
+  Copyright (C) 2022 Marvell.
+  All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause
+```
+
+Control Plane (CP) comprises of all control or status messages exchanged between an Octeon device and Host side drivers/applications.
+The Octeon Control Plane Agent is an application that runs on the Octeon which handles these messages in lieu of the Octeon,
+and facilitates this control plane functionality.
+
+Build pre-requisites {#section2}
+========================
+
+The application requires a set of packages to be built. At minimum the application requires the following
+packages:
+
+* libconfig
+* pkg-config
+* liboctep_cp.a
+* liboctep_cp.so
+
+Libconfig {#section3}
+---------
+
+Application uses configuration files that are being read and parsed by the libconfig library.
+To cross-compile libconfig download its sources from
+[Github](https://hyperrealm.github.io/libconfig/dist/libconfig-1.7.2.tar.gz)
+then unpack, compile and install it.
+
+eg.
+```bash
+    export CROSS_COMPILE=<path to cross compiler>
+    export PATH=$PATH:<path to aarch64-marvell-linux-gnu-xxxx tools>
+    mkdir libconfig-dep
+    cd libconfig-dep
+    mkdir bin
+    wget --no-check-certificate https://hyperrealm.github.io/libconfig/dist/libconfig-1.7.2.tar.gz
+    tar xf libconfig-1.7.2.tar.gz
+    cd libconfig-1.7.2
+    ./configure --host=aarch64-marvell-linux-gnu --prefix=`pwd`/../bin
+    make all
+    make install
+```
+
+libconfig artifacts should be available in bin folder.
+
+
+Application {#section4}
+-----------
+
+APP_DIR is location of application source code
+PREFIX_DIR is the
+
+```bash
+
+  cd $APP_DIR
+  make CC=$(CROSS_COMPILE)gcc LD=$(CROSS_COMPILE)ld
+  CFLAGS="-I<path to octep_cp_lib/bin/include> -I<path to libconfig/include"
+  LDFLAGS="-L<path to liboctep_cp -L<path to libconfig>"
+```
+
+Optional parameters for make are
+
+- PLAT=<aarch64(default)/x86_64>
+- INSTALL_PATH=<$APP_DIR/bin(default)>
+
+Following artifacts will be available in `INSTALL_PATH/bin`:
+
+- octep_cp_agent
+- octep_cp_agent-shared
+
+
+How to run application {#section5}
+----------------------
+Copy following files to a directory RUN_DIR
+
+$CP_LIB_DIR/liboctep_cp.so
+$INSTALL_PATH/bin/octep_cp_agent
+$INSTALL_PATH/bin/octep_cp_agent-shared
+$APP_DIR/*.cfg
+
+Run the app as follows
+
+```bash
+
+  cd $RUN_DIR
+  ./octep_cp_agent `pwd`/<soc>.cfg
+
+  <soc> has to replaced with soc name of the target on which the app is to be run.
+
+  Optional parameters
+  -y <milliseconds> yield cpu for msecs between subsequent calls to msg poll (default: 1ms)
+  -m <1-n> Max control messages and events to be polled at one time (default: 6)
+  htop can be used to check cpu usage by the app
+
+If the octep_cp_lib used, has been compiled to enable support for PEM and DPI PF vfio driver, then
+the following steps has to be followed to run the application.
+
+```bash
+
+  #Create hugepages
+  mkdir -p /dev/huge
+  mount -t hugetlbfs nodev /dev/huge
+  echo 12 > /sys/kernel/mm/hugepages/hugepages-524288kB/nr_hugepages
+
+  #Below shows the usual PEM PF device in lspci command
+  0001:00:10.0 System peripheral [0880]: Cavium, Inc. Device [177d:a06c]
+
+  #Below shows the usual DPI PF device in lspci command
+  0000:06:00.0 System peripheral [0880]: Cavium, Inc. Device [177d:a080]
+
+  #Bind PEM PF and DPI PF to vfio-pci driver
+  modprobe vfio-pci
+  echo "177d a06c" > /sys/bus/pci/drivers/vfio-pci/new_id
+  echo "177d a080" > /sys/bus/pci/drivers/vfio-pci/new_id
+
+  echo "0001:00:10.0" > /sys/bus/pci/drivers/vfio-pci/bind
+  echo "0000:06:00.0" > /sys/bus/pci/drivers/vfio-pci/bind
+
+  #Take note to unbind the PEM/DPI PF from any other driver if it is already bound, before
+  #trying to bind the device to vfio-pci. The current driver to which the PFs are bound can be checked by
+
+  lspci -ks <PEM/DPI BDF>
+
+  #Check the "Kernel driver in use: " field
+  #Unbind the device from that driver
+
+  echo "<PEM/DPI BDF>" > /sys/bus/pci/drivers/<driver>/unbind
+
+  #Run the application. Here is the example for cn106xx cards
+  ./octep_cp_agent /usr/bin/cn106xx.cfg -- --dpi_dev 0000:06:00.0 --pem_dev 0001:00:10.0
+
+```
+
+Editing config files {#section6}
+--------------------
+The config files provide various card specific information for the CP agent to parse, such as details about number of PEMs,
+number of PFs per PEM, number of VFs per PF, default MAC address of each interface etc.
+
+The default configurations for the interfaces will be parsed out from provided config file by the CP agent app.
+The default configurations currently expected to be provided by a config file include:
+
+- Number of PEMs - including indices of respective PEMs.
+- Number of PFs per PEM - including indices of respective PFs.
+- Number of VFs per PF - including indices of respective VFs.
+- Default MAC address of each interface, where interface can be a PF or a VF. Users can edit
+  the default MAC and is of the following format:
+
+    mac_addr = [0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX];
+
+  where XX indicate specific bytes in hex.
+
+- Default link state of each interface, where interface can be a PF or a VF.
+
+    eg: link_state = 0;
+
+- Default receive state (rx state) of each interface.
+
+    eg: rx_state = 0;
+
+- Default autonegotiation flags an interface provides.
+
+    eg: autoneg = 0x3;
+
+- Default pause mode flags an interface advertises.
+
+    eg: pause_mode = 0x3;
+
+- Default link speed of an interface
+
+    eg: speed = 10000;
+
+- Default supported and advertised modes of an interface.
+
+    eg: supported_modes = 0x1;
+        advertised_modes = 0x1;
+
+- Default heartbeat interval (hb_interval) and heartbeat miss count (hb_miss_count) for a PF.
+  (Valid only for PF entries)
+
+    eg: hb_interval = 1000;
+        hb_miss_count = 20;

@@ -47,7 +47,7 @@ func NewDummyPlugin() *DummyPlugin {
 	return &DummyPlugin{}
 }
 
-func (v *DummyPlugin) Start() (string, int32, error) {
+func (v *DummyPlugin) Start(ctx context.Context) (string, int32, error) {
 	return "127.0.0.1", 50051, nil
 }
 
@@ -215,7 +215,7 @@ var _ = g.Describe("Host Daemon", func() {
 		m := SriovManagerStub{}
 		hostDaemon, err = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
 		Expect(err).NotTo(HaveOccurred())
-		err = hostDaemon.StartVsp()
+		err = hostDaemon.StartVsp(context.Background())
 		Expect(err).NotTo(HaveOccurred())
 		err = hostDaemon.SetupDevices()
 		Expect(err).NotTo(HaveOccurred())

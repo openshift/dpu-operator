@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
@@ -118,24 +117,6 @@ func EnableIPV6LinkLocal(fs afero.Fs, interfaceName string, ipv6Addr string) err
 		return fmt.Errorf("error configuring IPv6 address %s/64 on link %s: %v", ipv6Addr, interfaceName, err)
 	}
 	return nil
-}
-
-// GetNetDevNameFromPCIeAddr retrieves the network device name associated with a given PCIe address.
-// This can fail if the given PCIe address is not a NetDev or the driver is not loaded correctly.
-func GetNetDevNameFromPCIeAddr(platform platform.Platform, pcieAddress string) (string, error) {
-	nics, err := platform.NetDevs()
-	if err != nil {
-		return "", fmt.Errorf("failed to get network devices: %w", err)
-	}
-
-	for _, nic := range nics {
-		if nic.PCIAddress != nil && *nic.PCIAddress == pcieAddress {
-			klog.Infof("GetNetDevNameFromPCIeAddr(): found DPU network device %s %s", nic.Name, *nic.PCIAddress)
-			return nic.Name, nil
-		}
-	}
-
-	return "", fmt.Errorf("network device not found for PCI address %s", pcieAddress)
 }
 
 func CreateNfVethPair(idx int) (*VEthPairDeviceInfo, error) {

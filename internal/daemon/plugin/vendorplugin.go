@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -27,7 +28,7 @@ var binData embed.FS
 type DpuIdentifier string
 
 type VendorPlugin interface {
-	Start() (string, int32, error)
+	Start(ctx context.Context) (string, int32, error)
 	Close()
 	CreateBridgePort(bpr *opi.CreateBridgePortRequest) (*opi.BridgePort, error)
 	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
@@ -79,9 +80,8 @@ func (v VspTemplateVars) ToMap() map[string]string {
 	}
 }
 
-func (g *GrpcPlugin) Start() (string, int32, error) {
+func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
 	start := time.Now()
-	timeout := 10 * time.Second
 	interval := 100 * time.Millisecond
 
 	err := g.deployVsp()
@@ -90,21 +90,32 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return "", 0, ctx.Err()
+		default:
+		}
+
 		err := g.ensureConnected()
 		if err != nil {
-			if time.Since(start) >= timeout {
-				return "", 0, fmt.Errorf("failed to ensure GRPC connection after %v: %v", timeout, err)
+			select {
+			case <-ctx.Done():
+				return "", 0, ctx.Err()
+			case <-time.After(interval):
 			}
-			time.Sleep(interval)
 			continue
 		}
 
-		ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode, DpuIdentifier: string(g.dpuIdentifier)})
+		ipPort, err := g.client.Init(ctx, &pb.InitRequest{DpuMode: g.dpuMode, DpuIdentifier: string(g.dpuIdentifier)})
 		if err != nil {
-			if time.Since(start) >= timeout {
-				return "", 0, fmt.Errorf("failed to start serving after %v: %v", timeout, err)
+			if strings.Contains(err.Error(), "already initialized") {
+				return "", 0, err
 			}
-			time.Sleep(interval)
+			select {
+			case <-ctx.Done():
+				return "", 0, ctx.Err()
+			case <-time.After(interval):
+			}
 			continue
 		}
 
@@ -134,7 +145,7 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
 	return func(d *GrpcPlugin) {
 		d.vsp = template_vars
-		d.log.Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
+		d.log.V(2).Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
 	}
 }
 

@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
-
+        "github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/firewall"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
@@ -151,6 +151,10 @@ func (s *server) Run() error {
 	if err != nil {
 		return fmt.Errorf("unable to run IPU plugin")
 	}
+        // Configure ACC firewall settings to allow microshift, dpu-operator, ACC-IMC internal traffics.
+        if err := firewall.Configure(); err != nil {
+		log.Error(err, "firewall setup failed: %v", err)
+	}
 
 	if s.mode == types.IpuMode {
 		log.Info("Starting infrapod")
@@ -271,6 +275,11 @@ func (s *server) Stop() {
 		s.listener.Close()
 		_ = s.cleanUp()
 	}
+        //Reset firewall to its default settings.
+        if err := firewall.CleanUp(); err != nil {
+                log.Error(err, "firewall cleanup failed: %v", err)
+        }
+
 	s.log.Info("IPU plugin has stopped")
 }
 

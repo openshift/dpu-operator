@@ -7,6 +7,7 @@ import (
 	g "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/dpu-operator/internal/daemon"
 	mockvsp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/mock-vsp"
@@ -14,6 +15,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/internal/utils"
+	"github.com/openshift/dpu-operator/pkgs/vars"
 	"github.com/spf13/afero"
 )
 
@@ -46,6 +48,14 @@ var _ = g.Describe("Full Daemon", func() {
 		utils.Touch(fs, "/dpu-cni")
 		fakePlatform = platform.NewFakePlatform("IPU Adapter E2100-CCQDA2")
 
+		// Create DpuOperatorConfig resource required by VSP plugin
+		k8sClient, err := client.New(config, client.Options{})
+		Expect(err).NotTo(HaveOccurred())
+		namespace := testutils.DpuOperatorNamespace()
+		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		testutils.CreateNamespace(k8sClient, namespace)
+		testutils.CreateDpuOperatorCR(k8sClient, dpuOperatorConfig)
+
 		mockVsp := mockvsp.NewMockVsp(mockvsp.WithPathManager(*pathManager))
 		mockVspListen, err := mockVsp.Listen()
 		Expect(err).NotTo(HaveOccurred())
@@ -62,7 +72,10 @@ var _ = g.Describe("Full Daemon", func() {
 		d = daemon.NewDaemon(fs, fakePlatform, "dpu", config, createVspTestImages(), pathManager)
 		go func() {
 			defer close(daemonDone)
-			d.PrepareAndServe(ctx)
+			err := d.PrepareAndServe(ctx)
+			if err != nil && err != context.Canceled {
+				Expect(err).NotTo(HaveOccurred())
+			}
 			// Always wait for context cancellation to ensure proper test synchronization
 			// If ListenAndServe blocked until context cancellation, this returns immediately
 			// If ListenAndServe failed early, we wait for context cancellation
@@ -84,5 +97,13 @@ var _ = g.Describe("Full Daemon", func() {
 		// Wait for both goroutines to complete
 		<-mockVspDone
 		<-daemonDone
+
+		// Clean up DpuOperatorConfig resources
+		k8sClient, err := client.New(testCluster.EnsureExists(), client.Options{})
+		Expect(err).NotTo(HaveOccurred())
+		namespace := testutils.DpuOperatorNamespace()
+		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
+		testutils.DeleteNamespace(k8sClient, namespace)
 	})
 })

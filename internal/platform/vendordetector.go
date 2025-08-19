@@ -12,6 +12,12 @@ import (
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
+type DetectedDpu struct {
+	IsDpuPlatform bool
+	Plugin        *plugin.GrpcPlugin
+	Identifier    plugin.DpuIdentifier
+}
+
 type DpuDetectorManager struct {
 	platform  Platform
 	detectors []VendorDetector
@@ -91,45 +97,56 @@ func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, 
 	return activeDetectors[0], nil
 }
 
-func (d *DpuDetectorManager) Detect(imageManager images.ImageManager, client client.Client, pm utils.PathManager) (bool, *plugin.GrpcPlugin, error) {
+func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client client.Client, pm utils.PathManager) ([]DetectedDpu, error) {
+	var detectedDpus []DetectedDpu
+
 	for _, detector := range d.detectors {
 		dpuPlatform, err := detector.IsDpuPlatform(d.platform)
 		if err != nil {
-			return false, nil, fmt.Errorf("Error detecting if running on DPU platform with detector %v: %v", detector.Name(), err)
+			return nil, fmt.Errorf("Error detecting if running on DPU platform with detector %v: %v", detector.Name(), err)
 		}
 
 		if dpuPlatform {
-			vsp, err := detector.VspPlugin(true, imageManager, client, pm, "")
+			vsp, err := detector.VspPlugin(true, imageManager, client, pm, "dpu-platform")
 			if err != nil {
-				return true, nil, err
+				return nil, err
 			}
-			return true, vsp, nil
+			detectedDpus = append(detectedDpus, DetectedDpu{
+				IsDpuPlatform: true,
+				Plugin:        vsp,
+				Identifier:    "",
+			})
+			continue
 		}
 
 		devices, err := d.platform.PciDevices()
 		if err != nil {
-			return false, nil, errors.Errorf("Error getting PCI info: %v", err)
+			return nil, errors.Errorf("Error getting PCI info: %v", err)
 		}
 
 		var dpuDevices []plugin.DpuIdentifier
 		for _, pci := range devices {
 			isDpu, err := detector.IsDPU(d.platform, *pci, dpuDevices)
 			if err != nil {
-				return false, nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
+				return nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
 			}
 			if isDpu {
 				identifier, err := detector.GetDpuIdentifier(d.platform, pci)
 				if err != nil {
-					return false, nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
+					return nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
 				}
 				dpuDevices = append(dpuDevices, identifier)
 				vsp, err := detector.VspPlugin(false, imageManager, client, pm, identifier)
 				if err != nil {
-					return true, nil, err
+					return nil, err
 				}
-				return false, vsp, nil
+				detectedDpus = append(detectedDpus, DetectedDpu{
+					IsDpuPlatform: false,
+					Plugin:        vsp,
+					Identifier:    identifier,
+				})
 			}
 		}
 	}
-	return false, nil, nil
+	return detectedDpus, nil
 }

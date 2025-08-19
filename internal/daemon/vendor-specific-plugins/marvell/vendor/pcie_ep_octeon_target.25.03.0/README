@@ -1,0 +1,51 @@
+Marvell Octeon Target Software Documentation {#MarvellDocumentation}
+===========================================
+
+```
+  Copyright (C) 2022 Marvell.
+  All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause
+```
+
+The purpose of the PCIe-EP (Endpoint) extension is to facilitate packet I/O
+between any host and an Octeon CN9K or CN10K (referered collectively as CNXK) connected to that host in PCIe EP mode.
+
+This README gives overview of instructions to build and run PCIe EP extension
+on CNXK platform.
+
+This repo contains Marvell Octeon Target side software components for reference and sample usage.
+
+Contents
+========
+
+- Overview
+- Octep CP library
+- Octep CP Agent
+- Build procedures
+
+Overview
+========
+The purpose of the software in this repo relates mainly to enable, support (and exist in)
+Octeon CN9K or CN10K (referered collectively as CNXK or the target) connected to a host in PCIe Endpoint mode.
+All the components in this repo is intended to run on the Octeon card, and provides a reference
+implementation for a "control plane" intended to help the card run in the PCIe Endpoint mode in congruence with
+the Host side PCIe Endpoint Drivers
+
+
+Octep CP Library
+================
+
+This library intends to provide a framework for application software, to interact with necessary functionalities
+related to the Octeon working in EP mode. The functionalities include an interface and a control protocol to communicate
+with the PCIe EP host drivers out of band, using a part of the BAR4 memory of the card.
+
+Octep CP Agent
+==============
+
+The octep_cp_agent application provides a reference or a default implementation, which utilizes the
+octep_cp_library API interface to bringup and maintain a control plane, to support the Octeon's EP functionalities.
+
+Build procedures
+================
+
+Please refer to the individual component README in their respective folder for individual building procedures.
