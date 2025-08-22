@@ -17,7 +17,13 @@ package ipuplugin
 import (
 	"context"
 	"fmt"
-	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/firewall"
+	"net"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
+        "github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/firewall"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
@@ -28,12 +34,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"net"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
-	"time"
 )
 
 const (
@@ -151,14 +151,12 @@ func (s *server) Run() error {
 	if err != nil {
 		return fmt.Errorf("unable to run IPU plugin")
 	}
+        // Configure ACC firewall settings to allow microshift, dpu-operator, ACC-IMC internal traffics.
+        if err := firewall.Configure(); err != nil {
+		log.Error(err, "firewall setup failed: %v", err)
+	}
 
 	if s.mode == types.IpuMode {
-		// Configure ACC firewall settings to allow microshift, dpu-operator, ACC-IMC internal traffics.
-		log.Info("Configure firewalld on ACC")
-		if err := firewall.Configure(); err != nil {
-			log.Error(err, "firewall setup failed: %v", err)
-		}
-
 		log.Info("Starting infrapod")
 		if s.p4Image != "" {
 			log.Infof("Using P4 image as : %s\n", s.p4Image)
@@ -234,8 +232,8 @@ func (s *server) Run() error {
 }
 
 func cleanUpRulesOnExit(p4rtClient types.P4RTClient) error {
-	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", p4rtClient.GetBin(), AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
-	p4rtclient.DeletePhyPortRules(p4rtClient, AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", p4rtClient.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	p4rtclient.DeletePhyPortRules(p4rtClient, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 
 	vfMacList, err := utils.GetVfMacList()
 	if err != nil {
@@ -252,8 +250,8 @@ func cleanUpRulesOnExit(p4rtClient types.P4RTClient) error {
 	log.Infof("DeleteLAGP4Rules, path->%s", p4rtClient.GetBin())
 	p4rtclient.DeleteLAGP4Rules(p4rtClient)
 
-	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", p4rtClient, AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
-	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(p4rtClient, AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", p4rtClient, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(p4rtClient, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 	return nil
 }
 
@@ -277,14 +275,10 @@ func (s *server) Stop() {
 		s.listener.Close()
 		_ = s.cleanUp()
 	}
-
-	if s.mode == types.IpuMode {
-		//Reset firewall to its default settings.
-		log.Info("Stop firewalld on ACC")
-		if err := firewall.CleanUp(); err != nil {
-			log.Error(err, "firewall cleanup failed: %v", err)
-		}
-	}
+        //Reset firewall to its default settings.
+        if err := firewall.CleanUp(); err != nil {
+                log.Error(err, "firewall cleanup failed: %v", err)
+        }
 
 	s.log.Info("IPU plugin has stopped")
 }
