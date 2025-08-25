@@ -89,3 +89,7 @@ func (pi *NetsecAcceleratorDetector) VspPlugin(dpuMode bool, imageManager images
 func (d *NetsecAcceleratorDetector) GetVendorName() string {
 	return "intel"
 }
+
+func (d *NetsecAcceleratorDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "intel-netsec"
+}
