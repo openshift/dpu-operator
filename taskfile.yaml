@@ -11,6 +11,8 @@ env:
 vars:
   DPU_OPERATOR_TEMP_DIR: /tmp/dpu-operator-tmp
   BINDIR: bin
+  BINDIR_ABS:
+    sh: if [[ "{{.BINDIR}}" = /* ]]; then echo "{{.BINDIR}}"; else echo "$(pwd)/{{.BINDIR}}"; fi
   REGISTRY:
     sh: hostname | sed 's/$/:5000/'
   ENVTEST_K8S_VERSION: 1.27.1
@@ -36,7 +38,7 @@ tasks:
   bindir:
     silent: true
     cmds:
-      - echo "{{.BINDIR}}"
+      - echo "{{.BINDIR_ABS}}"
 
   push-image-helper:
     internal: true
