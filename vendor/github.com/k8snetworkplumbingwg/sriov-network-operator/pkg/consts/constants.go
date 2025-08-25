@@ -14,7 +14,10 @@ const (
 	Chroot = "/host"
 	Host   = "/host"
 
-	ResyncPeriod                       = 5 * time.Minute
+	ResyncPeriod               = 5 * time.Minute
+	DaemonRequeueTime          = 30 * time.Second
+	DrainControllerRequeueTime = 5 * time.Second
+
 	DefaultConfigName                  = "default"
 	ConfigDaemonPath                   = "./bindata/manifests/daemon"
 	InjectorWebHookPath                = "./bindata/manifests/webhook"
@@ -36,7 +39,6 @@ const (
 	ServiceAccount                     = "ServiceAccount"
 	DPConfigFileName                   = "config.json"
 	OVSHWOLMachineConfigNameSuffix     = "ovs-hw-offload"
-	LeaderElectionID                   = "a56def2a.openshift.io"
 
 	LinkTypeEthernet   = "ether"
 	LinkTypeInfiniband = "infiniband"
@@ -88,7 +90,9 @@ const (
 	SyncStatusInProgress = "InProgress"
 
 	DrainDeleted = "Deleted"
+	DrainDelete  = "delete"
 	DrainEvicted = "Evicted"
+	DrainEvict   = "evict"
 
 	MCPPauseAnnotationState = "sriovnetwork.openshift.io/state"
 	MCPPauseAnnotationTime  = "sriovnetwork.openshift.io/time"
@@ -136,12 +140,21 @@ const (
 		`IMPORT{program}="/etc/udev/switchdev-vf-link-name.sh $attr{phys_port_name}", ` +
 		`NAME="%s_$env{NUMBER}"`
 
-	KernelArgPciRealloc       = "pci=realloc"
-	KernelArgIntelIommu       = "intel_iommu=on"
-	KernelArgIommuPt          = "iommu=pt"
-	KernelArgIommuPassthrough = "iommu.passthrough=1"
-	KernelArgRdmaShared       = "ib_core.netns_mode=1"
-	KernelArgRdmaExclusive    = "ib_core.netns_mode=0"
+	KernelArgPciRealloc    = "pci=realloc"
+	KernelArgIntelIommu    = "intel_iommu=on"
+	KernelArgIommuPt       = "iommu=pt"
+	KernelArgRdmaShared    = "ib_core.netns_mode=1"
+	KernelArgRdmaExclusive = "ib_core.netns_mode=0"
+
+	// Systemd consts
+	SriovSystemdConfigPath        = SriovConfBasePath + "/sriov-interface-config.yaml"
+	SriovSystemdResultPath        = SriovConfBasePath + "/sriov-interface-result.yaml"
+	SriovSystemdSupportedNicPath  = SriovConfBasePath + "/sriov-supported-nics-ids.yaml"
+	SriovSystemdServiceBinaryPath = "/var/lib/sriov/sriov-network-config-daemon"
+
+	SriovServiceBasePath        = "/etc/systemd/system"
+	SriovServicePath            = SriovServiceBasePath + "/sriov-config.service"
+	SriovPostNetworkServicePath = SriovServiceBasePath + "/sriov-config-post-network.service"
 
 	// Feature gates
 	// ParallelNicConfigFeatureGate: allow to configure nics in parallel

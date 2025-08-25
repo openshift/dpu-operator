@@ -176,7 +176,7 @@ func (s *sriov) VFIsReady(pciAddr string) (netlink.Link, error) {
 	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
 		vfIndex, err := s.networkHelper.GetInterfaceIndex(pciAddr)
 		if err != nil {
-			log.Log.Error(err, "VFIsReady(): invalid index number")
+			log.Log.Error(err, "VFIsReady(): invalid index number", "device", pciAddr)
 			return false, nil
 		}
 		vfLink, err = s.netlinkLib.LinkByIndex(vfIndex)
@@ -386,7 +386,11 @@ func (s *sriov) configureHWOptionsForSwitchdev(iface *sriovnetworkv1.Interface) 
 	}
 	// flow steering mode can be changed only when NIC is in legacy mode
 	if s.GetNicSriovMode(iface.PciAddress) != sriovnetworkv1.ESwithModeLegacy {
-		s.setEswitchModeAndNumVFs(iface.PciAddress, sriovnetworkv1.ESwithModeLegacy, 0)
+		err = s.setEswitchModeAndNumVFs(iface.PciAddress, sriovnetworkv1.ESwithModeLegacy, 0)
+		if err != nil {
+			log.Log.Error(err, "falied to switch Eswitch mode to legacy and reset number of vfs to 0")
+			return err
+		}
 	}
 	if err := s.networkHelper.SetDevlinkDeviceParam(iface.PciAddress, "flow_steering_mode", desiredFlowSteeringMode); err != nil {
 		if errors.Is(err, syscall.ENOTSUP) {
@@ -658,7 +662,7 @@ func (s *sriov) getConfigureAndReset(storeManager store.ManagerInterface, interf
 			}
 		}
 
-		if !configured && ifaceStatus.NumVfs > 0 {
+		if !configured {
 			toBeResetted = append(toBeResetted, ifaceStatus)
 		}
 	}
@@ -824,8 +828,10 @@ func (s *sriov) checkForConfigAndReset(ifaceStatus sriovnetworkv1.InterfaceExt, 
 		return err
 	}
 
-	if err = s.ResetSriovDevice(ifaceStatus); err != nil {
-		return err
+	if ifaceStatus.NumVfs > 0 {
+		if err = s.ResetSriovDevice(ifaceStatus); err != nil {
+			return err
+		}
 	}
 
 	// remove pf status from host
