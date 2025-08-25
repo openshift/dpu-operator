@@ -915,6 +915,8 @@ func skipIMCReboot() (bool, string) {
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
+	skipReboot := true
+	errMsg := ""
 
 	// Connect to the remote server.
 	client, err := ssh.Dial("tcp", imcAddress, config)
@@ -951,7 +953,9 @@ func skipIMCReboot() (bool, string) {
 		uuidFileExists = true
 	}
 	if !uuidFileExists {
-		return false, "UUID File does not exist"
+		skipReboot = false
+		errMsg = "UUID File does not exist"
+		// continue checking all other files
 	}
 
 	p4PkgName := os.Getenv("P4_NAME") + ".pkg"
@@ -960,7 +964,9 @@ func skipIMCReboot() (bool, string) {
 	p4pkgMatch, errStr := utils.CompareBinary(imcPath, vspPath, client)
 
 	if !p4pkgMatch {
-		return false, errStr
+		skipReboot = false
+		errMsg = errStr
+		// continue checking all other files
 	}
 
 	genLcpkgFileStr := genLoadCustomPkgFile(outputStr)
@@ -970,7 +976,9 @@ func skipIMCReboot() (bool, string) {
 	lcpkgFileMatch, errStr = utils.CompareFile(genLcpkgFileStr, remoteFilePath, client)
 
 	if !lcpkgFileMatch {
-		return false, errStr
+		skipReboot = false
+		errMsg = errStr
+		// continue checking all other files
 	}
 
 	postInitAppFile := postInitAppScript()
@@ -978,12 +986,17 @@ func skipIMCReboot() (bool, string) {
 	piaFileMatch, errStr = utils.CompareFile(postInitAppFile, postInitRemoteFilePath, client)
 
 	if !piaFileMatch {
-		return false, errStr
+		skipReboot = false
+		errMsg = errStr
+	}
+
+	if skipReboot == true {
+		errMsg = "checks pass, imc reboot not required"
 	}
 
 	log.Infof("uuidFileExists->%v, p4pkgMatch->%v, lcpkgFileMatch->%v, piaFileMatch->%v",
 		uuidFileExists, p4pkgMatch, lcpkgFileMatch, piaFileMatch)
-	return true, "checks pass, imc reboot not required"
+	return skipReboot, errMsg
 
 }
 

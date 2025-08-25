@@ -77,8 +77,8 @@ var _ = g.Describe("Full Daemon", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 			// Always wait for context cancellation to ensure proper test synchronization
-			// If ListenAndServe blocked until context cancellation, this returns immediately
-			// If ListenAndServe failed early, we wait for context cancellation
+			// If PrepareAndServe blocked until context cancellation, this returns immediately
+			// If PrepareAndServe failed early, we wait for context cancellation
 			<-ctx.Done()
 		}()
 	})
