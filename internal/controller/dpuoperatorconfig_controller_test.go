@@ -97,15 +97,25 @@ var _ = Describe("Main Controller", Ordered, func() {
 		mgr = startDPUControllerManager(ctx, client, &wg)
 		testutils.WaitAllNodesReady(mgr.GetClient())
 
-		found := configv1.DpuOperatorConfig{}
-		Eventually(func() error {
-			err := mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: "", Name: ""}, &found)
-			if errors.IsNotFound(err) {
-				return nil
-			} else {
-				return err
+		// Ensure clean state - remove any existing DpuOperatorConfig resources
+		crList := &configv1.DpuOperatorConfigList{}
+		err := mgr.GetClient().List(context.Background(), crList)
+		if err == nil {
+			for _, existingCr := range crList.Items {
+				err := mgr.GetClient().Delete(context.Background(), &existingCr)
+				if err != nil && !errors.IsNotFound(err) {
+					setupLog.Error(err, "Failed to delete existing DpuOperatorConfig", "name", existingCr.Name)
+				}
 			}
-		}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Succeed())
+		}
+
+		// Wait for all DpuOperatorConfig resources to be deleted
+		Eventually(func() int {
+			crList := &configv1.DpuOperatorConfigList{}
+			err := mgr.GetClient().List(context.Background(), crList)
+			Expect(err).NotTo(HaveOccurred())
+			return len(crList.Items)
+		}, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(Equal(0))
 	})
 	AfterAll(func() {
 		stopDPUControllerManager(cancel, &wg)
@@ -120,6 +130,11 @@ var _ = Describe("Main Controller", Ordered, func() {
 			BeforeAll(func() {
 				ns := testutils.DpuOperatorNamespace()
 				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+
+				// Ensure any existing CR is cleaned up first
+				existingCr := testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				testutils.DeleteDpuOperatorCR(mgr.GetClient(), existingCr)
+
 				testutils.CreateNamespace(mgr.GetClient(), ns)
 				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
 			})
@@ -145,6 +160,11 @@ var _ = Describe("Main Controller", Ordered, func() {
 			BeforeAll(func() {
 				ns := testutils.DpuOperatorNamespace()
 				cr = testutils.DpuOperatorCR("operator-config", "dpu", ns)
+
+				// Ensure any existing CR is cleaned up first
+				existingCr := testutils.DpuOperatorCR("operator-config", "dpu", ns)
+				testutils.DeleteDpuOperatorCR(mgr.GetClient(), existingCr)
+
 				testutils.CreateNamespace(mgr.GetClient(), ns)
 				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
 			})
