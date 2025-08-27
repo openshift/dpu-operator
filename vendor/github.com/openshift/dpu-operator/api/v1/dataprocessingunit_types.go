@@ -40,7 +40,7 @@ type DataProcessingUnitStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Status is the status of the DPU
-	Status string `json:"status,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
