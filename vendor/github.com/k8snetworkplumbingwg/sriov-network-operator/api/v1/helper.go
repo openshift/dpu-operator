@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"slices"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
@@ -143,53 +143,6 @@ func IsVfSupportedModel(vendorID, deviceID string) bool {
 	return false
 }
 
-func IsEnabledUnsupportedVendor(vendorID string, unsupportedNicIDMap map[string]string) bool {
-	for _, n := range unsupportedNicIDMap {
-		if IsValidPciString(n) {
-			ids := strings.Split(n, " ")
-			if vendorID == ids[0] {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func IsValidPciString(nicIDString string) bool {
-	ids := strings.Split(nicIDString, " ")
-
-	if len(ids) != 3 {
-		log.Info("IsValidPciString(): ", nicIDString)
-		return false
-	}
-
-	if len(ids[0]) != 4 {
-		log.Info("IsValidPciString():", "Invalid vendor PciId ", ids[0])
-		return false
-	}
-	if _, err := strconv.ParseInt(ids[0], 16, 32); err != nil {
-		log.Info("IsValidPciString():", "Invalid vendor PciId ", ids[0])
-	}
-
-	if len(ids[1]) != 4 {
-		log.Info("IsValidPciString():", "Invalid PciId of PF ", ids[1])
-		return false
-	}
-	if _, err := strconv.ParseInt(ids[1], 16, 32); err != nil {
-		log.Info("IsValidPciString():", "Invalid PciId of PF ", ids[1])
-	}
-
-	if len(ids[2]) != 4 {
-		log.Info("IsValidPciString():", "Invalid PciId of VF ", ids[2])
-		return false
-	}
-	if _, err := strconv.ParseInt(ids[2], 16, 32); err != nil {
-		log.Info("IsValidPciString():", "Invalid PciId of VF ", ids[2])
-	}
-
-	return true
-}
-
 func GetSupportedVfIds() []string {
 	var vfIds []string
 	for _, n := range NicIDMap {
@@ -231,15 +184,6 @@ func ContainsSwitchdevInterface(interfaces []Interface) bool {
 		}
 	}
 	return false
-}
-
-func FindInterface(interfaces Interfaces, name string) (iface Interface, err error) {
-	for _, i := range interfaces {
-		if i.Name == name {
-			return i, nil
-		}
-	}
-	return Interface{}, fmt.Errorf("unable to find interface: %v", name)
 }
 
 // GetEswitchModeFromSpec returns ESwitchMode from the interface spec, returns legacy if not set
@@ -1008,7 +952,7 @@ func GenerateBridgeName(iface *InterfaceExt) string {
 
 // NeedToUpdateBridges returns true if bridge for the host requires update
 func NeedToUpdateBridges(bridgeSpec, bridgeStatus *Bridges) bool {
-	return !reflect.DeepEqual(bridgeSpec, bridgeStatus)
+	return !equality.Semantic.DeepEqual(bridgeSpec, bridgeStatus)
 }
 
 // SetKeepUntilTime sets an annotation to hold the "keep until time" for the node’s state.

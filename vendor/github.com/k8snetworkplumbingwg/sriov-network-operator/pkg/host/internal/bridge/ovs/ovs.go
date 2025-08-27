@@ -6,15 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"github.com/ovn-org/libovsdb/client"
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/ovn-org/libovsdb/ovsdb"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	sriovnetworkv1 "github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1"
@@ -83,7 +84,7 @@ func (o *ovs) CreateOVSBridge(ctx context.Context, conf *sriovnetworkv1.OVSConfi
 		funcLog.Error(err, "CreateOVSBridge(): failed to read data from store")
 		return fmt.Errorf("failed to read data from store: %v", err)
 	}
-	if knownConfig == nil || !reflect.DeepEqual(conf, knownConfig) {
+	if knownConfig == nil || !equality.Semantic.DeepEqual(conf, knownConfig) {
 		funcLog.V(2).Info("CreateOVSBridge(): save current configuration to the store")
 		// config in store manager is not found or it is not the same config as passed with conf arg,
 		// update config in the store manager
@@ -102,13 +103,13 @@ func (o *ovs) CreateOVSBridge(ctx context.Context, conf *sriovnetworkv1.OVSConfi
 			return err
 		}
 		if currentState != nil {
-			if reflect.DeepEqual(conf, currentState) {
+			if equality.Semantic.DeepEqual(conf, currentState) {
 				// bridge already exist with the right config
 				funcLog.V(2).Info("CreateOVSBridge(): bridge state already match current configuration, no actions required")
 				return nil
 			}
 			funcLog.V(2).Info("CreateOVSBridge(): bridge state differs from the current configuration, reconfiguration required")
-			keepBridge = reflect.DeepEqual(conf.Bridge, currentState.Bridge)
+			keepBridge = equality.Semantic.DeepEqual(conf.Bridge, currentState.Bridge)
 		}
 	} else {
 		funcLog.V(2).Info("CreateOVSBridge(): configuration for the bridge not found in the store, create the bridge")
@@ -148,12 +149,7 @@ func (o *ovs) CreateOVSBridge(ctx context.Context, conf *sriovnetworkv1.OVSConfi
 		funcLog.Error(err, "CreateOVSBridge(): failed to get bridge after creation")
 		return err
 	}
-	funcLog.V(2).Info("CreateOVSBridge(): add internal interface to the bridge")
-	if err := o.addInterface(ctx, dbClient, bridge, &InterfaceEntry{
-		Name: bridge.Name,
-		UUID: uuid.NewString(),
-		Type: "internal",
-	}); err != nil {
+	if err := o.ensureInternalInterface(ctx, funcLog, dbClient, bridge); err != nil {
 		funcLog.Error(err, "CreateOVSBridge(): failed to add internal interface to the bridge")
 		return err
 	}
@@ -168,6 +164,40 @@ func (o *ovs) CreateOVSBridge(ctx context.Context, conf *sriovnetworkv1.OVSConfi
 		MTURequest:  conf.Uplinks[0].Interface.MTURequest,
 	}); err != nil {
 		funcLog.Error(err, "CreateOVSBridge(): failed to add uplink interface to the bridge")
+		return err
+	}
+	return nil
+}
+
+func (o *ovs) ensureInternalInterface(ctx context.Context, funcLog logr.Logger, dbClient client.Client, bridge *BridgeEntry) error {
+	funcLog.V(2).Info("CreateOVSBridge(): Check if internal interface exists in the bridge")
+	existingIface, err := o.getInterfaceByName(ctx, dbClient, bridge.Name)
+	if err != nil {
+		funcLog.Error(err, "CreateOVSBridge(): failed to check internal interface in the bridge")
+		return err
+	}
+	if existingIface != nil {
+		// If interface exists but is in error state, we should remove it
+		if existingIface.Error != nil {
+			funcLog.V(2).Info("CreateOVSBridge(): internal interface exists but is in error state, removing it", "error", *existingIface.Error)
+			if err := o.deleteInterfaceByName(ctx, dbClient, bridge.Name); err != nil {
+				funcLog.Error(err, "CreateOVSBridge(): failed to remove internal interface in error state")
+				return err
+			}
+			existingIface = nil
+		} else {
+			funcLog.V(2).Info("CreateOVSBridge(): internal interface already exists and is valid")
+			return nil // Interface is already in the desired state, return early
+		}
+	}
+	// existingIface is nil here, so we need to create it
+	funcLog.V(2).Info("CreateOVSBridge(): add internal interface to the bridge")
+	if err := o.addInterface(ctx, dbClient, bridge, &InterfaceEntry{
+		Name: bridge.Name,
+		UUID: uuid.NewString(),
+		Type: "internal",
+	}); err != nil {
+		funcLog.Error(err, "CreateOVSBridge(): failed to add internal interface to the bridge")
 		return err
 	}
 	return nil
@@ -423,7 +453,7 @@ func (o *ovs) addInterface(ctx context.Context, dbClient client.Client, br *Brid
 		return fmt.Errorf("failed to prepare operation for bridge mutate: %v", err)
 	}
 	if err := o.execTransaction(ctx, dbClient, addInterfaceOPs, addPortOPs, bridgeMutateOps); err != nil {
-		return fmt.Errorf("bridge deletion failed: %v", err)
+		return fmt.Errorf("bridge add interface failed: %v", err)
 	}
 	// check that interface has no error right after creation
 	for i := 0; i < interfaceErrorCheckCount; i++ {
