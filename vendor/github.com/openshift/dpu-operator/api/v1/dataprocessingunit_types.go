@@ -49,7 +49,7 @@ type DataProcessingUnitStatus struct {
 //+kubebuilder:resource:scope=Cluster
 //+kubebuilder:printcolumn:name="DPU Product",type="string",JSONPath=".spec.dpuProductName"
 //+kubebuilder:printcolumn:name="DPU Side",type="boolean",JSONPath=".spec.isDpuSide"
-//+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status"
+//+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 
 // DataProcessingUnit is the Schema for the dataprocessingunits API
 type DataProcessingUnit struct {
