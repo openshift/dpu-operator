@@ -54,6 +54,13 @@ spec:
                   - name
                   type: object
                 type: array
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: |-
+                  NodeSelector specifies which nodes this ServiceFunctionChain should be reconciled on.
+                  If empty, the ServiceFunctionChain will be reconciled on all nodes.
+                type: object
             required:
             - networkFunctions
             type: object
