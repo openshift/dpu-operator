@@ -30,7 +30,7 @@ type SfcReconciler struct {
 	nodeName string
 }
 
-func networkFunctionPod(name string, image string) *corev1.Pod {
+func networkFunctionPod(name string, image string, nodeSelector map[string]string) *corev1.Pod {
 	trueVar := true
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -41,6 +41,7 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 			},
 		},
 		Spec: corev1.PodSpec{
+			NodeSelector: nodeSelector,
 			Containers: []corev1.Container{
 				{
 					Name:  name,
@@ -97,7 +98,7 @@ func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, pod *corev1.Pod) 
 
 func (r *SfcReconciler) ensureNetworkFunctionExists(ctx context.Context, sfc *configv1.ServiceFunctionChain, nf configv1.NetworkFunction) error {
 	logger := r.log.WithValues("networkFunction", nf.Name)
-	pod := networkFunctionPod(nf.Name, nf.Image)
+	pod := networkFunctionPod(nf.Name, nf.Image, sfc.Spec.NodeSelector)
 
 	if err := r.createOrUpdatePod(ctx, pod); err != nil {
 		logger.Error(err, "Failed to ensure that pod exists")

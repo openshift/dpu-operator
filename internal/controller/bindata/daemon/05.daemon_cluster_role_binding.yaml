@@ -8,4 +8,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: dpu-daemon-sa
-  namespace: openshift-dpu-operator
+  namespace: {{.Namespace}}
