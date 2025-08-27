@@ -126,7 +126,15 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 					IsDpuSide:      true,
 				},
 				Status: v1.DataProcessingUnitStatus{
-					Status: "NotReady",
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Ready",
+							Status:             metav1.ConditionFalse,
+							Reason:             "Initializing",
+							Message:            "DPU resource is being initialized.",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
 				},
 			}
 			detectedDpus = append(detectedDpus, &DetectedDpuWithPlugin{
@@ -167,7 +175,15 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 						IsDpuSide:      false,
 					},
 					Status: v1.DataProcessingUnitStatus{
-						Status: "NotReady",
+						Conditions: []metav1.Condition{
+							{
+								Type:               "Ready",
+								Status:             metav1.ConditionFalse,
+								Reason:             "Initializing",
+								Message:            "DPU resource is being initialized.",
+								LastTransitionTime: metav1.Now(),
+							},
+						},
 					},
 				}
 				detectedDpus = append(detectedDpus, &DetectedDpuWithPlugin{

@@ -14,6 +14,9 @@ import (
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/go-logr/logr"
 	"github.com/spf13/afero"
 	"k8s.io/client-go/rest"
@@ -159,11 +162,27 @@ func (d *Daemon) Serve(ctx context.Context) error {
 			}
 
 			for _, managedDpu := range d.managedDpus {
+				var newCondition metav1.Condition
 				if managedDpu.Plugin.IsInitialized() {
-					managedDpu.DpuCR.Status.Status = "Ready"
+					newCondition = metav1.Condition{
+						Type:    "Ready",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Initialized",
+						Message: "DPU plugin is initialized and ready.",
+					}
 				} else {
-					managedDpu.DpuCR.Status.Status = "NotReady"
+					newCondition = metav1.Condition{
+						Type:    "Ready",
+						Status:  metav1.ConditionFalse,
+						Reason:  "NotInitialized",
+						Message: "DPU plugin is not yet initialized.",
+					}
 				}
+				// Always set a transition time
+				newCondition.LastTransitionTime = metav1.Now()
+
+				// Use the helper to add or update the condition
+				meta.SetStatusCondition(&managedDpu.DpuCR.Status.Conditions, newCondition)
 			}
 
 			// Sync DPU CRs with the current state
