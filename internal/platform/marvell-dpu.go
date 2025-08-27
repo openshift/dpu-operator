@@ -58,7 +58,7 @@ func (pi *MarvellDetector) IsDpuPlatform(platform Platform) (bool, error) {
 }
 
 func (pi *MarvellDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
-	identifier := fmt.Sprintf("marvell-dpu-%s", pci.Address)
+	identifier := fmt.Sprintf("marvell-dpu-%s", SanitizePCIAddress(pci.Address))
 	return plugin.DpuIdentifier(identifier), nil
 }
 
@@ -76,4 +76,8 @@ func (pi *MarvellDetector) VspPlugin(dpuMode bool, imageManager images.ImageMana
 // GetVendorName returns the name of the vendor
 func (d *MarvellDetector) GetVendorName() string {
 	return "marvell"
+}
+
+func (d *MarvellDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "marvell-dpu"
 }

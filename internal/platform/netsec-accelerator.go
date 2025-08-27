@@ -71,7 +71,7 @@ func (pi *NetsecAcceleratorDetector) IsDpuPlatform(platform Platform) (bool, err
 
 func (pi *NetsecAcceleratorDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error) {
 	serial, err := platform.ReadDeviceSerialNumber(pci)
-	return plugin.DpuIdentifier(serial), err
+	return plugin.DpuIdentifier(SanitizePCIAddress(serial)), err
 }
 
 func (pi *NetsecAcceleratorDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
@@ -88,4 +88,8 @@ func (pi *NetsecAcceleratorDetector) VspPlugin(dpuMode bool, imageManager images
 // GetVendorName returns the name of the vendor
 func (d *NetsecAcceleratorDetector) GetVendorName() string {
 	return "intel"
+}
+
+func (d *NetsecAcceleratorDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+	return "intel-netsec"
 }

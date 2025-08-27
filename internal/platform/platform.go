@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/jaypipes/ghw"
@@ -97,6 +98,13 @@ func (hp *HardwarePlatform) ReadDeviceSerialNumber(pciDevice *ghw.PCIDevice) (st
 	return serialHex, nil
 }
 
+// SanitizePCIAddress sanitizes a PCI address or device identifier for use as a Kubernetes cr name
+// by replacing characters that are not allowed in resource names with hyphens
+// (e.g., "0000:04:00.0" becomes "0000-04-00.0", "FAKE-SERIAL-0000:04:00.0" becomes "FAKE-SERIAL-0000-04-00.0")
+func SanitizePCIAddress(input string) string {
+	return strings.ReplaceAll(input, ":", "-")
+}
+
 type FakePlatform struct {
 	platformName string
 	devices      []*ghw.PCIDevice
@@ -149,6 +157,12 @@ func (p *FakePlatform) RemoveAllPciDevices() {
 	p.devices = make([]*ghw.PCIDevice, 0)
 }
 
-func (hp *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error) {
+func (p *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error) {
 	return nil, fmt.Errorf("Not implemented")
+}
+
+func (p *FakePlatform) AddPciDevice(dev *ghw.PCIDevice) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.devices = append(p.devices, dev)
 }
