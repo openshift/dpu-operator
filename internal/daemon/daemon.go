@@ -110,13 +110,11 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			d.log.Info("Starting DPU detection")
 			detectedDpusList, err := d.dpuDetectorManger.DetectAll(d.imageManager, d.client, *d.pm)
 			if err != nil {
 				d.log.Error(err, "Got error while detecting DPUs")
 				return err
 			}
-			d.log.Info("Detection completed", "found", len(detectedDpusList))
 
 			// Update managed DPUs with newly detected ones
 			d.updateManagedDpus(detectedDpusList)
@@ -129,13 +127,6 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				err := fmt.Errorf("Detected %d DPUs, but only one is currently supported", len(d.managedDpus))
 				d.log.Error(err, "Got error while detecting DPUs", "dpuKeys", keys)
 				return err
-			}
-
-			// Sync DPU CRs with the current state
-			err = d.SyncDpuCRs()
-			if err != nil {
-				d.log.Error(err, "Failed to sync DPU CRs")
-				// Don't fail the daemon if CR sync fails, just log and continue
 			}
 
 			// Create managers for DPUs that don't have them yet
@@ -164,6 +155,13 @@ func (d *Daemon) Serve(ctx context.Context) error {
 						}
 					}(sideManager, identifier, done)
 				}
+			}
+
+			// Sync DPU CRs with the current state
+			err = d.SyncDpuCRs()
+			if err != nil {
+				d.log.Error(err, "Failed to sync DPU CRs")
+				return err
 			}
 		case err := <-errChan:
 			d.log.Error(err, "Side manager failed, stopping all managers")
