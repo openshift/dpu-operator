@@ -20,6 +20,12 @@ import (
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	SfcFinalizerName     = "dpu.sfc.config.openshift.io/cleanup"
+	NFPodOwnerAnnotation = "dpu.sfc.config.openshift.io/owner"
 )
 
 // SfcReconciler reconciles a Service Function Chain object
@@ -30,7 +36,11 @@ type SfcReconciler struct {
 	nodeName string
 }
 
-func networkFunctionPod(name string, image string, nodeSelector map[string]string) *corev1.Pod {
+func NFPodOwnerAnnotationValue(sfc *configv1.ServiceFunctionChain) string {
+	return sfc.Namespace + "/" + sfc.Name
+}
+
+func networkFunctionPod(name string, image string, nodeSelector map[string]string, owner *configv1.ServiceFunctionChain) *corev1.Pod {
 	trueVar := true
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -38,6 +48,7 @@ func networkFunctionPod(name string, image string, nodeSelector map[string]strin
 			Namespace: "default",
 			Annotations: map[string]string{
 				"k8s.v1.cni.cncf.io/networks": "dpunfcni-conf, dpunfcni-conf",
+				NFPodOwnerAnnotation:          NFPodOwnerAnnotationValue(owner),
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -98,7 +109,7 @@ func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, pod *corev1.Pod) 
 
 func (r *SfcReconciler) ensureNetworkFunctionExists(ctx context.Context, sfc *configv1.ServiceFunctionChain, nf configv1.NetworkFunction) error {
 	logger := r.log.WithValues("networkFunction", nf.Name)
-	pod := networkFunctionPod(nf.Name, nf.Image, sfc.Spec.NodeSelector)
+	pod := networkFunctionPod(nf.Name, nf.Image, sfc.Spec.NodeSelector, sfc)
 
 	if err := r.createOrUpdatePod(ctx, pod); err != nil {
 		logger.Error(err, "Failed to ensure that pod exists")
@@ -156,6 +167,58 @@ func (r *SfcReconciler) matchesNodeSelector(ctx context.Context, nodeSelector ma
 	return true, nil
 }
 
+// cleanupNetworkFunctionPods deletes all pods created by this ServiceFunctionChain
+func (r *SfcReconciler) cleanupNetworkFunctionPods(ctx context.Context, sfc *configv1.ServiceFunctionChain) error {
+	r.log.Info("Cleaning up network function pods", "sfc", sfc.Name)
+
+	for _, nf := range sfc.Spec.NetworkFunctions {
+		podName := nf.Name
+		pod := &corev1.Pod{}
+		err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: "default"}, pod)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				r.log.Info("Pod already deleted", "pod", podName)
+				continue
+			}
+			r.log.Error(err, "Failed to get pod for cleanup", "pod", podName)
+			return err
+		}
+
+		// Check if this pod belongs to our SFC by checking labels or annotations
+		if pod.Annotations[NFPodOwnerAnnotation] == NFPodOwnerAnnotationValue(sfc) {
+			r.log.Info("Deleting network function pod", "pod", podName)
+			if err := r.Delete(ctx, pod); err != nil {
+				r.log.Error(err, "Failed to delete pod", "pod", podName)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *SfcReconciler) removeFinalizer(ctx context.Context, sfc *configv1.ServiceFunctionChain) error {
+	if controllerutil.ContainsFinalizer(sfc, SfcFinalizerName) {
+		controllerutil.RemoveFinalizer(sfc, SfcFinalizerName)
+		if err := r.Update(ctx, sfc); err != nil {
+			r.log.Error(err, "Failed to remove finalizer")
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *SfcReconciler) addFinalizer(ctx context.Context, sfc *configv1.ServiceFunctionChain) error {
+	if !controllerutil.ContainsFinalizer(sfc, SfcFinalizerName) {
+		controllerutil.AddFinalizer(sfc, SfcFinalizerName)
+		if err := r.Update(ctx, sfc); err != nil {
+			r.log.Error(err, "Failed to add finalizer")
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *SfcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = log.FromContext(ctx)
 	r.log.Info("SfcReconciler", "nodeName", r.nodeName)
@@ -169,6 +232,42 @@ func (r *SfcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 		r.log.Error(err, "Failed to get ServiceFunctionChain CR")
 		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Handle deletion
+	if sfc.DeletionTimestamp != nil {
+		r.log.Info("ServiceFunctionChain is being deleted", "sfc", sfc.Name)
+
+		// Check if this SFC should be cleaned up on this node with daemons being split brained.
+		matches, err := r.matchesNodeSelector(ctx, sfc.Spec.NodeSelector)
+		if err != nil {
+			r.log.Error(err, "Failed to check node selector during deletion")
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+
+		// Clean up pods created by this SFC
+		if matches {
+			if err := r.cleanupNetworkFunctionPods(ctx, sfc); err != nil {
+				r.log.Error(err, "Failed to cleanup network function pods")
+				return ctrl.Result{RequeueAfter: time.Minute}, err
+			}
+			r.log.Info("Network function pods cleaned up", "sfc", sfc.Name)
+		}
+
+		// Remove our finalizer
+		if err := r.removeFinalizer(ctx, sfc); err != nil {
+			r.log.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
+
+		r.log.Info("ServiceFunctionChain deleted", "sfc", sfc.Name)
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if not present
+	if err := r.addFinalizer(ctx, sfc); err != nil {
+		r.log.Error(err, "Failed to add finalizer")
+		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
 	// Check if this SFC should be reconciled on this node
