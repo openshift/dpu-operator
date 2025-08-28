@@ -47,7 +47,7 @@ func createOperatorConfigFolderIfNeeded() error {
 	_, err := os.Stat(SriovConfBasePathUse)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(SriovConfBasePathUse, os.ModeDir)
+			err = os.MkdirAll(SriovConfBasePathUse, 0777)
 			if err != nil {
 				return fmt.Errorf("failed to create the sriov config folder on host in path %s: %v", SriovConfBasePathUse, err)
 			}
@@ -60,7 +60,7 @@ func createOperatorConfigFolderIfNeeded() error {
 	_, err = os.Stat(PfAppliedConfigUse)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(PfAppliedConfigUse, os.ModeDir)
+			err = os.MkdirAll(PfAppliedConfigUse, 0777)
 			if err != nil {
 				return fmt.Errorf("failed to create the pci folder on host in path %s: %v", PfAppliedConfigUse, err)
 			}
@@ -89,7 +89,7 @@ func (s *manager) ClearPCIAddressFolder() error {
 		return fmt.Errorf("failed to remove the PCI address folder on path %s: %v", PfAppliedConfigUse, err)
 	}
 
-	err = os.Mkdir(PfAppliedConfigUse, os.ModeDir)
+	err = os.Mkdir(PfAppliedConfigUse, 0777)
 	if err != nil {
 		return fmt.Errorf("failed to create the pci folder on host in path %s: %v", PfAppliedConfigUse, err)
 	}
@@ -174,7 +174,7 @@ func (s *manager) WriteCheckpointFile(ns *sriovnetworkv1.SriovNetworkNodeState) 
 	defer file.Close()
 	log.Log.Info("WriteCheckpointFile(): try to decode the checkpoint file")
 	if err = json.NewDecoder(file).Decode(&sriovnetworkv1.InitialState); err != nil {
-		log.Log.V(2).Error(err, "WriteCheckpointFile(): fail to decode, writing new file instead")
+		log.Log.Error(err, "WriteCheckpointFile(): fail to decode, writing new file instead")
 		log.Log.Info("WriteCheckpointFile(): write checkpoint file")
 		if err = file.Truncate(0); err != nil {
 			return err
