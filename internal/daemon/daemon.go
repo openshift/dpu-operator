@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/openshift/dpu-operator/api/v1"
@@ -12,6 +13,9 @@ import (
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/afero"
@@ -110,13 +114,11 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			d.log.Info("Starting DPU detection")
 			detectedDpusList, err := d.dpuDetectorManger.DetectAll(d.imageManager, d.client, *d.pm)
 			if err != nil {
 				d.log.Error(err, "Got error while detecting DPUs")
 				return err
 			}
-			d.log.Info("Detection completed", "found", len(detectedDpusList))
 
 			// Update managed DPUs with newly detected ones
 			d.updateManagedDpus(detectedDpusList)
@@ -129,13 +131,6 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				err := fmt.Errorf("Detected %d DPUs, but only one is currently supported", len(d.managedDpus))
 				d.log.Error(err, "Got error while detecting DPUs", "dpuKeys", keys)
 				return err
-			}
-
-			// Sync DPU CRs with the current state
-			err = d.SyncDpuCRs()
-			if err != nil {
-				d.log.Error(err, "Failed to sync DPU CRs")
-				// Don't fail the daemon if CR sync fails, just log and continue
 			}
 
 			// Create managers for DPUs that don't have them yet
@@ -164,6 +159,37 @@ func (d *Daemon) Serve(ctx context.Context) error {
 						}
 					}(sideManager, identifier, done)
 				}
+			}
+
+			for _, managedDpu := range d.managedDpus {
+				var newCondition metav1.Condition
+				if managedDpu.Plugin.IsInitialized() {
+					newCondition = metav1.Condition{
+						Type:    "Ready",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Initialized",
+						Message: "DPU plugin is initialized and ready.",
+					}
+				} else {
+					newCondition = metav1.Condition{
+						Type:    "Ready",
+						Status:  metav1.ConditionFalse,
+						Reason:  "NotInitialized",
+						Message: "DPU plugin is not yet initialized.",
+					}
+				}
+				// Always set a transition time
+				newCondition.LastTransitionTime = metav1.Now()
+
+				// Use the helper to add or update the condition
+				meta.SetStatusCondition(&managedDpu.DpuCR.Status.Conditions, newCondition)
+			}
+
+			// Sync DPU CRs with the current state
+			err = d.SyncDpuCRs()
+			if err != nil {
+				d.log.Error(err, "Failed to sync DPU CRs")
+				return err
 			}
 		case err := <-errChan:
 			d.log.Error(err, "Side manager failed, stopping all managers")
@@ -228,12 +254,9 @@ func (d *Daemon) SyncDpuCRs() error {
 
 	// Sync each managed DPU to K8s
 	for identifier, managedDpu := range d.managedDpus {
-		syncedCR, err := d.syncSingleDpuCR(managedDpu.DpuCR, existingCRMap)
+		err := d.syncSingleDpuCR(managedDpu.DpuCR, existingCRMap)
 		if err != nil {
 			d.log.Error(err, "Failed to sync DPU CR", "identifier", identifier)
-		} else {
-			// Update the ManagedDpu to point to the actual Kubernetes CR
-			managedDpu.DpuCR = syncedCR
 		}
 	}
 
@@ -253,65 +276,61 @@ func (d *Daemon) SyncDpuCRs() error {
 	return nil
 }
 
-func (d *Daemon) syncSingleDpuCR(dpuCR *v1.DataProcessingUnit, existingCRMap map[string]*v1.DataProcessingUnit) (*v1.DataProcessingUnit, error) {
+func (d *Daemon) syncSingleDpuCR(dpuCR *v1.DataProcessingUnit, existingCRMap map[string]*v1.DataProcessingUnit) error {
 	identifier := dpuCR.Name
 
-	// Check if CR already exists
-	if existingCR, exists := existingCRMap[identifier]; exists {
-		// CR exists, update it if needed
-		needsSpecUpdate := existingCR.Spec != dpuCR.Spec
-		needsStatusUpdate := existingCR.Status.Status != dpuCR.Status.Status
+	// Check if CR exists in the cluster
+	existingCR := &v1.DataProcessingUnit{}
+	err := d.client.Get(context.TODO(), client.ObjectKey{
+		Name:      identifier,
+		Namespace: dpuCR.Namespace,
+	}, existingCR)
 
-		if needsSpecUpdate {
-			existingCR.Spec = dpuCR.Spec
-			err := d.client.Update(context.TODO(), existingCR)
+	if err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			// CR doesn't exist, create it
+			err := d.client.Create(context.TODO(), dpuCR)
 			if err != nil {
-				return nil, fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
+				return fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
 			}
-		}
 
-		if needsStatusUpdate {
-			existingCR.Status = dpuCR.Status
-			err := d.client.Status().Update(context.TODO(), existingCR)
+			// Update status after creation
+			err = d.client.Status().Update(context.TODO(), dpuCR)
 			if err != nil {
-				return nil, fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
+				return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 			}
+
+			d.log.Info("Created DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
+			return nil
 		}
-
-		if needsSpecUpdate || needsStatusUpdate {
-			d.log.Info("Updated DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
-		}
-
-		// Update the in-memory CR to match the latest from Kubernetes
-		dpuCR.Status = existingCR.Status
-		dpuCR.ResourceVersion = existingCR.ResourceVersion
-
-		return existingCR, nil
-	} else {
-		// CR doesn't exist, create it
-		err := d.client.Create(context.TODO(), dpuCR)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
-		}
-
-		// Update status after creation
-		err = d.client.Status().Update(context.TODO(), dpuCR)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
-		}
-
-		d.log.Info("Created DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
-
-		return dpuCR, nil
+		return fmt.Errorf("Failed to get DPU CR %s: %v", identifier, err)
 	}
-}
 
-// updateDpuStatus updates the status for the specified DPU in managedDpus map
-func (d *Daemon) updateDpuStatus(identifier string, status string) {
-	if managedDpu, exists := d.managedDpus[identifier]; exists {
-		managedDpu.DpuCR.Status.Status = status
-		d.log.Info("Updated DPU status", "identifier", identifier, "status", status)
+	// CR exists, update it to reflect all fields
+	needsSpecUpdate := !reflect.DeepEqual(existingCR.Spec, dpuCR.Spec)
+	needsStatusUpdate := !reflect.DeepEqual(existingCR.Status, dpuCR.Status)
+
+	if needsSpecUpdate {
+		existingCR.Spec = dpuCR.Spec
+		err := d.client.Update(context.TODO(), existingCR)
+		if err != nil {
+			return fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
+		}
 	}
+
+	if needsStatusUpdate {
+		existingCR.Status = dpuCR.Status
+		err := d.client.Status().Update(context.TODO(), existingCR)
+		if err != nil {
+			return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
+		}
+	}
+
+	if needsSpecUpdate || needsStatusUpdate {
+		d.log.Info("Updated DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
+	}
+
+	return nil
 }
 
 func (d *Daemon) updateManagedDpus(detectedDpusList []*platform.DetectedDpuWithPlugin) {
@@ -322,13 +341,10 @@ func (d *Daemon) updateManagedDpus(detectedDpusList []*platform.DetectedDpuWithP
 		currentlyDetected[identifier] = detected
 	}
 
-	// Update existing managed DPUs and create new ones
+	// Create new managed DPUs. Each identifier is unique for each DPU, so it's not
+	// possible to have the identifier point to a DPU that morphed into another DPU
 	for identifier, detected := range currentlyDetected {
-		if existingManaged, exists := d.managedDpus[identifier]; exists {
-			// Update the DPU CR while preserving management state
-			existingManaged.DpuCR = detected.DpuCR
-			existingManaged.Plugin = detected.Plugin
-		} else {
+		if _, exists := d.managedDpus[identifier]; !exists {
 			// Create new ManagedDpu entry
 			d.managedDpus[identifier] = &ManagedDpu{
 				DpuCR:   detected.DpuCR,
@@ -371,10 +387,6 @@ func (d *Daemon) runSideManager(mgr SideManager, identifier string, managerCtx c
 		d.log.Error(err, "Failed to start VSP in sideManager")
 		return err
 	}
-
-	// Mark the DPU as ready after successful VSP start
-	// TODO: hook this up to a health probe to the VSP so that it goes into NotReady while it doesn't respond
-	d.updateDpuStatus(identifier, "Ready")
 
 	err = mgr.SetupDevices()
 	if err != nil {
