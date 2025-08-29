@@ -3,7 +3,9 @@ package sfcreconciler
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync/atomic"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -11,35 +13,41 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
-	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	SfcFinalizerName = "sfc.config.openshift.io/cleanup"
 )
 
 // SfcReconciler reconciles a Service Function Chain object
 type SfcReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	log    logr.Logger
+	Scheme   *runtime.Scheme
+	log      logr.Logger
+	nodeName string
 }
 
-func networkFunctionPod(name string, image string) *corev1.Pod {
+func networkFunctionPod(name string, image string, nodeSelector map[string]string, owner *configv1.ServiceFunctionChain) *corev1.Pod {
 	trueVar := true
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: vars.Namespace,
+			Namespace: "default",
 			Annotations: map[string]string{
-				"k8s.v1.cni.cncf.io/networks": "dpunfcni-conf, dpunfcni-conf",
+				"k8s.v1.cni.cncf.io/networks":   "dpunfcni-conf, dpunfcni-conf",
+				"sfc.config.openshift.io/owner": owner.Namespace + "/" + owner.Name,
 			},
 		},
 		Spec: corev1.PodSpec{
+			NodeSelector: nodeSelector,
 			Containers: []corev1.Container{
 				{
 					Name:  name,
@@ -76,19 +84,19 @@ func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, pod *corev1.Pod) 
 	if err != nil && errors.IsNotFound(err) {
 		r.log.Info("Creating Pod", "name", pod.Name)
 		if err := r.Create(ctx, pod); err != nil {
-			r.log.Error(err, "Failed to create Pod", "pod", pod.Name)
+			r.log.Error(err, "Failed to create Pod", "pod", pod.Name, "namespace", pod.Namespace)
 			return err
 		}
 		r.log.Info("Pod created successfully", "pod", pod.Name)
 	} else if err == nil {
 		r.log.Info("Updating Pod", "name", pod.Name)
 		if err := r.Update(ctx, pod); err != nil {
-			r.log.Error(err, "Failed to update Pod", "pod", pod.Name)
+			r.log.Error(err, "Failed to update Pod", "pod", pod.Name, "namespace", pod.Namespace)
 			return err
 		}
 		r.log.Info("Pod updated successfully", "pod", pod.Name)
 	} else {
-		r.log.Error(err, "Failed to get Pod", "pod", pod.Name)
+		r.log.Error(err, "Failed to get Pod", "pod", pod.Name, "namespace", pod.Namespace)
 		return err
 	}
 	return nil
@@ -96,12 +104,7 @@ func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, pod *corev1.Pod) 
 
 func (r *SfcReconciler) ensureNetworkFunctionExists(ctx context.Context, sfc *configv1.ServiceFunctionChain, nf configv1.NetworkFunction) error {
 	logger := r.log.WithValues("networkFunction", nf.Name)
-	pod := networkFunctionPod(nf.Name, nf.Image)
-
-	if err := controllerutil.SetControllerReference(sfc, pod, r.Scheme); err != nil {
-		logger.Error(err, "Failed to set owner reference on Pod")
-		return err
-	}
+	pod := networkFunctionPod(nf.Name, nf.Image, sfc.Spec.NodeSelector, sfc)
 
 	if err := r.createOrUpdatePod(ctx, pod); err != nil {
 		logger.Error(err, "Failed to ensure that pod exists")
@@ -111,18 +114,162 @@ func (r *SfcReconciler) ensureNetworkFunctionExists(ctx context.Context, sfc *co
 	return nil
 }
 
+// NewSfcReconciler creates a new SfcReconciler with the current node name
+func NewSfcReconciler(client client.Client, scheme *runtime.Scheme) *SfcReconciler {
+	nodeName := os.Getenv("K8S_NODE")
+	if nodeName == "" {
+		// Fallback to hostname if K8S_NODE is not set
+		hostname, err := os.Hostname()
+		if err != nil {
+			nodeName = "unknown"
+		} else {
+			nodeName = hostname
+		}
+	}
+
+	return &SfcReconciler{
+		Client:   client,
+		Scheme:   scheme,
+		nodeName: nodeName,
+	}
+}
+
+// matchesNodeSelector checks if the current node matches the ServiceFunctionChain's nodeSelector
+func (r *SfcReconciler) matchesNodeSelector(ctx context.Context, nodeSelector map[string]string) (bool, error) {
+	if len(nodeSelector) == 0 {
+		// No node selector means match all nodes
+		return true, nil
+	}
+
+	// Get the current node object
+	node := &corev1.Node{}
+	err := r.Get(ctx, types.NamespacedName{Name: r.nodeName}, node)
+	if err != nil {
+		r.log.Error(err, "Failed to get node", "nodeName", r.nodeName)
+		return false, err
+	}
+
+	// Check if all nodeSelector labels match the node's labels
+	for key, value := range nodeSelector {
+		nodeValue, exists := node.Labels[key]
+		if !exists || nodeValue != value {
+			r.log.Info("Node selector does not match", "key", key, "expectedValue", value, "nodeValue", nodeValue, "exists", exists)
+			return false, nil
+		}
+	}
+
+	r.log.Info("Node selector matches current node", "nodeSelector", nodeSelector, "nodeName", r.nodeName)
+	return true, nil
+}
+
+// cleanupNetworkFunctionPods deletes all pods created by this ServiceFunctionChain
+func (r *SfcReconciler) cleanupNetworkFunctionPods(ctx context.Context, sfc *configv1.ServiceFunctionChain) error {
+	r.log.Info("Cleaning up network function pods", "sfc", sfc.Name)
+
+	for _, nf := range sfc.Spec.NetworkFunctions {
+		podName := nf.Name
+		pod := &corev1.Pod{}
+		err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: "default"}, pod)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				r.log.Info("Pod already deleted", "pod", podName)
+				continue
+			}
+			r.log.Error(err, "Failed to get pod for cleanup", "pod", podName)
+			return err
+		}
+
+		// Check if this pod belongs to our SFC by checking labels or annotations
+		if pod.Annotations["sfc.config.openshift.io/owner"] == sfc.Namespace+"/"+sfc.Name {
+			r.log.Info("Deleting network function pod", "pod", podName)
+			if err := r.Delete(ctx, pod); err != nil {
+				r.log.Error(err, "Failed to delete pod", "pod", podName)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (r *SfcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = log.FromContext(ctx)
-	r.log.Info("SfcReconciler")
+	r.log.Info("SfcReconciler", "nodeName", r.nodeName)
 
 	sfc := &configv1.ServiceFunctionChain{}
 	err := r.Get(ctx, req.NamespacedName, sfc)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			r.log.Info("ServiceFunctionChain not found, ignoring")
+			return ctrl.Result{}, nil
+		}
+		r.log.Error(err, "Failed to get ServiceFunctionChain")
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// Handle deletion
+	if sfc.DeletionTimestamp != nil {
+		r.log.Info("ServiceFunctionChain is being deleted", "sfc", sfc.Name)
+
+		// Check if this SFC should be cleaned up on this node
+		matches, err := r.matchesNodeSelector(ctx, sfc.Spec.NodeSelector)
+		if err != nil {
+			r.log.Error(err, "Failed to check node selector during deletion")
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+
+		if matches {
+			// Clean up pods created by this SFC
+			if err := r.cleanupNetworkFunctionPods(ctx, sfc); err != nil {
+				r.log.Error(err, "Failed to cleanup network function pods")
+				return ctrl.Result{RequeueAfter: time.Minute}, err
+			}
+		}
+
+		// Remove our finalizer
+		if controllerutil.ContainsFinalizer(sfc, SfcFinalizerName) {
+			controllerutil.RemoveFinalizer(sfc, SfcFinalizerName)
+			if err := r.Update(ctx, sfc); err != nil {
+				r.log.Error(err, "Failed to remove finalizer")
+				return ctrl.Result{RequeueAfter: time.Minute}, err
+			}
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if not present
+	if !controllerutil.ContainsFinalizer(sfc, SfcFinalizerName) {
+		controllerutil.AddFinalizer(sfc, SfcFinalizerName)
+		if err := r.Update(ctx, sfc); err != nil {
+			r.log.Error(err, "Failed to add finalizer")
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Check if this SFC should be reconciled on this node
+	matches, err := r.matchesNodeSelector(ctx, sfc.Spec.NodeSelector)
+	if err != nil {
+		r.log.Error(err, "Failed to check node selector")
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
+
+	if !matches {
+		r.log.Info("ServiceFunctionChain node selector does not match current node, skipping reconciliation",
+			"nodeSelector", sfc.Spec.NodeSelector, "currentNode", r.nodeName)
+		return ctrl.Result{}, nil
+	}
+
+	r.log.Info("ServiceFunctionChain matches current node, proceeding with reconciliation",
+		"nodeSelector", sfc.Spec.NodeSelector, "currentNode", r.nodeName)
+
 	for _, nf := range sfc.Spec.NetworkFunctions {
-		r.ensureNetworkFunctionExists(ctx, sfc, nf)
+		err := r.ensureNetworkFunctionExists(ctx, sfc, nf)
+		if err != nil {
+			r.log.Error(err, "Failed to ensure network function exists", "networkFunction", nf.Name)
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
 	}
 
 	return ctrl.Result{}, nil

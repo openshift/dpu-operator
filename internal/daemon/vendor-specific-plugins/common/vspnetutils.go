@@ -20,10 +20,14 @@ const (
 	netDevVfDevicePrefix = "virtfn"
 )
 
+type VethPairKey struct {
+	IfMac string // MAC address of the veth interface
+}
+
 type VEthPairDeviceInfo struct {
+	VethKey   VethPairKey
 	IfName    string // Interface Name of the veth
 	PeerName  string // Interface Name of the peer veth
-	IfMac     string // MAC address of the veth interface
 	PeerIfMAC string // MAC address of the Peer veth interface
 }
 
@@ -131,9 +135,9 @@ func CreateNfVethPair(idx int) (*VEthPairDeviceInfo, error) {
 // CreateVethPair function to create a veth pair with the given index and InterfaceInfo
 func CreateVethPair(ifname string, peername string) (*VEthPairDeviceInfo, error) {
 	deviceInfo := VEthPairDeviceInfo{
+		VethKey:   VethPairKey{IfMac: ""},
 		IfName:    ifname,
 		PeerName:  peername,
-		IfMac:     "",
 		PeerIfMAC: "",
 	}
 
@@ -182,7 +186,7 @@ func CreateVethPair(ifname string, peername string) (*VEthPairDeviceInfo, error)
 		return nil, err
 	}
 
-	deviceInfo.IfMac = ifLink.Attrs().HardwareAddr.String()
+	deviceInfo.VethKey.IfMac = ifLink.Attrs().HardwareAddr.String()
 	deviceInfo.PeerIfMAC = peerLink.Attrs().HardwareAddr.String()
 
 	return &deviceInfo, nil
@@ -241,23 +245,27 @@ func SetPfHwModeVepa(pfName string) error {
 // TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
 func CreateOvSBridge(bridgeName string) error {
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-br", bridgeName)
+	klog.Infof("CreateOvSBridge(): %s", cmd.String())
 	return cmd.Run()
 }
 
 // TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
 func DeleteOvSBridge(bridgeName string) error {
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-br", bridgeName)
+	klog.Infof("DeleteOvSBridge(): %s", cmd.String())
 	return cmd.Run()
 }
 
 // TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
 func AddInterfaceToOvSBridge(bridgeName string, ifname string) error {
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-port", bridgeName, ifname)
+	klog.Infof("AddInterfaceToOvSBridge(): %s", cmd.String())
 	return cmd.Run()
 }
 
 // TODO: Use https://github.com/ovn-kubernetes/libovsdb/tree/main
 func DeleteInterfaceFromOvSBridge(bridgeName string, ifname string) error {
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, ifname)
+	klog.Infof("DeleteInterfaceFromOvSBridge(): %s", cmd.String())
 	return cmd.Run()
 }

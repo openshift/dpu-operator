@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: my-pod
+  name: my-pod-2
   namespace: default
   annotations:
     k8s.v1.cni.cncf.io/networks: default-sriov-net

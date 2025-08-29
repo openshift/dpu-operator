@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "my-nf"
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/networks: dpunfcni-conf, dpunfcni-conf
+spec:
+  nodeName: worker-229-ptl
+  containers:
+    - name: "my-nf"
+      image: "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"
+      resources:
+        requests:
+          openshift.io/dpu: "2"
+        limits:
+          openshift.io/dpu: "2"
+      securityContext:
+        privileged: true
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - NET_RAW
+            - NET_ADMIN

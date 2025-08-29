@@ -1,12 +1,13 @@
 apiVersion: config.openshift.io/v1
 kind: ServiceFunctionChain
 metadata:
-  name: sfc-name
+  name: sfc-node-specific
   namespace: openshift-dpu-operator
 spec:
-  # Target only nodes with the "dpu" label set to "true"
+  # Target a specific node by hostname
   nodeSelector:
-    dpu: "true"
+    kubernetes.io/hostname: worker-229-ptl
   networkFunctions:
   - name: test-nf
     image: ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest
+ 

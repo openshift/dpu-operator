@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"embed"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -188,19 +187,22 @@ func (r *DpuOperatorConfigReconciler) ensureNetworkResourcesInjector(ctx context
 }
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-	logger.Info("Create the Network Function NAD")
-	nadFile := ""
-	switch cfg.Spec.Mode {
-	case "dpu":
-		nadFile = "networkfn-nad-dpu"
-	case "host":
-		nadFile = "networkfn-nad-host"
-	default:
-		err := errors.NewBadRequest(fmt.Sprintf("Invalid Mode: %s", cfg.Spec.Mode))
-		logger.Error(err, "Invalid mode specified")
+
+	logger.Info("Create the Network Function DPU NAD")
+	err := r.createAndApplyAllFromBinData(logger, "networkfn-nad-dpu", cfg)
+	if err != nil {
+		logger.Error(err, "Failed to create Network Function DPU NAD")
 		return err
 	}
-	return r.createAndApplyAllFromBinData(logger, nadFile, cfg)
+
+	logger.Info("Create the Network Function Host NAD")
+	err = r.createAndApplyAllFromBinData(logger, "networkfn-nad-host", cfg)
+	if err != nil {
+		logger.Error(err, "Failed to create Network Function Host NAD")
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

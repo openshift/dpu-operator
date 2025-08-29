@@ -21,9 +21,11 @@ import (
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type HostSideManager struct {
@@ -323,8 +325,17 @@ func (d *HostSideManager) setupReconcilers() {
 		mgr, err := ctrl.NewManager(d.config, ctrl.Options{
 			Scheme: scheme.Scheme,
 			NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+				// Watch ServiceFunctionChains only in operator namespace, but Pods in both namespaces
 				opts.DefaultNamespaces = map[string]cache.Config{
 					vars.Namespace: {},
+				}
+				opts.ByObject = map[client.Object]cache.ByObject{
+					&corev1.Pod{}: {
+						Namespaces: map[string]cache.Config{
+							vars.Namespace: {},
+							"default":      {},
+						},
+					},
 				}
 				return cache.New(config, opts)
 			},
@@ -333,10 +344,7 @@ func (d *HostSideManager) setupReconcilers() {
 			d.log.Error(err, "unable to start manager")
 		}
 
-		sfcReconciler := &sfcreconciler.SfcReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}
+		sfcReconciler := sfcreconciler.NewSfcReconciler(mgr.GetClient(), mgr.GetScheme())
 
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
 			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")

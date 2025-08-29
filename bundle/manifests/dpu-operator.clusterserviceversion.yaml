@@ -18,7 +18,7 @@ metadata:
             "name": "dpuoperatorconfig-sample"
           },
           "spec": {
-            "mode": "host"
+            "logLevel": 0
           }
         },
         {
@@ -34,11 +34,21 @@ metadata:
             },
             "name": "servicefunctionchain-sample"
           },
-          "spec": null
+          "spec": {
+            "networkFunctions": [
+              {
+                "image": "nginx:latest",
+                "name": "firewall"
+              }
+            ],
+            "nodeSelector": {
+              "dpu": "true"
+            }
+          }
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-12T16:14:09Z"
+    createdAt: "2025-08-27T02:55:39Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"

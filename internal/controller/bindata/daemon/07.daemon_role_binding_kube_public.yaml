@@ -6,7 +6,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: dpu-daemon-sa
-  namespace: openshift-dpu-operator
+  namespace: {{.Namespace}}
 roleRef:
   kind: Role
   name: dpu-daemon-role-kube-public
