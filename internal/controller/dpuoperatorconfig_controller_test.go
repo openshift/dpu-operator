@@ -129,10 +129,10 @@ var _ = Describe("Main Controller", Ordered, func() {
 		Context("When DpuOperatorConfig CR exists with host mode", func() {
 			BeforeAll(func() {
 				ns := testutils.DpuOperatorNamespace()
-				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
 
 				// Ensure any existing CR is cleaned up first
-				existingCr := testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				existingCr := testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), existingCr)
 
 				testutils.CreateNamespace(mgr.GetClient(), ns)
@@ -151,7 +151,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			})
 			AfterAll(func() {
 				ns := testutils.DpuOperatorNamespace()
-				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, "host", ns)
+				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
 			})
 		})
@@ -159,10 +159,10 @@ var _ = Describe("Main Controller", Ordered, func() {
 		Context("When DpuOperatorConfig CR is created with dpu mode", func() {
 			BeforeAll(func() {
 				ns := testutils.DpuOperatorNamespace()
-				cr = testutils.DpuOperatorCR("operator-config", "dpu", ns)
+				cr = testutils.DpuOperatorCR("operator-config", ns)
 
 				// Ensure any existing CR is cleaned up first
-				existingCr := testutils.DpuOperatorCR("operator-config", "dpu", ns)
+				existingCr := testutils.DpuOperatorCR("operator-config", ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), existingCr)
 
 				testutils.CreateNamespace(mgr.GetClient(), ns)
@@ -183,7 +183,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			})
 			AfterAll(func() {
 				ns := testutils.DpuOperatorNamespace()
-				cr = testutils.DpuOperatorCR("operator-config", "host", ns)
+				cr = testutils.DpuOperatorCR("operator-config", ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
 			})
 		})

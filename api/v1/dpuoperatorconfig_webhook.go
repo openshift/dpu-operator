@@ -19,6 +19,7 @@ package v1
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,11 +51,6 @@ var _ webhook.CustomValidator = &DpuOperatorConfig{}
 func (r *DpuOperatorConfig) validateDpuOperatorConfig() (admission.Warnings, error) {
 	if r.Name != vars.DpuOperatorConfigName {
 		return nil, fmt.Errorf("DpuOperatorConfig must have standard name \"%s\"", vars.DpuOperatorConfigName)
-	}
-
-	mode := r.Spec.Mode
-	if mode != "host" && mode != "dpu" && mode != "auto" {
-		return nil, fmt.Errorf("Invalid mode")
 	}
 
 	return nil, nil

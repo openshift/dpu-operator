@@ -68,10 +68,10 @@ var _ = g.Describe("Full Daemon", func() {
 		k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
 		ns := testutils.DpuOperatorNamespace()
-		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+		cr := testutils.DpuOperatorCR("dpu-operator-config", ns)
 
 		// Clean up any existing resources first
-		existingCr := testutils.DpuOperatorCR("dpu-operator-config", "host", ns)
+		existingCr := testutils.DpuOperatorCR("dpu-operator-config", ns)
 		testutils.DeleteDpuOperatorCR(k8sClient, existingCr)
 
 		testutils.CreateNamespace(k8sClient, ns)
@@ -85,10 +85,10 @@ var _ = g.Describe("Full Daemon", func() {
 		k8sClient, err := client.New(config, client.Options{})
 		Expect(err).NotTo(HaveOccurred())
 		namespace := testutils.DpuOperatorNamespace()
-		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
 
 		// Clean up any existing resources first
-		existingDpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		existingDpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
 		testutils.DeleteDpuOperatorCR(k8sClient, existingDpuOperatorConfig)
 
 		testutils.CreateNamespace(k8sClient, namespace)
@@ -157,12 +157,12 @@ var _ = g.Describe("Full Daemon", func() {
 		}
 		klog.Info("Clean up DpuOperatorConfig resources")
 		namespace := testutils.DpuOperatorNamespace()
-		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, "auto", namespace)
+		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
 		klog.Infof("Deleting DpuOperatorConfig: %s", vars.DpuOperatorConfigName)
 		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
 
 		// Also clean up the original CR
-		cr := testutils.DpuOperatorCR("dpu-operator-config", "host", namespace)
+		cr := testutils.DpuOperatorCR("dpu-operator-config", namespace)
 		klog.Info("Deleting original CR: dpu-operator-config")
 		testutils.DeleteDpuOperatorCR(k8sClient, cr)
 		klog.Infof("Deleting namespace: %s", namespace.Name)

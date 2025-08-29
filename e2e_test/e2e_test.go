@@ -245,33 +245,14 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			configInvalidName := configv1.DpuOperatorConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: vars.Namespace,
-					Name:      "invalidname",
+					Name:      "invalid-name",
 				},
 				Spec: configv1.DpuOperatorConfigSpec{
-					Mode:     "host",
 					LogLevel: 2,
 				},
 			}
 			err := dpuSideClient.Create(context.TODO(), &configInvalidName)
 			Expect(err).To(MatchError(ContainSubstring("DpuOperatorConfig must have standard name")))
-		})
-
-		g.It("should fail to add DpuOperatorConfig with invalid Mode", func() {
-			if skipTests {
-				g.Skip("Skipping test as external DpuOperatorConfig already exists")
-			}
-			configInvalidMode := configv1.DpuOperatorConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: vars.Namespace,
-					Name:      vars.DpuOperatorConfigName,
-				},
-				Spec: configv1.DpuOperatorConfigSpec{
-					Mode:     "invalidmode",
-					LogLevel: 2,
-				},
-			}
-			err := dpuSideClient.Create(context.TODO(), &configInvalidMode)
-			Expect(err).To(MatchError(ContainSubstring("Invalid mode")))
 		})
 
 		createDpuOperatorConfig := func() error {
@@ -281,7 +262,6 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 					Name:      vars.DpuOperatorConfigName,
 				},
 				Spec: configv1.DpuOperatorConfigSpec{
-					Mode:     "auto",
 					LogLevel: 2,
 				},
 			}
@@ -317,13 +297,16 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			err := dpuSideClient.Get(context.TODO(), configv1.DpuOperatorConfigNamespacedName, &configToUpdate)
 			Expect(err).NotTo(HaveOccurred())
 
-			configToUpdate.Spec.Mode = "invalidmode"
-			err = dpuSideClient.Update(context.TODO(), &configToUpdate)
-			Expect(err).To(MatchError(ContainSubstring("Invalid mode")))
-
-			configToUpdate.Spec.Mode = "dpu"
+			// Update Log Level
+			configToUpdate.Spec.LogLevel = 5
 			err = dpuSideClient.Update(context.TODO(), &configToUpdate)
 			Expect(err).NotTo(HaveOccurred())
+
+			// Verify the update to Log Level was applied
+			updatedConfig := configv1.DpuOperatorConfig{}
+			err = dpuSideClient.Get(context.TODO(), configv1.DpuOperatorConfigNamespacedName, &updatedConfig)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updatedConfig.Spec.LogLevel).To(Equal(5))
 
 			Expect(deleteDpuOperatorConfig()).NotTo(HaveOccurred())
 		})
