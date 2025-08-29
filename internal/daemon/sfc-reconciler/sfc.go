@@ -23,6 +23,7 @@ import (
 )
 
 // SfcReconciler reconciles a Service Function Chain object
+// The SF container created has privileged permissions
 type SfcReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
