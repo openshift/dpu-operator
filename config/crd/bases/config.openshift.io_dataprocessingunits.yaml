@@ -21,6 +21,9 @@ spec:
     - jsonPath: .spec.isDpuSide
       name: DPU Side
       type: boolean
+    - jsonPath: .spec.nodeName
+      name: Node Name
+      type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Status
       type: string
@@ -56,8 +59,12 @@ spec:
               isDpuSide:
                 description: IsDpuSide indicates if this DPU is on the DPU side
                 type: boolean
+              nodeName:
+                description: NodeName is the name of the node where this DPU is located
+                type: string
             required:
             - isDpuSide
+            - nodeName
             type: object
           status:
             description: DataProcessingUnitStatus defines the observed state of DataProcessingUnit

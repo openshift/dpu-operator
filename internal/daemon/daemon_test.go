@@ -107,7 +107,7 @@ var _ = g.Describe("Full Daemon", func() {
 			}
 		}()
 
-		d = daemon.NewDaemon(fs, fakePlatform, "dpu", config, createVspTestImages(), pathManager)
+		d = daemon.NewDaemon(fs, fakePlatform, "dpu", config, createVspTestImages(), pathManager, "test-node")
 		go func() {
 			defer close(daemonDone)
 			err := d.PrepareAndServe(ctx)
