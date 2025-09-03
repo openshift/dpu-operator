@@ -101,7 +101,7 @@ type DetectedDpuWithPlugin struct {
 	Plugin *plugin.GrpcPlugin
 }
 
-func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client client.Client, pm utils.PathManager) ([]*DetectedDpuWithPlugin, error) {
+func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client client.Client, pm utils.PathManager, nodeName string) ([]*DetectedDpuWithPlugin, error) {
 	var detectedDpus []*DetectedDpuWithPlugin
 
 	for _, detector := range d.detectors {
@@ -124,6 +124,7 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 				Spec: v1.DataProcessingUnitSpec{
 					DpuProductName: detector.Name(),
 					IsDpuSide:      true,
+					NodeName:       nodeName,
 				},
 				Status: v1.DataProcessingUnitStatus{
 					Conditions: []metav1.Condition{
@@ -173,6 +174,7 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 					Spec: v1.DataProcessingUnitSpec{
 						DpuProductName: detector.Name(),
 						IsDpuSide:      false,
+						NodeName:       nodeName,
 					},
 					Status: v1.DataProcessingUnitStatus{
 						Conditions: []metav1.Condition{

@@ -52,9 +52,10 @@ type Daemon struct {
 	p                 platform.Platform
 	dpuDetectorManger *platform.DpuDetectorManager
 	managedDpus       map[string]*ManagedDpu
+	nodeName          string
 }
 
-func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager) Daemon {
+func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		fs:                fs,
@@ -67,7 +68,13 @@ func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Confi
 		dpuDetectorManger: platform.NewDpuDetectorManager(p),
 		managers:          make([]SideManager, 0),
 		managedDpus:       make(map[string]*ManagedDpu),
+		nodeName:          nodeName,
 	}
+}
+
+func (d *Daemon) WithNodeName(nodeName string) *Daemon {
+	d.nodeName = nodeName
+	return d
 }
 
 func (d *Daemon) PrepareAndServe(ctx context.Context) error {
@@ -114,7 +121,7 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			detectedDpusList, err := d.dpuDetectorManger.DetectAll(d.imageManager, d.client, *d.pm)
+			detectedDpusList, err := d.dpuDetectorManger.DetectAll(d.imageManager, d.client, *d.pm, d.nodeName)
 			if err != nil {
 				d.log.Error(err, "Got error while detecting DPUs")
 				return err

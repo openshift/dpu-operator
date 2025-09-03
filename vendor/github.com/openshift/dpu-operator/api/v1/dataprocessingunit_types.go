@@ -32,6 +32,8 @@ type DataProcessingUnitSpec struct {
 	DpuProductName string `json:"dpuProductName,omitempty"`
 	// IsDpuSide indicates if this DPU is on the DPU side
 	IsDpuSide bool `json:"isDpuSide"`
+	// NodeName is the name of the node where this DPU is located
+	NodeName string `json:"nodeName"`
 }
 
 // DataProcessingUnitStatus defines the observed state of DataProcessingUnit
@@ -49,6 +51,7 @@ type DataProcessingUnitStatus struct {
 //+kubebuilder:resource:scope=Cluster
 //+kubebuilder:printcolumn:name="DPU Product",type="string",JSONPath=".spec.dpuProductName"
 //+kubebuilder:printcolumn:name="DPU Side",type="boolean",JSONPath=".spec.isDpuSide"
+//+kubebuilder:printcolumn:name="Node Name",type="string",JSONPath=".spec.nodeName"
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 
 // DataProcessingUnit is the Schema for the dataprocessingunits API
