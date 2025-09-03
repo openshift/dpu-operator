@@ -108,6 +108,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
 		os.Exit(1)
 	}
+
+	dpuReconciler := controller.NewDataProcessingUnitReconciler(mgr.GetClient(), mgr.GetScheme(), imageManager)
+	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
+		dpuReconciler = dpuReconciler.WithImagePullPolicy(value)
+	}
+	if err = dpuReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DataProcessingUnit")
+		os.Exit(1)
+	}
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = (&configv1.DpuOperatorConfig{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "DpuOperatorConfig")
