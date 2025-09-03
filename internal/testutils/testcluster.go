@@ -410,12 +410,11 @@ func DpuOperatorNamespace() *corev1.Namespace {
 	return namespace
 }
 
-func DpuOperatorCR(name string, mode string, ns *corev1.Namespace) *configv1.DpuOperatorConfig {
+func DpuOperatorCR(name string, ns *corev1.Namespace) *configv1.DpuOperatorConfig {
 	config := &configv1.DpuOperatorConfig{}
 	config.SetNamespace(ns.Name)
 	config.SetName(name)
 	config.Spec = configv1.DpuOperatorConfigSpec{
-		Mode:     mode,
 		LogLevel: 2,
 	}
 	return config
