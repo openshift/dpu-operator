@@ -6,6 +6,18 @@ metadata:
       [
         {
           "apiVersion": "config.openshift.io/v1",
+          "kind": "DataProcessingUnit",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "dpu-operator"
+            },
+            "name": "dataprocessingunit-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "config.openshift.io/v1",
           "kind": "DpuOperatorConfig",
           "metadata": {
             "labels": {
@@ -38,7 +50,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-12T16:14:09Z"
+    createdAt: "2025-09-03T16:45:10Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -58,6 +70,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: DataProcessingUnit is the Schema for the dataprocessingunits API
+      displayName: Data Processing Unit
+      kind: DataProcessingUnit
+      name: dataprocessingunits.config.openshift.io
+      version: v1
     - description: DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
       displayName: Dpu Operator Config
       kind: DpuOperatorConfig
@@ -192,6 +209,32 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits/status
+          verbs:
+          - get
+          - patch
+          - update
         - apiGroups:
           - config.openshift.io
           resources:
