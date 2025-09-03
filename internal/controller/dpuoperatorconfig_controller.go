@@ -168,7 +168,7 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 
 func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
 	mergedData := images.MergeVarsWithImages(r.imageManager, r.yamlVars())
-	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg, r.Scheme)
+	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {

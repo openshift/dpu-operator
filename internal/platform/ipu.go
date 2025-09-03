@@ -24,7 +24,7 @@ type IntelDetector struct {
 }
 
 func NewIntelDetector() *IntelDetector {
-	return &IntelDetector{name: "Intel IPU"}
+	return &IntelDetector{name: "Intel IPU E2100"}
 }
 
 func (d *IntelDetector) Name() string {

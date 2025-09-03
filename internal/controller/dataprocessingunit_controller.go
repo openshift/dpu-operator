@@ -119,10 +119,8 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 		"Args":                      "[]",
 	}
 
-	// Apply all VSP resources using the existing bindata
-	// Pass nil for owner reference since render function expects DpuOperatorConfig
-	// TODO: Consider creating a generic version that accepts any owner type
-	err = render.ApplyAllFromBinData(logger, "vsp", templateVars, dpuBinData, r.Client, nil, r.Scheme)
+	// Apply all VSP resources using the existing bindata with DPU CR as owner
+	err = render.ApplyAllFromBinData(logger, "vsp", templateVars, dpuBinData, r.Client, dpu)
 	if err != nil {
 		return fmt.Errorf("failed to apply VSP resources: %v", err)
 	}
