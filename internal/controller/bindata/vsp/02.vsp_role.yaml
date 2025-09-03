@@ -15,37 +15,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
   - pods
-  - services
+  - pods/status
   verbs:
   - get
   - list
   - watch
-  - create
-  - delete
-  - update
-  - patch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-- apiGroups:
-    - apps
-  resources:
-    - daemonsets
-  verbs:
-    - watch
-    - list
-    - get
-    - create
-    - delete
-    - update
