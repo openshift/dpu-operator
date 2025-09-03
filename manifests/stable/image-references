@@ -6,8 +6,8 @@ spec:
   - name: dpu-operator
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-dpu-operator:latest
+      name: quay.io/openshift/dpu-operator:latest
   - name: dpu-daemon
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-dpu-daemon:latest
+      name: quay.io/openshift/dpu-daemon:latest
