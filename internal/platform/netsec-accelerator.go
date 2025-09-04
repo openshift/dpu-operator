@@ -75,14 +75,7 @@ func (pi *NetsecAcceleratorDetector) GetDpuIdentifier(platform Platform, pci *gh
 }
 
 func (pi *NetsecAcceleratorDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
-	template_vars := plugin.NewVspTemplateVars()
-	vspImage, err := imageManager.GetImage(images.VspImageIntelNetSec)
-	if err != nil {
-		return nil, errors.Errorf("Error getting Intel NetSec VSP image: %v", err)
-	}
-	template_vars.VendorSpecificPluginImage = vspImage
-	template_vars.Command = `[ "/vsp-intel-netsec" ]`
-	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
+	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithPathManager(pm))
 }
 
 // GetVendorName returns the name of the vendor
@@ -92,4 +85,8 @@ func (d *NetsecAcceleratorDetector) GetVendorName() string {
 
 func (d *NetsecAcceleratorDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
 	return "intel-netsec"
+}
+
+func (d *NetsecAcceleratorDetector) GetVspDirectory() string {
+	return "netsec"
 }

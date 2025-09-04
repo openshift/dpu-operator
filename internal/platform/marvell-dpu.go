@@ -63,14 +63,7 @@ func (pi *MarvellDetector) GetDpuIdentifier(platform Platform, pci *ghw.PCIDevic
 }
 
 func (pi *MarvellDetector) VspPlugin(dpuMode bool, imageManager images.ImageManager, client client.Client, pm utils.PathManager, dpuIdentifier plugin.DpuIdentifier) (*plugin.GrpcPlugin, error) {
-	template_vars := plugin.NewVspTemplateVars()
-	vspImage, err := imageManager.GetImage(images.VspImageMarvell)
-	if err != nil {
-		return nil, errors.Errorf("Error getting Marvell VSP image: %v", err)
-	}
-	template_vars.VendorSpecificPluginImage = vspImage
-	template_vars.Command = `[ "/vsp-mrvl" ]`
-	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithVsp(template_vars), plugin.WithPathManager(pm))
+	return plugin.NewGrpcPlugin(dpuMode, dpuIdentifier, client, plugin.WithPathManager(pm))
 }
 
 // GetVendorName returns the name of the vendor
@@ -80,4 +73,8 @@ func (d *MarvellDetector) GetVendorName() string {
 
 func (d *MarvellDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
 	return "marvell-dpu"
+}
+
+func (d *MarvellDetector) GetVspDirectory() string {
+	return "marvell"
 }

@@ -23,6 +23,7 @@ import (
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/images"
+	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
@@ -59,18 +60,20 @@ func (r *DataProcessingUnitReconciler) WithImagePullPolicy(policy string) *DataP
 	return r
 }
 
-//+kubebuilder:rbac:groups=config.openshift.io,resources=dataprocessingunits,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,resources=dataprocessingunits/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=config.openshift.io,resources=dataprocessingunits/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
-
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
+// +kubebuilder:rbac:groups="",resources=pods,verbs=*
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=*
+// +kubebuilder:rbac:groups="",resources=services,verbs=*
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=*
+// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=*
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=anyuid;hostnetwork;privileged,verbs=use
 func (r *DataProcessingUnitReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
@@ -108,7 +111,7 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 		return fmt.Errorf("failed to get VSP image for DPU type %s: %v", dpu.Spec.DpuProductName, err)
 	}
 
-	templateVars := map[string]string{
+	additionalVars := map[string]string{
 		"Namespace":                 vars.Namespace,
 		"VspName":                   r.getVSPName(dpu),
 		"DpuName":                   dpu.Name,
@@ -118,11 +121,22 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 		"Command":                   "[]",
 		"Args":                      "[]",
 	}
+	templateVars := images.MergeVarsWithImages(r.imageManager, additionalVars)
 
-	// Apply all VSP resources using the existing bindata with DPU CR as owner
-	err = render.ApplyAllFromBinData(logger, "vsp", templateVars, dpuBinData, r.Client, dpu)
+	// Apply shared VSP resources (ServiceAccount, Roles, etc.)
+	err = render.ApplyAllFromBinData(logger, "vsp/shared", templateVars, dpuBinData, r.Client, dpu)
 	if err != nil {
-		return fmt.Errorf("failed to apply VSP resources: %v", err)
+		return fmt.Errorf("failed to apply shared VSP resources: %v", err)
+	}
+
+	// Apply vendor-specific VSP resources (Pod)
+	vendorDir, err := r.getVendorDirectory(dpu)
+	if err != nil {
+		return fmt.Errorf("failed to get vendor directory for DPU type %s: %v", dpu.Spec.DpuProductName, err)
+	}
+	err = render.ApplyAllFromBinData(logger, vendorDir, templateVars, dpuBinData, r.Client, dpu)
+	if err != nil {
+		return fmt.Errorf("failed to apply vendor-specific VSP resources: %v", err)
 	}
 
 	logger.Info("Successfully ensured all VSP resources", "dpu", dpu.Name, "vspName", r.getVSPName(dpu))
@@ -131,6 +145,15 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 
 func (r *DataProcessingUnitReconciler) getVSPName(dpu *configv1.DataProcessingUnit) string {
 	return fmt.Sprintf("vsp-%s", dpu.Name)
+}
+
+func (r *DataProcessingUnitReconciler) getVendorDirectory(dpu *configv1.DataProcessingUnit) (string, error) {
+	detectorManager := platform.NewDpuDetectorManager(platform.NewHardwarePlatform())
+	vendorDir, err := detectorManager.GetVendorDirectory(dpu.Spec.DpuProductName)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("vsp/%s", vendorDir), nil
 }
 
 // dpuProductToImageKey maps DPU product names to their corresponding VSP image keys

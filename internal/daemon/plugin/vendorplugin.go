@@ -11,7 +11,6 @@ import (
 	"github.com/go-logr/logr"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/utils"
-	"github.com/openshift/dpu-operator/pkgs/vars"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -41,39 +40,10 @@ type GrpcPlugin struct {
 	dsClient      pb.DeviceServiceClient
 	dpuMode       bool
 	dpuIdentifier DpuIdentifier
-	vsp           VspTemplateVars
 	conn          *grpc.ClientConn
 	pathManager   utils.PathManager
 	initialized   bool
 	initMutex     sync.RWMutex
-}
-
-func NewVspTemplateVars() VspTemplateVars {
-	return VspTemplateVars{
-		VendorSpecificPluginImage: "",
-		Namespace:                 vars.Namespace,
-		ImagePullPolicy:           "Always",
-		Command:                   "[ ]",
-		Args:                      "[ ]",
-	}
-}
-
-type VspTemplateVars struct {
-	VendorSpecificPluginImage string
-	Namespace                 string
-	ImagePullPolicy           string
-	Command                   string
-	Args                      string
-}
-
-func (v VspTemplateVars) ToMap() map[string]string {
-	return map[string]string{
-		"VendorSpecificPluginImage": v.VendorSpecificPluginImage,
-		"Namespace":                 v.Namespace,
-		"ImagePullPolicy":           v.ImagePullPolicy,
-		"Command":                   v.Command,
-		"Args":                      v.Args,
-	}
 }
 
 func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
@@ -138,18 +108,10 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 	}
 }
 
-func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
-	return func(d *GrpcPlugin) {
-		d.vsp = template_vars
-		d.log.V(2).Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
-	}
-}
-
 func NewGrpcPlugin(dpuMode bool, dpuIdentifier DpuIdentifier, client client.Client, opts ...func(*GrpcPlugin)) (*GrpcPlugin, error) {
 	gp := &GrpcPlugin{
 		dpuMode:       dpuMode,
 		dpuIdentifier: dpuIdentifier,
-		vsp:           VspTemplateVars{},
 		k8sClient:     client,
 		log:           ctrl.Log.WithName("GrpcPlugin"),
 		pathManager:   *utils.NewPathManager("/"),
