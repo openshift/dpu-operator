@@ -6,6 +6,18 @@ metadata:
       [
         {
           "apiVersion": "config.openshift.io/v1",
+          "kind": "DataProcessingUnit",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "dpu-operator"
+            },
+            "name": "dataprocessingunit-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "config.openshift.io/v1",
           "kind": "DpuOperatorConfig",
           "metadata": {
             "labels": {
@@ -38,7 +50,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-12T16:14:09Z"
+    createdAt: "2025-09-03T16:45:10Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -58,6 +70,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: DataProcessingUnit is the Schema for the dataprocessingunits API
+      displayName: Data Processing Unit
+      kind: DataProcessingUnit
+      name: dataprocessingunits.config.openshift.io
+      version: v1
     - description: DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
       displayName: Dpu Operator Config
       kind: DpuOperatorConfig
@@ -192,6 +209,32 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - dataprocessingunits/status
+          verbs:
+          - get
+          - patch
+          - update
         - apiGroups:
           - config.openshift.io
           resources:
@@ -364,10 +407,20 @@ spec:
                 - /manager
                 env:
                 - name: DpuOperatorDaemonImage
-                  value: quay.io/openshift/origin-dpu-daemon:4.20
+                  value: quay.io/openshift/dpu-daemon:latest
                 - name: NRIWebhookImage
-                  value: quay.io/openshift/sriov-dp-admission-controller:latest
-                image: quay.io/openshift/origin-dpu-operator:4.20
+                  value: quay.io/openshift/dpu-network-resources-injector:latest
+                - name: IntelVspImage
+                  value: quay.io/openshift/dpu-intel-ipu-vsp:latest
+                - name: IntelVspP4Image
+                  value: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
+                - name: MarvellVspImage
+                  value: quay.io/openshift/dpu-marvell-vsp:latest
+                - name: MarvellVspCpAgentImage
+                  value: quay.io/openshift/dpu-marvell-cp-agent:latest
+                - name: IntelNetSecVspImage
+                  value: quay.io/openshift/dpu-intel-netsec-vsp:latest
+                image: quay.io/openshift/dpu-operator:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz

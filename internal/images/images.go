@@ -8,6 +8,7 @@ const (
 	VspImageMarvell        = "MarvellVspImage"
 	VspImageIntelNetSec    = "IntelNetSecVspImage"
 	VspImageP4Intel        = "IntelVspP4Image"
+	VspImageMarvellCpAgent = "MarvellVspCpAgentImage"
 	DpuOperatorDaemonImage = "DpuOperatorDaemonImage"
 	NRIWebhookImage        = "NRIWebhookImage"
 )
@@ -28,6 +29,7 @@ func AllImageKeys() []string {
 		VspImageMarvell,
 		VspImageIntelNetSec,
 		VspImageP4Intel,
+		VspImageMarvellCpAgent,
 	}
 }
 
