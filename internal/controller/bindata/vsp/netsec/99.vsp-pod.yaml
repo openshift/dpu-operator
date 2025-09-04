@@ -17,13 +17,13 @@ spec:
   restartPolicy: Always
   containers:
   - name: vsp
-    image: {{.VendorSpecificPluginImage}}
+    image: {{.IntelNetSecVspImage}}
     imagePullPolicy: {{.ImagePullPolicy}}
     securityContext:
       privileged: true
       runAsUser: 0
-    command: {{.Command}}
-    args: {{.Args}}
+    command: ["/vsp-intel-netsec"]
+    args: []
     volumeMounts:
     - mountPath: /host
       mountPropagation: Bidirectional

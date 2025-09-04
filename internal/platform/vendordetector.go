@@ -48,6 +48,9 @@ type VendorDetector interface {
 
 	// A unique identifier for when detection happens on the DPU
 	DpuPlatformIdentifier() plugin.DpuIdentifier
+
+	// Returns the vendor-specific VSP directory path for bindata templates
+	GetVspDirectory() string
 }
 
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
@@ -60,6 +63,15 @@ func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
 			// add more detectors here
 		},
 	}
+}
+
+func (d *DpuDetectorManager) GetVendorDirectory(dpuProductName string) (string, error) {
+	for _, detector := range d.detectors {
+		if detector.Name() == dpuProductName {
+			return detector.GetVspDirectory(), nil
+		}
+	}
+	return "", fmt.Errorf("unknown DPU product name: %s", dpuProductName)
 }
 
 func (pi *DpuDetectorManager) IsDpu() (bool, error) {

@@ -22,26 +22,12 @@ rules:
   - persistentvolumeclaims
   verbs:
   - '*'
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - ""
   resources:
   - persistentvolumes
   verbs:
   - '*'
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - ""
   resources:
@@ -72,13 +58,6 @@ rules:
   - services
   verbs:
   - '*'
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
@@ -109,6 +88,18 @@ rules:
   - apps
   resources:
   - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
   verbs:
   - create
   - delete
@@ -222,6 +213,7 @@ rules:
   - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:

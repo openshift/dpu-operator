@@ -13,10 +13,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/k8snetworkplumbingwg/sriov-network-operator/pkg/apply"
-	configv1 "github.com/openshift/dpu-operator/api/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,7 +55,7 @@ func BinDataYamlFiles(dirPath string, binData embed.FS) ([]string, error) {
 	return yamlFileDescriptors, nil
 }
 
-func applyFromBinData(logger logr.Logger, filePath string, data map[string]string, binData embed.FS, client client.Client, cfg *configv1.DpuOperatorConfig, scheme *runtime.Scheme) error {
+func applyObjectFromBinData(logger logr.Logger, filePath string, data map[string]string, binData embed.FS, client client.Client, owner client.Object) error {
 	file, err := binData.Open(filepath.Join("bindata", filePath))
 	if err != nil {
 		return fmt.Errorf("Failed to read file '%s': %v", filePath, err)
@@ -71,8 +69,8 @@ func applyFromBinData(logger logr.Logger, filePath string, data map[string]strin
 	if err != nil {
 		return err
 	}
-	if cfg != nil {
-		if err := ctrl.SetControllerReference(cfg, obj, scheme); err != nil {
+	if owner != nil {
+		if err := ctrl.SetControllerReference(owner, obj, client.Scheme()); err != nil {
 			return err
 		}
 	}
@@ -95,13 +93,13 @@ func applyFromBinData(logger logr.Logger, filePath string, data map[string]strin
 	return nil
 }
 
-func ApplyAllFromBinData(logger logr.Logger, binDataPath string, data map[string]string, binData embed.FS, client client.Client, cfg *configv1.DpuOperatorConfig, scheme *runtime.Scheme) error {
+func ApplyAllFromBinData(logger logr.Logger, binDataPath string, data map[string]string, binData embed.FS, client client.Client, owner client.Object) error {
 	filePaths, err := BinDataYamlFiles(binDataPath, binData)
 	if err != nil {
 		return err
 	}
 	for _, f := range filePaths {
-		err = applyFromBinData(logger, f, data, binData, client, cfg, scheme)
+		err = applyObjectFromBinData(logger, f, data, binData, client, owner)
 		if err != nil {
 			return err
 		}
