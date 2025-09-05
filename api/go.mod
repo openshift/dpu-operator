@@ -3,7 +3,7 @@ module github.com/openshift/dpu-operator/api
 go 1.24.3
 
 require (
-	github.com/onsi/ginkgo/v2 v2.25.1
+	github.com/onsi/ginkgo/v2 v2.25.2
 	github.com/onsi/gomega v1.37.0
 	github.com/openshift/dpu-operator v0.0.0-20250224150056-b825f9135488
 	k8s.io/api v0.32.2
