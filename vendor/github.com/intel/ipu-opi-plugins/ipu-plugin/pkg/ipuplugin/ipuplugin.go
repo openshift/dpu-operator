@@ -234,8 +234,8 @@ func (s *server) Run() error {
 }
 
 func cleanUpRulesOnExit(p4rtClient types.P4RTClient) error {
-	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", p4rtClient.GetBin(), AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
-	p4rtclient.DeletePhyPortRules(p4rtClient, AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", p4rtClient.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	p4rtclient.DeletePhyPortRules(p4rtClient, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 
 	vfMacList, err := utils.GetVfMacList()
 	if err != nil {
@@ -252,8 +252,8 @@ func cleanUpRulesOnExit(p4rtClient types.P4RTClient) error {
 	log.Infof("DeleteLAGP4Rules, path->%s", p4rtClient.GetBin())
 	p4rtclient.DeleteLAGP4Rules(p4rtClient)
 
-	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", p4rtClient, AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
-	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(p4rtClient, AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", p4rtClient, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(p4rtClient, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 	return nil
 }
 

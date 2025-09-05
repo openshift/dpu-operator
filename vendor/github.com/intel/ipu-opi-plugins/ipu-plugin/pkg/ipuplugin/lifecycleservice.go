@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	kh "golang.org/x/crypto/ssh/knownhosts"
+
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
@@ -54,25 +56,42 @@ const (
 	deviceId            = "0x1452"
 	vendorId            = "0x8086"
 	imcAddress          = "192.168.0.1:22"
-	ApfNumber           = 16
+	ApfNumber           = 48
 	last_byte_mac_range = 239
 )
 
+type AccApfInfoType struct {
+	Mac  string
+	Name string
+}
+
+var AccApfInfo []AccApfInfoType
+var AccApfsAvailForCNI []string
+
 var InitAccApfMacs = false
-var AccApfMacList []string
 var PeerToPeerP4RulesAdded = false
 
-// Reserved ACC interfaces(using vport_id or last digit of interface name, like 4 represents-> enp0s1f0d4)
+// Reserved ACC interfaces(using vport_id or last digit of interface name, for example, index 4 represents-> enp0s1f0d4)
+/* With 1 NF config
+NF_PR_START_ID->6 to NF_PR_END_ID->7
+NF_AVAIL_START_ID->8 to NF_AVAIL_END_ID->9
+HOST_VF_START_ID->10 to HOST_VF_END_ID->25
+*/
 const (
 	PHY_PORT0_PRIMARY_INTF_INDEX   = 1
-	PHY_PORT0_SECONDARY_INTF_INDEX = 4
-	NF_IN_PR_INTF_INDEX            = 9
-	NF_OUT_PR_INTF_INDEX           = 10
-)
+	RSVD_INIT_LEN                  = 4
+	PHY_PORT0_SECONDARY_INTF_INDEX = (PHY_PORT0_PRIMARY_INTF_INDEX + RSVD_INIT_LEN)
 
-// TODO: GetFilteredPFs can be used to fill the array.
-var AccIntfNames = [ApfNumber]string{"enp0s1f0", "enp0s1f0d1", "enp0s1f0d2", "enp0s1f0d3", "enp0s1f0d4", "enp0s1f0d5", "enp0s1f0d6",
-	"enp0s1f0d7", "enp0s1f0d8", "enp0s1f0d9", "enp0s1f0d10", "enp0s1f0d11", "enp0s1f0d12", "enp0s1f0d13", "enp0s1f0d14", "enp0s1f0d15"}
+	MAX_NF_CNT        = 1
+	NF_PR_START_ID    = (PHY_PORT0_SECONDARY_INTF_INDEX + 1)
+	NF_PR_LEN         = (MAX_NF_CNT * 2)
+	NF_PR_END_ID      = (NF_PR_START_ID + NF_PR_LEN - 1)
+	NF_AVAIL_START_ID = NF_PR_END_ID + 1
+	NF_AVAIL_END_ID   = (NF_AVAIL_START_ID + NF_PR_LEN - 1)
+	HOST_VF_START_ID  = (NF_AVAIL_END_ID + 1)
+	MAX_HOST_VF_CNT   = (16)
+	HOST_VF_END_ID    = (HOST_VF_START_ID + MAX_HOST_VF_CNT - 1)
+)
 
 func NewLifeCycleService(daemonHostIp, daemonIpuIp string, daemonPort int, mode string, p4rtClient types.P4RTClient, brCtlr types.BridgeController) *LifeCycleServiceServer {
 	return &LifeCycleServiceServer{
@@ -981,12 +1000,78 @@ func skipIMCReboot() (bool, string) {
 
 }
 
+// Note: To evaluate, if we really need this api, since it
+// can break, if the format of config changes in cp_init.cfg
+// this api queries the param->acc_apf in /etc/dpcp/cp_init.cfg.
+// The param(acc_apf) appears in 3 lines in that file, and we run
+// the command to fetch the value in the second line.
+func queryNumAccApfsInIMCConfig() (int, error) {
+
+	log.Infof("queryNumAccApfsInIMCConfig")
+	//remove duplicate entries, and ensure host-key(ssh-keyscan) is present.
+	sshCmds := "ssh-keygen -R 192.168.0.1; ssh-keyscan 192.168.0.1 >> /root/.ssh/known_hosts"
+
+	_, err := utils.ExecuteScript(sshCmds)
+	if err != nil {
+		log.Errorf("error->%v, for ssh key commands->%v", err, sshCmds)
+		return 0, fmt.Errorf("error->%v, for ssh key commands->%v", err, sshCmds)
+	}
+
+	hostKeyCallback, err := kh.New("/root/.ssh/known_hosts")
+	if err != nil {
+		log.Errorf("error->%v, unable to create hostkeycallback function: ", err)
+		return 0, fmt.Errorf("error->%v, unable to create hostkeycallback function: ", err)
+	}
+
+	config := &ssh.ClientConfig{
+		User: "root",
+		Auth: []ssh.AuthMethod{
+			ssh.Password(""),
+		},
+		HostKeyCallback: hostKeyCallback,
+	}
+
+	// Connect to the remote server.
+	client, err := ssh.Dial("tcp", imcAddress, config)
+	if err != nil {
+		return 0, fmt.Errorf("failed to dial remote server: %s", err)
+	}
+	defer client.Close()
+
+	// Start a session.
+	session, err := client.NewSession()
+	if err != nil {
+		return 0, fmt.Errorf("failed to create session: %s", err)
+	}
+	defer session.Close()
+
+	commands := `grep "acc_apf = "  /etc/dpcp/cp_init.cfg | sed -n 2p | awk '/acc_apf = / {print $3}'`
+
+	// Run a command on the remote server and capture the output.
+	outputBytes, err := session.CombinedOutput(commands)
+	if err != nil {
+		log.Errorf("queryNumAccApfsInIMCConfig: error from command->%v", err)
+		return 0, fmt.Errorf("queryNumAccApfsInIMCConfig: error from command->%v", err)
+	}
+
+	outputStr := strings.TrimSuffix(string(outputBytes), "\n")
+	//to skip the semicolon, for example, if output is-> 48;
+	outputStr = outputStr[:len(outputStr)-1]
+
+	numAccApfs, err := strconv.Atoi(outputStr)
+
+	if err != nil {
+		log.Errorf("queryNumAccApfsInIMCConfig: Error converting string to int: %v", err)
+		return 0, fmt.Errorf("queryNumAccApfsInIMCConfig: Error converting string to int: %v", err)
+	}
+	log.Infof("queryNumAccApfsInIMCConfig ->%v", numAccApfs)
+
+	return numAccApfs, nil
+
+}
+
 func (e *ExecutableHandlerImpl) validate() bool {
 
-	if numAPFs := countAPFDevices(); numAPFs < ApfNumber {
-		log.Errorf("Not enough APFs %v, expected->%v", numAPFs, ApfNumber)
-		return false
-	}
 	if noReboot, infoStr := skipIMCReboot(); !noReboot {
 		fmt.Printf("IMC reboot required : %v\n", infoStr)
 		return false
@@ -996,26 +1081,33 @@ func (e *ExecutableHandlerImpl) validate() bool {
 }
 
 func (e *ExecutableHandlerImpl) SetupAccApfs() error {
-	var err error
-
 	if !InitAccApfMacs {
-		AccApfMacList, err = utils.GetAccApfMacList()
-
-		if err != nil {
-			log.Errorf("SetupAccApfs: Error-> %v", err)
-			return fmt.Errorf("SetupAccApfs: Error-> %v", err)
+		var pfList []netlink.Link
+		InitHandlers()
+		if err := GetFilteredPFs(&pfList); err != nil {
+			log.Errorf("SetupAccApfs: err->%v from GetFilteredPFs", err)
+			return fmt.Errorf("SetupAccApfs: err->%v from GetFilteredPFs", err)
+		}
+		if len(pfList) != ApfNumber {
+			log.Errorf("not enough APFs initialized on ACC, total APFs->%d, APFs->%v", len(pfList), pfList)
+			return fmt.Errorf("not enough APFs initialized on ACC, total APFs->%d, APFs->%v", len(pfList), pfList)
 		}
 
-		if len(AccApfMacList) != ApfNumber {
-			log.Errorf("not enough APFs initialized on ACC, total APFs->%d, APFs->%v", len(AccApfMacList), AccApfMacList)
-			return fmt.Errorf("not enough APFs initialized on ACC, total APFs->%d", len(AccApfMacList))
+		for i := 0; i < len(pfList); i++ {
+			accApf := AccApfInfoType{
+				Mac:  pfList[i].Attrs().HardwareAddr.String(),
+				Name: pfList[i].Attrs().Name,
+			}
+			AccApfInfo = append(AccApfInfo, accApf)
 		}
-		log.Infof("On ACC, total APFs->%d", len(AccApfMacList))
-		for i := 0; i < len(AccApfMacList); i++ {
-			log.Infof("index->%d, mac->%s", i, AccApfMacList[i])
-		}
-		InitAccApfMacs = true
 	}
+	log.Infof("AccApfInfo->%v", AccApfInfo)
+	for i := NF_AVAIL_START_ID; i <= NF_AVAIL_END_ID; i = i + 1 {
+		AccApfsAvailForCNI = append(AccApfsAvailForCNI, AccApfInfo[i].Name)
+	}
+	log.Infof("AccApfsAvailForCNI->%v", AccApfsAvailForCNI)
+
+	InitAccApfMacs = true
 	return nil
 }
 
@@ -1046,13 +1138,13 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 	}
 	//Add Phy Port0 to ovs bridge
 	//Note: Per current design, Phy Port1 is added to a different bridge(through P4 rules).
-	if err := brCtlr.AddPort(AccIntfNames[PHY_PORT0_SECONDARY_INTF_INDEX]); err != nil {
-		log.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_SECONDARY_INTF_INDEX])
-		return fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_SECONDARY_INTF_INDEX])
+	if err := brCtlr.AddPort(AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Name); err != nil {
+		log.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Name)
+		return fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Name)
 	}
 	//Add P4 rules for phy ports
-	log.Infof("AddPhyPortRules, path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
-	p4rtclient.AddPhyPortRules(p, AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	log.Infof("AddPhyPortRules, path->%s, 1->%v, 2->%v", p.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	p4rtclient.AddPhyPortRules(p, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 
 	CheckAndAddPeerToPeerP4Rules(p)
 
@@ -1068,8 +1160,8 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 	time.Sleep(2 * time.Second)
 
 	//Add P4 rules to handle Primary network traffic via phy port0
-	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
-	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfMacList[PHY_PORT0_SECONDARY_INTF_INDEX], AccApfMacList[PHY_PORT0_PRIMARY_INTF_INDEX])
+	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 
 	return nil
 }
