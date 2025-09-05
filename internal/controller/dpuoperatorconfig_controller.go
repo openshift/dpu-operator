@@ -27,7 +27,6 @@ import (
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -39,16 +38,14 @@ var binData embed.FS
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
 type DpuOperatorConfigReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
 	imageManager    images.ImageManager
 	imagePullPolicy string
 	pathManager     utils.PathManager
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, imageManager images.ImageManager) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, imageManager images.ImageManager) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
 		Client:          client,
-		Scheme:          scheme,
 		imageManager:    imageManager,
 		imagePullPolicy: "IfNotPresent",
 	}
@@ -167,7 +164,7 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 
 func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
 	mergedData := images.MergeVarsWithImages(r.imageManager, r.yamlVars())
-	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg, r.Scheme)
+	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {

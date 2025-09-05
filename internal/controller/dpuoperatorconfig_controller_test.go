@@ -56,7 +56,7 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	Expect(err).NotTo(HaveOccurred())
 
 	mockImageManager := images.NewDummyImageManager()
-	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), mockImageManager)
+	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mockImageManager)
 	err = b.SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 

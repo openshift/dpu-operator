@@ -91,7 +91,7 @@ func main() {
 
 	imageManager := images.NewEnvImageManager()
 
-	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), imageManager)
+	b := controller.NewDpuOperatorConfigReconciler(mgr.GetClient(), imageManager)
 
 	if value, ok := os.LookupEnv("IMAGE_PULL_POLICIES"); ok {
 		b = b.WithImagePullPolicy(value)
