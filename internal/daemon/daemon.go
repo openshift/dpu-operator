@@ -252,11 +252,14 @@ func (d *Daemon) SyncDpuCRs() error {
 		return fmt.Errorf("Failed to list existing DPU CRs: %v", err)
 	}
 
-	// Create a map of existing CRs by name for quick lookup
+	// Create a map of existing CRs by name for quick lookup, filtered by node name
 	existingCRMap := make(map[string]*v1.DataProcessingUnit)
 	for i := range existingCRs.Items {
 		cr := &existingCRs.Items[i]
-		existingCRMap[cr.Name] = cr
+		// Only include CRs that belong to this node
+		if cr.Spec.NodeName == d.nodeName {
+			existingCRMap[cr.Name] = cr
+		}
 	}
 
 	// Sync each managed DPU to K8s
@@ -268,9 +271,10 @@ func (d *Daemon) SyncDpuCRs() error {
 	}
 
 	// Check for orphaned CRs that no longer have corresponding in-memory DPUs
+	// Only consider CRs that belong to this node
 	for crName, orphanedCR := range existingCRMap {
 		if _, exists := d.managedDpus[crName]; !exists {
-			d.log.Info("Found orphaned DPU CR, removing it", "crName", crName)
+			d.log.Info("Found orphaned DPU CR for this node, removing it", "crName", crName, "nodeName", d.nodeName)
 			err := d.client.Delete(context.TODO(), orphanedCR)
 			if err != nil {
 				d.log.Error(err, "Failed to delete orphaned DPU CR", "crName", crName)
