@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/openshift/dpu-operator/api/v1"
+	v1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
@@ -300,18 +300,21 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *v1.DataProcessingUnit, existingCRMap map
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			// CR doesn't exist, create it
-			err := d.client.Create(context.TODO(), dpuCR)
+			// TODO FIXME: client Create/Update will update the dpuCR with metafields such as resourceVersion. Meaning that the dpuCR pointer cannot be
+			// reused to create a new DPU CR. For now, we do a deep copy of the dpuCR and use that to update the status.
+			dpuCRCopy := dpuCR.DeepCopy()
+			err := d.client.Create(context.TODO(), dpuCRCopy)
 			if err != nil {
 				return fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
 			}
 
 			// Update status after creation
-			err = d.client.Status().Update(context.TODO(), dpuCR)
+			err = d.client.Status().Update(context.TODO(), dpuCRCopy)
 			if err != nil {
 				return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 			}
 
-			d.log.Info("Created DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
+			d.log.Info("Created DPU CR", "name", identifier, "dpuProductName", dpuCRCopy.Spec.DpuProductName, "isDpuSide", dpuCRCopy.Spec.IsDpuSide)
 			return nil
 		}
 		return fmt.Errorf("Failed to get DPU CR %s: %v", identifier, err)
