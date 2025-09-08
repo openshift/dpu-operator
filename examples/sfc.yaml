@@ -4,6 +4,9 @@ metadata:
   name: sfc-name
   namespace: openshift-dpu-operator
 spec:
+  # Target only nodes with the "dpu" label set to "true"
+  nodeSelector:
+    dpu: "true"
   networkFunctions:
   - name: test-nf
     image: ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest

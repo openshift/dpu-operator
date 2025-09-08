@@ -333,10 +333,7 @@ func (d *HostSideManager) setupReconcilers() {
 			d.log.Error(err, "unable to start manager")
 		}
 
-		sfcReconciler := &sfcreconciler.SfcReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}
+		sfcReconciler := sfcreconciler.NewSfcReconciler(mgr.GetClient(), mgr.GetScheme())
 
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
 			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
