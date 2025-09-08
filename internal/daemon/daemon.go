@@ -7,13 +7,14 @@ import (
 	"reflect"
 	"time"
 
-	v1 "github.com/openshift/dpu-operator/api/v1"
+	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -35,7 +36,7 @@ type SideManager interface {
 
 // ManagedDpu represents a DPU with all its runtime state and management components
 type ManagedDpu struct {
-	DpuCR   *v1.DataProcessingUnit
+	DpuCR   *configv1.DataProcessingUnit
 	Plugin  *plugin.GrpcPlugin
 	Manager SideManager
 }
@@ -198,6 +199,13 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				d.log.Error(err, "Failed to sync DPU CRs")
 				return err
 			}
+
+			// Update node labels based on detected DPUs
+			err = d.updateNodeLabels()
+			if err != nil {
+				d.log.Error(err, "Failed to update node labels")
+				return err
+			}
 		case err := <-errChan:
 			d.log.Error(err, "Side manager failed, stopping all managers")
 			d.shutdown(cancelManagers, managerDone)
@@ -228,7 +236,7 @@ func (d *Daemon) shutdown(cancelManagers context.CancelFunc, managerDone []chan 
 	d.log.Info("All side managers stopped")
 }
 
-func (d *Daemon) createSideManager(dpuCR *v1.DataProcessingUnit, dpuPlugin *plugin.GrpcPlugin) (SideManager, error) {
+func (d *Daemon) createSideManager(dpuCR *configv1.DataProcessingUnit, dpuPlugin *plugin.GrpcPlugin) (SideManager, error) {
 	if dpuCR.Spec.IsDpuSide {
 		dsm, err := NewDpuSideManager(dpuPlugin, d.config, WithPathManager(*d.pm))
 		if err != nil {
@@ -246,14 +254,14 @@ func (d *Daemon) createSideManager(dpuCR *v1.DataProcessingUnit, dpuPlugin *plug
 
 func (d *Daemon) SyncDpuCRs() error {
 	// Get all existing DPU CRs from K8s
-	existingCRs := &v1.DataProcessingUnitList{}
+	existingCRs := &configv1.DataProcessingUnitList{}
 	err := d.client.List(context.TODO(), existingCRs)
 	if err != nil {
 		return fmt.Errorf("Failed to list existing DPU CRs: %v", err)
 	}
 
 	// Create a map of existing CRs by name for quick lookup, filtered by node name
-	existingCRMap := make(map[string]*v1.DataProcessingUnit)
+	existingCRMap := make(map[string]*configv1.DataProcessingUnit)
 	for i := range existingCRs.Items {
 		cr := &existingCRs.Items[i]
 		// Only include CRs that belong to this node
@@ -287,11 +295,11 @@ func (d *Daemon) SyncDpuCRs() error {
 	return nil
 }
 
-func (d *Daemon) syncSingleDpuCR(dpuCR *v1.DataProcessingUnit, existingCRMap map[string]*v1.DataProcessingUnit) error {
+func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRMap map[string]*configv1.DataProcessingUnit) error {
 	identifier := dpuCR.Name
 
 	// Check if CR exists in the cluster
-	existingCR := &v1.DataProcessingUnit{}
+	existingCR := &configv1.DataProcessingUnit{}
 	err := d.client.Get(context.TODO(), client.ObjectKey{
 		Name:      identifier,
 		Namespace: dpuCR.Namespace,
@@ -417,5 +425,61 @@ func (d *Daemon) runSideManager(mgr SideManager, identifier string, managerCtx c
 		d.log.Error(err, "Failed to serve on sideManager")
 		return err
 	}
+	return nil
+}
+
+// updateNodeLabels updates the node labels based on the detected DPUs. This is done independently since labels can be
+// removed or modified accidently. We always want this label to be set/deleted properly.
+func (d *Daemon) updateNodeLabels() error {
+	const DpuSideLabelKey = "dpu.config.openshift.io/dpuside"
+
+	// Get the current node
+	node := &corev1.Node{}
+	err := d.client.Get(context.TODO(), client.ObjectKey{Name: d.nodeName}, node)
+	if err != nil {
+		return fmt.Errorf("Failed to get node %s: %v", d.nodeName, err)
+	}
+
+	// Determine the label value based on detected DPUs
+	var labelValue string
+	if len(d.managedDpus) == 0 {
+		// No DPUs detected, remove the label if it exists
+		if node.Labels != nil {
+			if _, exists := node.Labels[DpuSideLabelKey]; exists {
+				delete(node.Labels, DpuSideLabelKey)
+				err := d.client.Update(context.TODO(), node)
+				if err != nil {
+					return fmt.Errorf("Failed to remove DPU side label from node %s: %v", d.nodeName, err)
+				}
+				d.log.Info("Removed DPU side label from node", "nodeName", d.nodeName)
+			}
+		}
+		return nil
+	}
+
+	for _, managedDpu := range d.managedDpus {
+		if managedDpu.DpuCR.Spec.IsDpuSide {
+			labelValue = "dpu"
+		} else {
+			labelValue = "dpu-host"
+		}
+		break // It is a bug if there is node with managedDPU that is both hosting a DPU and is a DPU itself. Hense we only need to look at the first managedDPU DPU CR.
+	}
+
+	if node.Labels == nil {
+		node.Labels = make(map[string]string)
+	}
+
+	// Check if the label needs to be updated
+	currentValue, exists := node.Labels[DpuSideLabelKey]
+	if !exists || currentValue != labelValue {
+		node.Labels[DpuSideLabelKey] = labelValue
+		err := d.client.Update(context.TODO(), node)
+		if err != nil {
+			return fmt.Errorf("Failed to update DPU side label on node %s: %v", d.nodeName, err)
+		}
+		d.log.Info("Updated DPU side label on node", "nodeName", d.nodeName, "labelValue", labelValue)
+	}
+
 	return nil
 }
