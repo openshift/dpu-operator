@@ -533,7 +533,7 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250903161606-c02e7e5c4408
+# github.com/intel/ipu-opi-plugins/ipu-plugin v0.0.0-20250908233734-cbba7e8e8e1a
 ## explicit; go 1.23.6
 github.com/intel/ipu-opi-plugins/ipu-plugin/ipuplugin/cmd
 github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/firewall
