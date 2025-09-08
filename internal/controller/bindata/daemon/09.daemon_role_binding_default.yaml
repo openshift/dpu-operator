@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dpu-daemon-role-binding-default
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dpu-daemon-role-default
+subjects:
+- kind: ServiceAccount
+  name: dpu-daemon-sa
+  namespace: {{.Namespace}} 
