@@ -54,6 +54,13 @@ spec:
                   - name
                   type: object
                 type: array
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: |-
+                  NodeSelector specifies which nodes this ServiceFunctionChain CR should be able to create the Network Function pod.
+                  If empty, the ServiceFunctionChain will try to deploy the Network Function pod on all nodes.
+                type: object
             required:
             - networkFunctions
             type: object
