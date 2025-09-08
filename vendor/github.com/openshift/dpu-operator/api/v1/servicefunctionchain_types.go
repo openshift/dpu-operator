@@ -25,8 +25,8 @@ import (
 
 // ServiceFunctionChainSpec defines the desired state of ServiceFunctionChain
 type ServiceFunctionChainSpec struct {
-	// NodeSelector specifies which nodes this ServiceFunctionChain should be reconciled on.
-	// If empty, the ServiceFunctionChain will be reconciled on all nodes.
+	// NodeSelector specifies which nodes this ServiceFunctionChain CR should be able to create the Network Function pod.
+	// If empty, the ServiceFunctionChain will try to deploy the Network Function pod on all nodes.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
