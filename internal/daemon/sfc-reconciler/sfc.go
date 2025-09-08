@@ -11,14 +11,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
-	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -34,7 +32,7 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: vars.Namespace,
+			Namespace: "default",
 			Annotations: map[string]string{
 				"k8s.v1.cni.cncf.io/networks": "dpunfcni-conf, dpunfcni-conf",
 			},
@@ -97,11 +95,6 @@ func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, pod *corev1.Pod) 
 func (r *SfcReconciler) ensureNetworkFunctionExists(ctx context.Context, sfc *configv1.ServiceFunctionChain, nf configv1.NetworkFunction) error {
 	logger := r.log.WithValues("networkFunction", nf.Name)
 	pod := networkFunctionPod(nf.Name, nf.Image)
-
-	if err := controllerutil.SetControllerReference(sfc, pod, r.Scheme); err != nil {
-		logger.Error(err, "Failed to set owner reference on Pod")
-		return err
-	}
 
 	if err := r.createOrUpdatePod(ctx, pod); err != nil {
 		logger.Error(err, "Failed to ensure that pod exists")

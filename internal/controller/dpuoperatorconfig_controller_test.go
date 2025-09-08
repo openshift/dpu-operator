@@ -178,7 +178,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 			It("should have the network function NAD created by controller manager", func() {
 				nad := &netattdefv1.NetworkAttachmentDefinition{}
 				Eventually(func() error {
-					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testNetworkFunctionNADDpu}, nad)
+					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: "default", Name: testNetworkFunctionNADDpu}, nad)
 				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
 			AfterAll(func() {

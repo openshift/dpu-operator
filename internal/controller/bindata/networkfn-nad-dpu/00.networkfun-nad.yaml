@@ -2,7 +2,7 @@ apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: dpunfcni-conf
-  namespace: {{.Namespace}}
+  namespace: default
   annotations:
         k8s.v1.cni.cncf.io/resourceName: {{.ResourceName}}
 spec:
