@@ -6,9 +6,7 @@ import (
 	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -71,26 +69,37 @@ func networkFunctionPod(name string, image string) *corev1.Pod {
 	}
 }
 
-func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, pod *corev1.Pod) error {
-	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod)
-	if err != nil && errors.IsNotFound(err) {
-		r.log.Info("Creating Pod", "name", pod.Name)
-		if err := r.Create(ctx, pod); err != nil {
-			r.log.Error(err, "Failed to create Pod", "pod", pod.Name)
-			return err
+func (r *SfcReconciler) createOrUpdatePod(ctx context.Context, desiredPod *corev1.Pod) error {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      desiredPod.Name,
+			Namespace: desiredPod.Namespace,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pod, func() error {
+		// Set the annotation fields, metadata can change when a pod is created. We shouldn't override the metadata by using the desired pod
+		// definition directly. Metadata fields shouldn't be removed. Instead we use use the mutation pattern (get actual object from API
+		// server then modify it in place)
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
 		}
-		r.log.Info("Pod created successfully", "pod", pod.Name)
-	} else if err == nil {
-		r.log.Info("Updating Pod", "name", pod.Name)
-		if err := r.Update(ctx, pod); err != nil {
-			r.log.Error(err, "Failed to update Pod", "pod", pod.Name)
-			return err
+		for key, value := range desiredPod.Annotations {
+			pod.Annotations[key] = value
 		}
-		r.log.Info("Pod updated successfully", "pod", pod.Name)
-	} else {
-		r.log.Error(err, "Failed to get Pod", "pod", pod.Name)
+
+		// Set the complete PodSpec from the template. The pod spec should not be changed directly when using the sfc CR.
+		pod.Spec = desiredPod.Spec
+
+		return nil
+	})
+
+	if err != nil {
+		r.log.Error(err, "Failed to create or update Pod", "pod", pod.Name, "namespace", pod.Namespace)
 		return err
 	}
+
+	r.log.Info("Pod created or updated successfully", "pod", pod.Name, "namespace", pod.Namespace)
 	return nil
 }
 
