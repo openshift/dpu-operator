@@ -72,7 +72,14 @@ setup_venv() {
 
     cd $submodule_dir
 
-    current_sha=$(git rev-parse HEAD)
+    # Check if git is available and we're in a git repository
+    if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+        # Git is available, use git rev-parse HEAD
+        current_sha=$(git rev-parse HEAD)
+    else
+        # Git not available, fallback to tar + sha
+        current_sha=$(tar --sort=name -cf - . | sha256sum | cut -d' ' -f1)
+    fi
     
     # Check SHA and venv existence first (fast checks)
     if [[ -d $venv_path && -f $sha_file && $(cat $sha_file) == "$current_sha" ]]; then
