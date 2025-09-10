@@ -20,13 +20,13 @@ spec:
         env:
         - name: DpuOperatorDaemonImage
           value: {{ .RegistryURL }}/dpu-daemon:dev
-        - name: IntelVspImage
+        - name: intel_ipu
           value: {{ .RegistryURL }}/intel-vsp:dev
         - name: IntelVspP4Image
           value: {{ .RegistryURL }}/intel-vsp-p4:dev
-        - name: MarvellVspImage
+        - name: marvell_dpu
           value: {{ .RegistryURL }}/mrvl-vsp:dev
-        - name: IntelNetSecVspImage
+        - name: intel_netsec
           value: {{ .RegistryURL }}/intel-netsec-vsp:dev
         - name: IMAGE_PULL_POLICIES
           value: Always

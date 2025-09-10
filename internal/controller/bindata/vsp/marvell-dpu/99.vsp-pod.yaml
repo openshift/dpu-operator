@@ -17,13 +17,13 @@ spec:
   restartPolicy: Always
   containers:
   - name: vsp
-    image: {{.VendorSpecificPluginImage}}
+    image: {{.marvell_dpu}}
     imagePullPolicy: {{.ImagePullPolicy}}
     securityContext:
       privileged: true
       runAsUser: 0
-    command: {{.Command}}
-    args: {{.Args}}
+    command: ["/vsp-mrvl"]
+    args: []
     volumeMounts:
     - mountPath: /host
       mountPropagation: Bidirectional

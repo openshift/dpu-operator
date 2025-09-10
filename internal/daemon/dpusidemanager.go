@@ -142,7 +142,9 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 	d.startedWg.Add(1)
 	d.log.Info("Starting DpuDaemon")
 	d.server = grpc.NewServer()
-	d.setupReconcilers()
+	if err := d.setupReconcilers(); err != nil {
+		return nil, fmt.Errorf("failed to setup reconcilers: %v", err)
+	}
 
 	pb.RegisterBridgePortServiceServer(d.server, d)
 
@@ -253,7 +255,7 @@ func (d *DpuSideManager) Serve(ctx context.Context, listener net.Listener) error
 	}
 }
 
-func (d *DpuSideManager) setupReconcilers() {
+func (d *DpuSideManager) setupReconcilers() error {
 	d.log.Info("DpuSideManager.setupReconcilers() starting")
 	if d.manager == nil {
 		t := time.Duration(0)
@@ -276,14 +278,17 @@ func (d *DpuSideManager) setupReconcilers() {
 		})
 		if err != nil {
 			d.log.Error(err, "unable to start manager")
+			return fmt.Errorf("failed to create controller manager: %v", err)
 		}
 
 		sfcReconciler := sfcreconciler.NewSfcReconciler(mgr.GetClient(), mgr.GetScheme())
 
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
 			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
+			return fmt.Errorf("failed to setup ServiceFunctionChain controller: %v", err)
 		}
 		d.manager = mgr
 	}
 	d.log.Info("DpuSideManager.setupReconcilers() Done")
+	return nil
 }

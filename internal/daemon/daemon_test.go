@@ -132,7 +132,7 @@ var _ = g.Describe("Full Daemon", func() {
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(dpuCR.Spec.IsDpuSide).To(BeTrue())
-				Expect(dpuCR.Spec.DpuProductName).To(Equal("Intel IPU"))
+				Expect(dpuCR.Spec.DpuProductName).To(Equal("Intel IPU E2100"))
 				return nil
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 		})

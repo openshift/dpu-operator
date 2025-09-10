@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: dpu-daemon-role
+  name: vsp-role
   namespace: {{.Namespace}}
 rules:
 - apiGroups:
@@ -13,27 +13,43 @@ rules:
   verbs:
     - use
 - apiGroups:
-  - config.openshift.io
-  resources:
-  - servicefunctionchains
-  - servicefunctionchains/finalizers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - ""
   resources:
   - pods
+  - pods/status
+  - serviceaccounts
+  - services
+  - configmaps
+  - secrets
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete

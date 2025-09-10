@@ -80,19 +80,16 @@ spec:
           value: quay.io/openshift/dpu-daemon:latest
         - name: NRIWebhookImage
           value: quay.io/openshift/dpu-network-resources-injector:latest
-        - name: IntelVspImage
+        - name: intel_ipu
           value: quay.io/openshift/dpu-intel-ipu-vsp:latest
         - name: IntelVspP4Image
           value: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
-        - name: MarvellVspImage
+        - name: marvell_dpu
           value: quay.io/openshift/dpu-marvell-vsp:latest
         - name: MarvellVspCpAgentImage
           value: quay.io/openshift/dpu-marvell-cp-agent:latest
-        - name: IntelNetSecVspImage
+        - name: intel_netsec
           value: quay.io/openshift/dpu-intel-netsec-vsp:latest
-        #TODO: We will need pointers to all supported VSP images so we can dynamically detect the correct vendor to support at runtime
-        # - name: IntelVspImage
-        #   value: quay.io/openshift/origin-intel-vsp-image:4.16
         image: quay.io/openshift/dpu-operator:latest
         name: manager
         securityContext:

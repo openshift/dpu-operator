@@ -17,13 +17,13 @@ spec:
   restartPolicy: Always
   containers:
   - name: vsp
-    image: {{.VendorSpecificPluginImage}}
+    image: {{.intel_ipu}}
     imagePullPolicy: {{.ImagePullPolicy}}
     securityContext:
       privileged: true
       runAsUser: 0
-    command: {{.Command}}
-    args: {{.Args}}
+    command: ["/ipuplugin"]
+    args: ["-v=debug", "--p4rtName=vsp-p4-service.{{.Namespace}}.svc.cluster.local", "--p4Image={{.IntelVspP4Image}}"]
     volumeMounts:
     - mountPath: /host
       mountPropagation: Bidirectional
