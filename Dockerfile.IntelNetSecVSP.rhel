@@ -13,7 +13,7 @@ COPY . .
 # Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
 # As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
 RUN mkdir -p /bin && \
-    GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-netsec-vsp
+    GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-netsec-vsp
 
 # Use distroless as minimal base image to package the Marvell VSP binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
