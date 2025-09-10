@@ -48,8 +48,30 @@ func setupDpuLink() error {
 		return err
 	}
 
-	cpagentCmd := "/usr/bin/octep_cp_agent /usr/bin/cn106xx.cfg --"
-	cpagentCmd += " --dpi_dev " + dpi_pf[0]
+	rvu_pf_2, _ := mrvlutils.GetAllVfsByDeviceID(mrvlutils.MrvlRVUPF2Id)
+
+	klog.Infof("Found RVU PF 2: %v", rvu_pf_2)
+
+	if rvu_pf_2 != nil {
+		err = mrvlutils.BindToVFIO(rvu_pf_2[1])
+		if err != nil {
+			klog.Errorf("Failed to bind RVU PF 2 with VFIO: %v", err)
+			return err
+		}
+	}
+
+	cpagentCmd := ""
+	if rvu_pf_2 != nil {
+		cpagentCmd += "/usr/bin/octep_cp_agent"
+	} else {
+		cpagentCmd += "/usr/bin/octep_cp_agent.25.03.0"
+	}
+	cpagentCmd += " /usr/bin/cn106xx.cfg --"
+	if rvu_pf_2 != nil {
+		cpagentCmd += " --sdp_rvu_pf " + rvu_pf_2[1]
+	} else {
+		cpagentCmd += " --dpi_dev " + dpi_pf[0]
+	}
 	cpagentCmd += " --pem_dev " + pem_pf[0]
 	cpagentCmd += " &> /tmp/octep-cp-agent.log"
 	err = exec.Command("bash", "-c", cpagentCmd).Run()

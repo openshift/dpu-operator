@@ -40,6 +40,7 @@ const (
 	IntelNetSecDpuBackplanef3PCIeAddress string = "0000:f4:00.3"
 	VlanOffset                           int    = 2 // Vlan ID offset since vlan 0 is untagged and to reserve vlan 1
 	NoOfVethPairs                        int    = 2 // Only support 1 Network Function with 2 pairs (TODO: Need CRD)
+	MaxChains                            int    = 1 // Only support 1 Chain of Network Functions
 	OvSBridgeName                        string = "br-secondary"
 )
 
@@ -63,8 +64,22 @@ type intelNetSecVspServer struct {
 	dpuPcieAddress string               // PCIe address of the DPU device (function 0) on the Host
 	// Intel NetSec Accelerator specific interfaces
 	vfCnt              int
-	vethTunnelPairDevs []*vspnetutils.VEthPairDeviceInfo
+	vethTunnelPairDevs map[vspnetutils.VethPairKey]*vspnetutils.VEthPairDeviceInfo
 	vfDevs             map[vspnetutils.VfDeviceKey]*vspnetutils.VfDeviceInfo
+	// Network Functions
+	numNfs                int
+	serviceFunctionChains map[int]*intelNetSecServiceFunctionChain
+}
+
+// This datastructure represents a pseudo VF representor. Representor lanes are created with layer2 VLAN isolation.
+type intelNetSecVfRepDev struct {
+	vfRepDev    *vspnetutils.VfDeviceInfo
+	hostSideMac string
+}
+
+type intelNetSecServiceFunctionChain struct {
+	vfRepDevs map[vspnetutils.VfDeviceKey]*intelNetSecVfRepDev
+	sfpVfDevs *vspnetutils.VfDeviceInfo
 }
 
 // getVFs retrieves the VF PCIe addresses for the given PF PCIe address for Intel NetSec accelerator devices.
@@ -98,18 +113,34 @@ func (vsp *intelNetSecVspServer) configureCommChannelIPs(dpuMode bool) (pb.IpPor
 	var err error
 	if dpuMode {
 		// All NetSec DPU devices have the same internal PCIe Addresses. Netdev names can change with each RHEL release.
-		ifName, err = vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, IntelNetSecDpuBackplanef2PCIeAddress)
+		ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuBackplanef2PCIeAddress)
 		if err != nil {
 			vsp.log.Error(err, "Error getting netdev name from PCIe address in DPU mode", "PCIeAddress", IntelNetSecDpuBackplanef2PCIeAddress)
 			return pb.IpPort{}, err
 		}
+
+		if len(ifNames) != 1 {
+			err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", IntelNetSecDpuBackplanef2PCIeAddress, ifNames)
+			vsp.log.Error(err, "Error getting netdev name from PCIe address in DPU mode", "PCIeAddress", IntelNetSecDpuBackplanef2PCIeAddress)
+			return pb.IpPort{}, err
+		}
+
+		ifName = ifNames[0]
 		addr = IPv6AddrDpu
 	} else {
-		ifName, err = vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, vsp.dpuPcieAddress)
+		ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vsp.dpuPcieAddress)
 		if err != nil {
 			vsp.log.Error(err, "Error getting netdev name from PCIe address in Host mode", "PCIeAddress", vsp.dpuPcieAddress)
 			return pb.IpPort{}, err
 		}
+
+		if len(ifNames) != 1 {
+			err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vsp.dpuPcieAddress, ifNames)
+			vsp.log.Error(err, "Error getting netdev name from PCIe address in Host mode", "PCIeAddress", vsp.dpuPcieAddress)
+			return pb.IpPort{}, err
+		}
+
+		ifName = ifNames[0]
 		addr = IPv6AddrHost
 	}
 
@@ -184,19 +215,75 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 	// 1. IntelNetSecDpuSFPf0PCIeAddress can be used for the cluster network.
 	// 2. IntelNetSecDpuSFPf1PCIeAddress we use the second 25Gbe interface for now.
 	// With 1) you can't have the same interface on 2 bridges.
-	sfpPortIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, IntelNetSecDpuSFPf1PCIeAddress)
+	sfpPortIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuSFPf1PCIeAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
 		return err
 	}
 
-	err = vspnetutils.AddInterfaceToOvSBridge(bridgeName, sfpPortIfName)
+	if len(sfpPortIfNames) != 1 {
+		return fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", IntelNetSecDpuSFPf1PCIeAddress, sfpPortIfNames)
+	}
+
+	sfpPortIfName := sfpPortIfNames[0]
+
+	// The following code takes the second SFP port's first VF and adds this VF to the OvS bridge.
+	// The reason why a VF is chosen is to support VLAN use cases and multiple independent chains.
+	// TODO: When more chains are supported we need to put the following in a loop
+	vfPcieAddr, err := vspnetutils.VfPCIAddressFromVfIndex(vsp.fs, sfpPortIfName, 0)
 	if err != nil {
-		vsp.log.Error(err, "Error occurred in adding SFP Port Interface to Bridge", "BridgeName", bridgeName, "SfpPortIfName", sfpPortIfName)
+		vsp.log.Error(err, "Error getting VF PCI address", "VFID", 0, "InterfaceName", sfpPortIfName)
 		return err
 	}
 
-	vsp.log.Info("SFP Port Interface Added to Bridge Successfully", "BridgeName", bridgeName, "SfpPortIfName", sfpPortIfName)
+	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfPcieAddr)
+	if err != nil {
+		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
+		return err
+	}
+
+	if len(vfIfNames) != 1 {
+		return fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vfPcieAddr, vfIfNames)
+	}
+
+	vfIfName := vfIfNames[0]
+
+	sfpPortlink, err := netlink.LinkByName(sfpPortIfName)
+	if err != nil {
+		vsp.log.Error(err, "Failed to get link by name", "sfpPortIfName", sfpPortIfName)
+		return err
+	}
+
+	if err := netlink.LinkSetVfSpoofchk(sfpPortlink, 0, false); err != nil {
+		vsp.log.Error(err, "Failed to set spoof check off for VF", "VfID", 0, "sfpPortIfName", sfpPortIfName)
+		return err
+	}
+
+	if err := netlink.LinkSetVfTrust(sfpPortlink, 0, true); err != nil {
+		vsp.log.Error(err, "Failed to set trust on for VF", "VfID", 0, "sfpPortIfName", sfpPortIfName)
+		return err
+	}
+
+	vsp.serviceFunctionChains[0] = &intelNetSecServiceFunctionChain{
+		sfpVfDevs: &vspnetutils.VfDeviceInfo{
+			VfKey: vspnetutils.VfDeviceKey{
+				PfInterfaceName: sfpPortIfName,
+				Id:              0,
+			},
+			PciAddress: vfPcieAddr,
+			Vlan:       0,
+			Allocated:  true,
+		},
+		vfRepDevs: make(map[vspnetutils.VfDeviceKey]*intelNetSecVfRepDev),
+	}
+
+	err = vspnetutils.AddInterfaceToOvSBridge(bridgeName, vfIfName)
+	if err != nil {
+		vsp.log.Error(err, "Error occurred in adding SFP Port Interface to Bridge", "BridgeName", bridgeName, "SfpPortIfName", sfpPortIfNames[0])
+		return err
+	}
+
+	vsp.log.Info("SFP Port Interface Added to Bridge Successfully", "BridgeName", bridgeName, "SfpPortIfName", sfpPortIfNames[0])
 	return nil
 }
 
@@ -208,7 +295,7 @@ func (vsp *intelNetSecVspServer) createVethPairs() error {
 			vsp.log.Error(err, "Error creating veth pair", "Index", idx)
 			return err
 		}
-		vsp.vethTunnelPairDevs = append(vsp.vethTunnelPairDevs, pair)
+		vsp.vethTunnelPairDevs[pair.VethKey] = pair
 	}
 
 	vsp.log.Info("createVethPairs(): Created veth pairs", "Count", len(vsp.vethTunnelPairDevs))
@@ -322,11 +409,19 @@ func (vsp *intelNetSecVspServer) getConnectedVf(OPIBridgePortName string) (*vspn
 		return nil, err
 	}
 
-	pfIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, backPlanePcieAddr)
+	pfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(backPlanePcieAddr)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", backPlanePcieAddr)
 		return nil, err
 	}
+
+	if len(pfIfNames) != 1 {
+		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", backPlanePcieAddr, pfIfNames)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", backPlanePcieAddr)
+		return nil, err
+	}
+
+	pfIfName := pfIfNames[0]
 
 	// For Intel NetSec, PF ID is always 0 and VF ID is mapped one to one.
 	key := vspnetutils.VfDeviceKey{
@@ -353,16 +448,45 @@ func (vsp *intelNetSecVspServer) CreateBridgePort(ctx context.Context, in *opi.C
 		return nil, err
 	}
 
-	vfIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, vfDevice.PciAddress)
+	if vfDevice.Allocated == true {
+		err = fmt.Errorf("VF Device is already allocated PFInterfaceName: %s, VFId: %d", vfDevice.VfKey.PfInterfaceName, vfDevice.VfKey.Id)
+		vsp.log.Error(err, "CreateBridgePort() VF Device is already allocated")
+		return nil, err
+	}
+
+	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
 	}
 
+	if len(vfIfNames) != 1 {
+		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vfDevice.PciAddress, vfIfNames)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
+		return nil, err
+	}
+
+	vfIfName := vfIfNames[0]
+
 	err = vspnetutils.AddInterfaceToOvSBridge(OvSBridgeName, vfIfName)
 	if err != nil {
 		vsp.log.Error(err, "Error adding VF to OvS Bridge", "BridgePortName", in.BridgePort.Name, "vfIfName", vfIfName)
 		return nil, err
+	}
+
+	macStr := net.HardwareAddr(in.BridgePort.Spec.MacAddress).String()
+	_, exists := vsp.serviceFunctionChains[0].vfRepDevs[vfDevice.VfKey]
+	if exists {
+		err = fmt.Errorf("VF Device is already exists PFInterfaceName: %s, VFId: %d", vfDevice.VfKey.PfInterfaceName, vfDevice.VfKey.Id)
+		vsp.log.Error(err, "CreateBridgePort() VF Device is already exists")
+		return nil, err
+	} else {
+		vsp.serviceFunctionChains[0].vfRepDevs[vfDevice.VfKey] = &intelNetSecVfRepDev{
+			vfRepDev:    vfDevice,
+			hostSideMac: macStr,
+		}
+		vfDevice.Allocated = true
+		vsp.log.Info("CreateBridgePort(): Added VF to Service Function Chain", "BridgePortName", in.BridgePort.Name, "vfIfName", vfIfName, "vfDevice", vfDevice, "hostSideMac", macStr)
 	}
 
 	vsp.log.Info("CreateBridgePort(): Added VF to OvS Bridge", "BridgePortName", in.BridgePort.Name, "vfIfName", vfIfName)
@@ -379,11 +503,19 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 		return nil, err
 	}
 
-	vfIfName, err := vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, vfDevice.PciAddress)
+	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
 	}
+
+	if len(vfIfNames) != 1 {
+		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vfDevice.PciAddress, vfIfNames)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
+		return nil, err
+	}
+
+	vfIfName := vfIfNames[0]
 
 	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, vfIfName)
 	if err != nil {
@@ -391,20 +523,127 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 		return nil, err
 	}
 
+	vfDeviceFromSFC, ok := vsp.serviceFunctionChains[0].vfRepDevs[vfDevice.VfKey]
+	if !ok {
+		err = fmt.Errorf("VF Device not found PFInterfaceName: %s, VFId: %d", vfDevice.VfKey.PfInterfaceName, vfDevice.VfKey.Id)
+		vsp.log.Error(err, "DeleteBridgePort() could not find VF Device")
+		return nil, err
+	}
+
+	if vfDeviceFromSFC.vfRepDev.Allocated == false {
+		err = fmt.Errorf("VF Device is not allocated PFInterfaceName: %s, VFId: %d", vfDevice.VfKey.PfInterfaceName, vfDevice.VfKey.Id)
+		vsp.log.Error(err, "DeleteBridgePort() VF Device is not allocated")
+		return nil, err
+	}
+
+	vfDeviceFromSFC.vfRepDev.Allocated = false
+	delete(vsp.serviceFunctionChains[0].vfRepDevs, vfDevice.VfKey)
+
 	vsp.log.Info("DeleteBridgePort(): Deleted VF from OvS Bridge", "BridgePortName", in.Name, "vfIfName", vfIfName)
 
 	return nil, nil
 }
 
+func (vsp *intelNetSecVspServer) vethUpAndAddToBridge(veth *vspnetutils.VEthPairDeviceInfo) error {
+	// The peer interface is the dataplane interface that needs to be up and added to the bridge.
+	vethLink, err := netlink.LinkByName(veth.PeerName)
+	if err != nil {
+		vsp.log.Error(err, "Error getting inport Veth", "InportVeth", veth.IfName, "PeerName", veth.PeerName)
+		return err
+	}
+
+	vsp.log.Info("vethUpAndAddToBridge(): Setting up dataplane interface", "PeerName", veth.PeerName)
+	if err := netlink.LinkSetUp(vethLink); err != nil {
+		vsp.log.Error(err, "Error setting up inport Veth", "InportVeth", veth.IfName, "PeerName", veth.PeerName)
+		return err
+	}
+
+	vsp.log.Info("vethUpAndAddToBridge(): Adding dataplane interface to OvS Bridge", "PeerName", veth.PeerName)
+	err = vspnetutils.AddInterfaceToOvSBridge(OvSBridgeName, veth.PeerName)
+	if err != nil {
+		vsp.log.Error(err, "Error adding inport Veth to OvS Bridge", "InportVeth", veth.IfName, "PeerName", veth.PeerName)
+		return err
+	}
+
+	return nil
+}
+
 // TODO: Implement this
 func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
 	vsp.log.Info("Received CreateNetworkFunction() request", "Input", in.Input, "Output", in.Output)
-	return nil, nil
+
+	// The expectation is that 2 devices would be allocated for the Network Function and we use the mac addresses
+	// of each VETH pair to find it and add them to the bridge.
+	inportVeth, ok := vsp.vethTunnelPairDevs[vspnetutils.VethPairKey{IfMac: in.Input}]
+	if !ok {
+		err := fmt.Errorf("veth pair not found for input: %s", in.Input)
+		vsp.log.Error(err, "Error getting inport Veth", "InportVeth", in.Input)
+		return nil, err
+	}
+	vsp.log.Info("CreateNetworkFunction(): Inport Veth", "InportVeth", inportVeth)
+
+	outportVeth, ok := vsp.vethTunnelPairDevs[vspnetutils.VethPairKey{IfMac: in.Output}]
+	if !ok {
+		err := fmt.Errorf("veth pair not found for output: %s", in.Output)
+		vsp.log.Error(err, "Error getting outport Veth", "OutportVeth", in.Output)
+		return nil, err
+	}
+	vsp.log.Info("CreateNetworkFunction(): Outport Veth", "OutportVeth", outportVeth)
+
+	err := vsp.vethUpAndAddToBridge(inportVeth)
+	if err != nil {
+		vsp.log.Error(err, "Error setting up inport Veth", "InportVeth", inportVeth.IfName)
+		return nil, err
+	}
+
+	err = vsp.vethUpAndAddToBridge(outportVeth)
+	if err != nil {
+		vsp.log.Error(err, "Error setting up outport Veth", "OutportVeth", outportVeth.IfName)
+		return nil, err
+	}
+
+	vsp.log.Info("CreateNetworkFunction(): Added Flow Rules to OvS Bridge", "InportVeth", inportVeth.IfName, "OutportVeth", outportVeth.IfName)
+	vsp.numNfs++
+	out := new(pb.Empty)
+	return out, nil
 }
 
 // TODO: Implement this
 func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
 	vsp.log.Info("Received DeleteNetworkFunction() request", "Input", in.Input, "Output", in.Output)
+
+	vsp.numNfs--
+
+	inportVeth, ok := vsp.vethTunnelPairDevs[vspnetutils.VethPairKey{IfMac: in.Input}]
+	if !ok {
+		err := fmt.Errorf("veth pair not found for input: %s", in.Input)
+		vsp.log.Error(err, "Error getting inport Veth", "InportVeth", in.Input)
+		return nil, err
+	}
+	vsp.log.Info("DeleteNetworkFunction(): Inport Veth", "InportVeth", inportVeth)
+
+	outportVeth, ok := vsp.vethTunnelPairDevs[vspnetutils.VethPairKey{IfMac: in.Output}]
+	if !ok {
+		err := fmt.Errorf("veth pair not found for output: %s", in.Output)
+		vsp.log.Error(err, "Error getting outport Veth", "OutportVeth", in.Output)
+		return nil, err
+	}
+	vsp.log.Info("DeleteNetworkFunction(): Outport Veth", "OutportVeth", outportVeth)
+
+	err := vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, inportVeth.IfName)
+	if err != nil {
+		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "InportVeth", inportVeth.IfName)
+		return nil, err
+	}
+	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "InportVeth", inportVeth.IfName)
+
+	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, outportVeth.IfName)
+	if err != nil {
+		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "OutportVeth", outportVeth.IfName)
+		return nil, err
+	}
+	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "OutportVeth", outportVeth.IfName)
+
 	return nil, nil
 }
 
@@ -423,11 +662,19 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
 		pcieAddr = vsp.dpuPcieAddress
 	}
 
-	ifName, err = vspnetutils.GetNetDevNameFromPCIeAddr(vsp.platform, pcieAddr)
+	ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(pcieAddr)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
 		return err
 	}
+
+	if len(ifNames) != 1 {
+		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", pcieAddr, ifNames)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
+		return err
+	}
+
+	ifName = ifNames[0]
 
 	// WORKAROUND: Set the PF hardware mode to VEPA (Virtual Ethernet Port Aggregator)
 	// Only needed on the host because the NetSec Accelerator will switch packets, but the
@@ -511,6 +758,12 @@ func (vsp *intelNetSecVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) 
 		err = vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuBackplanef2PCIeAddress, int(in.VfCnt))
 		if err != nil {
 			vsp.log.Error(err, "Error setting number of VFs", "VfCnt", in.VfCnt, "PcieAddress", IntelNetSecDpuBackplanef2PCIeAddress)
+			return &pb.VfCount{VfCnt: 0}, err
+		}
+
+		err = vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
+		if err != nil {
+			vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
 			return &pb.VfCount{VfCnt: 0}, err
 		}
 	} else {
@@ -609,12 +862,15 @@ func NewIntelNetSecVspServer(opts ...func(*intelNetSecVspServer)) *intelNetSecVs
 	flag.Parse()
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&options)))
 	vsp := &intelNetSecVspServer{
-		log:         ctrl.Log.WithName("IntelNetSecVsp"),
-		pathManager: *utils.NewPathManager("/"),
-		done:        make(chan error),
-		fs:          afero.NewOsFs(),
-		platform:    &platform.HardwarePlatform{},
-		vfDevs:      make(map[vspnetutils.VfDeviceKey]*vspnetutils.VfDeviceInfo),
+		log:                   ctrl.Log.WithName("IntelNetSecVsp"),
+		pathManager:           *utils.NewPathManager("/"),
+		done:                  make(chan error),
+		fs:                    afero.NewOsFs(),
+		platform:              &platform.HardwarePlatform{},
+		vfDevs:                make(map[vspnetutils.VfDeviceKey]*vspnetutils.VfDeviceInfo),
+		vethTunnelPairDevs:    make(map[vspnetutils.VethPairKey]*vspnetutils.VEthPairDeviceInfo),
+		numNfs:                0,
+		serviceFunctionChains: make(map[int]*intelNetSecServiceFunctionChain),
 	}
 
 	for _, opt := range opts {

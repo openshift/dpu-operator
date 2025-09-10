@@ -5,12 +5,13 @@ import (
 	"embed"
 	"fmt"
 	"net"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
-	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
@@ -27,7 +28,7 @@ var binData embed.FS
 type DpuIdentifier string
 
 type VendorPlugin interface {
-	Start() (string, int32, error)
+	Start(ctx context.Context) (string, int32, error)
 	Close()
 	CreateBridgePort(bpr *opi.CreateBridgePortRequest) (*opi.BridgePort, error)
 	DeleteBridgePort(bpr *opi.DeleteBridgePortRequest) error
@@ -49,6 +50,8 @@ type GrpcPlugin struct {
 	vsp           VspTemplateVars
 	conn          *grpc.ClientConn
 	pathManager   utils.PathManager
+	initialized   bool
+	initMutex     sync.RWMutex
 }
 
 func NewVspTemplateVars() VspTemplateVars {
@@ -79,9 +82,8 @@ func (v VspTemplateVars) ToMap() map[string]string {
 	}
 }
 
-func (g *GrpcPlugin) Start() (string, int32, error) {
+func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
 	start := time.Now()
-	timeout := 10 * time.Second
 	interval := 100 * time.Millisecond
 
 	err := g.deployVsp()
@@ -90,23 +92,39 @@ func (g *GrpcPlugin) Start() (string, int32, error) {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return "", 0, ctx.Err()
+		default:
+		}
+
 		err := g.ensureConnected()
 		if err != nil {
-			if time.Since(start) >= timeout {
-				return "", 0, fmt.Errorf("failed to ensure GRPC connection after %v: %v", timeout, err)
+			select {
+			case <-ctx.Done():
+				return "", 0, ctx.Err()
+			case <-time.After(interval):
 			}
-			time.Sleep(interval)
 			continue
 		}
 
-		ipPort, err := g.client.Init(context.TODO(), &pb.InitRequest{DpuMode: g.dpuMode, DpuIdentifier: string(g.dpuIdentifier)})
+		ipPort, err := g.client.Init(ctx, &pb.InitRequest{DpuMode: g.dpuMode, DpuIdentifier: string(g.dpuIdentifier)})
 		if err != nil {
-			if time.Since(start) >= timeout {
-				return "", 0, fmt.Errorf("failed to start serving after %v: %v", timeout, err)
+			if strings.Contains(err.Error(), "already initialized") {
+				// VSP was already initialized, mark as initialized and return the error
+				g.SetInitDone(false)
+				return "", 0, err
 			}
-			time.Sleep(interval)
+			select {
+			case <-ctx.Done():
+				return "", 0, ctx.Err()
+			case <-time.After(interval):
+			}
 			continue
 		}
+
+		// Init succeeded, mark as initialized
+		g.SetInitDone(true)
 
 		g.log.Info("GrpcPlugin Start() succeeded", "duration", time.Since(start), "ip", ipPort.Ip, "port", ipPort.Port, "dpuMode",
 			g.dpuMode, "dpuIdentifier", g.dpuIdentifier)
@@ -134,7 +152,7 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
 	return func(d *GrpcPlugin) {
 		d.vsp = template_vars
-		d.log.Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
+		d.log.V(2).Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
 	}
 }
 
@@ -155,7 +173,7 @@ func (gp *GrpcPlugin) deployVsp() error {
 	}
 
 	gp.log.Info("Deploying VSP", "vspImage", vspImage, "command", gp.vsp.Command, "args", gp.vsp.Args)
-	err = render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, dpuOperatorConfig, scheme.Scheme)
+	err = render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, dpuOperatorConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start vendor plugin container (vspImage: %s): %v", vspImage, err)
 	}
@@ -262,4 +280,18 @@ func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {
 		VfCnt: count,
 	}
 	return g.dsClient.SetNumVfs(context.Background(), c)
+}
+
+// IsInitialized returns true if the VSP has been successfully initialized
+func (g *GrpcPlugin) IsInitialized() bool {
+	g.initMutex.RLock()
+	defer g.initMutex.RUnlock()
+	return g.initialized
+}
+
+// SetInitDone sets the initialization status with proper mutex locking
+func (g *GrpcPlugin) SetInitDone(initialized bool) {
+	g.initMutex.Lock()
+	defer g.initMutex.Unlock()
+	g.initialized = initialized
 }

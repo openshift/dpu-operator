@@ -32,7 +32,6 @@ var _ = Describe("Webhook Unit Test", func() {
 			config := &DpuOperatorConfig{}
 			config.SetName(vars.DpuOperatorConfigName)
 			config.Spec = DpuOperatorConfigSpec{
-				Mode:     "host",
 				LogLevel: 2,
 			}
 
@@ -64,7 +63,7 @@ var _ = Describe("Webhook Test", func() {
 					Namespace: vars.Namespace,
 				},
 				Spec: DpuOperatorConfigSpec{
-					Mode: "host",
+					LogLevel: 0,
 				},
 			}
 			err = k8sClient.Create(ctx, createValid)
@@ -85,25 +84,13 @@ var _ = Describe("Webhook Test", func() {
 		It("should reject invalid DpuOperatorConfig", func() {
 			var err error
 
-			createInvalidMode := &DpuOperatorConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      vars.DpuOperatorConfigName,
-					Namespace: vars.Namespace,
-				},
-				Spec: DpuOperatorConfigSpec{
-					Mode: "invalid",
-				},
-			}
-			err = k8sClient.Create(ctx, createInvalidMode)
-			Expect(err).To(HaveOccurred())
-
 			createInvalidName := &DpuOperatorConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "invalid",
 					Namespace: vars.Namespace,
 				},
 				Spec: DpuOperatorConfigSpec{
-					Mode: "host",
+					LogLevel: 0,
 				},
 			}
 			err = k8sClient.Create(ctx, createInvalidName)

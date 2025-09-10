@@ -83,8 +83,8 @@ func WithPathManager(pathManager utils.PathManager) func(*DpuSideManager) {
 	}
 }
 
-func (d *DpuSideManager) StartVsp() error {
-	addr, port, err := d.vsp.Start()
+func (d *DpuSideManager) StartVsp(ctx context.Context) error {
+	addr, port, err := d.vsp.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed calling VSP Start() from DpuSideManager: %v", err)
 	}

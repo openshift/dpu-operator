@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
 
 	daemon "github.com/openshift/dpu-operator/internal/daemon"
 	"github.com/openshift/dpu-operator/internal/platform"
@@ -31,8 +32,10 @@ func main() {
 
 	imageManager := images.NewEnvImageManager()
 
+	nodeName := os.Getenv("K8S_NODE")
+
 	platform := &platform.HardwarePlatform{}
-	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), imageManager, utils.NewPathManager("/"))
+	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), imageManager, utils.NewPathManager("/"), nodeName)
 	if err := d.PrepareAndServe(context.Background()); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)

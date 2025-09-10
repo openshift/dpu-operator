@@ -3,4 +3,4 @@ kind: DpuOperatorConfig
 metadata:
   name: dpu-operator-config
 spec:
-  mode: host
+  logLevel: 0

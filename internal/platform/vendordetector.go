@@ -5,9 +5,11 @@ import (
 	"fmt"
 
 	"github.com/jaypipes/ghw"
+	"github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kind/pkg/errors"
 )
@@ -43,6 +45,9 @@ type VendorDetector interface {
 	GetDpuIdentifier(platform Platform, pci *ghw.PCIDevice) (plugin.DpuIdentifier, error)
 
 	GetVendorName() string
+
+	// A unique identifier for when detection happens on the DPU
+	DpuPlatformIdentifier() plugin.DpuIdentifier
 }
 
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
@@ -91,45 +96,104 @@ func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, 
 	return activeDetectors[0], nil
 }
 
-func (d *DpuDetectorManager) Detect(imageManager images.ImageManager, client client.Client, pm utils.PathManager) (bool, *plugin.GrpcPlugin, error) {
+type DetectedDpuWithPlugin struct {
+	DpuCR  *v1.DataProcessingUnit
+	Plugin *plugin.GrpcPlugin
+}
+
+func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client client.Client, pm utils.PathManager, nodeName string) ([]*DetectedDpuWithPlugin, error) {
+	var detectedDpus []*DetectedDpuWithPlugin
+
 	for _, detector := range d.detectors {
 		dpuPlatform, err := detector.IsDpuPlatform(d.platform)
 		if err != nil {
-			return false, nil, fmt.Errorf("Error detecting if running on DPU platform with detector %v: %v", detector.Name(), err)
+			return nil, fmt.Errorf("Error detecting if running on DPU platform with detector %v: %v", detector.Name(), err)
 		}
 
 		if dpuPlatform {
-			vsp, err := detector.VspPlugin(true, imageManager, client, pm, "")
+			identifier := detector.DpuPlatformIdentifier()
+			vsp, err := detector.VspPlugin(true, imageManager, client, pm, identifier)
 			if err != nil {
-				return true, nil, err
+				return nil, err
 			}
-			return true, vsp, nil
+
+			dpuCR := &v1.DataProcessingUnit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(identifier),
+				},
+				Spec: v1.DataProcessingUnitSpec{
+					DpuProductName: detector.Name(),
+					IsDpuSide:      true,
+					NodeName:       nodeName,
+				},
+				Status: v1.DataProcessingUnitStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Ready",
+							Status:             metav1.ConditionFalse,
+							Reason:             "Initializing",
+							Message:            "DPU resource is being initialized.",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			}
+			detectedDpus = append(detectedDpus, &DetectedDpuWithPlugin{
+				DpuCR:  dpuCR,
+				Plugin: vsp,
+			})
+			continue
 		}
 
 		devices, err := d.platform.PciDevices()
 		if err != nil {
-			return false, nil, errors.Errorf("Error getting PCI info: %v", err)
+			return nil, errors.Errorf("Error getting PCI info: %v", err)
 		}
 
 		var dpuDevices []plugin.DpuIdentifier
 		for _, pci := range devices {
 			isDpu, err := detector.IsDPU(d.platform, *pci, dpuDevices)
 			if err != nil {
-				return false, nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
+				return nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
 			}
 			if isDpu {
 				identifier, err := detector.GetDpuIdentifier(d.platform, pci)
 				if err != nil {
-					return false, nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
+					return nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
 				}
 				dpuDevices = append(dpuDevices, identifier)
 				vsp, err := detector.VspPlugin(false, imageManager, client, pm, identifier)
 				if err != nil {
-					return true, nil, err
+					return nil, err
 				}
-				return false, vsp, nil
+
+				dpuCR := &v1.DataProcessingUnit{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: string(identifier),
+					},
+					Spec: v1.DataProcessingUnitSpec{
+						DpuProductName: detector.Name(),
+						IsDpuSide:      false,
+						NodeName:       nodeName,
+					},
+					Status: v1.DataProcessingUnitStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:               "Ready",
+								Status:             metav1.ConditionFalse,
+								Reason:             "Initializing",
+								Message:            "DPU resource is being initialized.",
+								LastTransitionTime: metav1.Now(),
+							},
+						},
+					},
+				}
+				detectedDpus = append(detectedDpus, &DetectedDpuWithPlugin{
+					DpuCR:  dpuCR,
+					Plugin: vsp,
+				})
 			}
 		}
 	}
-	return false, nil, nil
+	return detectedDpus, nil
 }

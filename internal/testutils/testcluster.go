@@ -410,12 +410,11 @@ func DpuOperatorNamespace() *corev1.Namespace {
 	return namespace
 }
 
-func DpuOperatorCR(name string, mode string, ns *corev1.Namespace) *configv1.DpuOperatorConfig {
+func DpuOperatorCR(name string, ns *corev1.Namespace) *configv1.DpuOperatorConfig {
 	config := &configv1.DpuOperatorConfig{}
 	config.SetNamespace(ns.Name)
 	config.SetName(name)
 	config.Spec = configv1.DpuOperatorConfigSpec{
-		Mode:     mode,
 		LogLevel: 2,
 	}
 	return config
@@ -452,7 +451,13 @@ func CreateDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 }
 
 func DeleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
-	client.Delete(context.Background(), cr)
+	err := client.Delete(context.Background(), cr)
+	if err != nil && !errors.IsNotFound(err) {
+		// If resource already doesn't exist, that's fine
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Wait for the resource to be fully deleted
 	found := configv1.DpuOperatorConfig{}
 	Eventually(func() error {
 		err := client.Get(context.Background(), types.NamespacedName{Namespace: vars.Namespace, Name: cr.GetName()}, &found)

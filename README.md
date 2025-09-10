@@ -33,6 +33,12 @@ Run the following command to deploy the YAML files to the two clusters defined b
 task deploy
 ```
 
+For 1 cluster deployment, you will only need /root/kubeconfig.ocpcluster. 1 cluster deployment means both Host(s) and DPU(s) are in the same cluster. 
+
+```sh
+task deploy-1c
+```
+
 4. **Undeploy**
 
 Undoes what deploying did:
@@ -89,6 +95,63 @@ Using the following makefile target, a Kind cluster will be set up against which
 ```sh
 make test
 ```
+
+### How to start DPU Operator components
+
+The DPU Operator relies on a combination of label matching and custom resources. Assuming the DPU Operator is installed, the following steps will deploy daemon pods and vendor specific pods on hosts and DPUs.
+
+Firstly, mark all nodes with the label `dpu=true` that are DPUs or Hosts with DPU. In a 2 cluster deployment, you will need to label the nodes with 2 seperate kubeconfigs. In a 1 cluster deployment, currently Hosts with DPU and DPUs are labeled with the same value. An example of doing this would be `kubectl label node worker1 dpu=true` & `kubectl label node worker-dpu1 dpu=true`.
+
+To tell the operator to start components the `DpuOperatorConfig` needs to be created.
+
+For 1 cluster deployment and 2 cluster deployment on the host cluster:
+
+```sh
+kubectl create -f examples/host.yaml
+```
+
+For 2 cluster deployment on the DPU cluster:
+
+```sh
+kubectl create -f examples/dpu.yaml
+```
+
+After creating the `DpuOperatorConfig` CR, you should see the following pods:
+```sh
+oc get pods -n openshift-dpu-operator -o wide
+NAME                                              READY   STATUS    RESTARTS   AGE   IP                NODE             NOMINATED NODE   READINESS GATES
+dpu-daemon-rn6mc                                  1/1     Running   0          22h   192.168.122.218   worker-229       <none>           <none>
+dpu-daemon-xrrlg                                  1/1     Running   0          22h   192.168.122.90    worker-229-ptl   <none>           <none>
+dpu-operator-controller-manager-68bdf56c8-4tddp   1/1     Running   0          22h   10.128.2.133      worker-229       <none>           <none>
+network-resources-injector-699988f484-4m2df       1/1     Running   0          22h   10.128.2.134      worker-229       <none>           <none>
+vsp-rdbk6                                         1/1     Running   0          22h   192.168.122.218   worker-229       <none>           <none>
+vsp-x4bdh                                         1/1     Running   0          22h   192.168.122.90    worker-229-ptl   <none>           <none>
+
+```
+
+### Developer Workflow
+
+A typical developer would run the following commands to test changes to the operator:
+
+```sh
+# Label nodes if not done priorly
+kubectl label node worker1 dpu=true
+kubectl label node worker-dpu1 dpu=true
+# For two cluster deployment the DPU nodes are done using the second cluster's kubeconfig.
+task build-image-all
+task deploy # or `task deploy-1c` for single cluster deployment
+kubectl create -f examples/host.yaml
+# For two cluster deployment, the `examples/dpu.yaml` is created on the DPU cluster.
+# Wait for daemon/vsp pods to settle
+# Create pods and/or ServiceFunctionChain yaml
+kubectl create -f examples/my-pod.yaml
+```
+
+### Network Functions
+
+Currently the `ServiceFunctionChain` will deploy a pod with the provided image onto the DPU.
+
+However there is an example network function provided in the path `examples/sfc-pod.yaml` that could be used to deploy to the DPU directly via the dpu-cni. The ServiceFunctionChain CR is currently optional.
 
 ## Contributing
 

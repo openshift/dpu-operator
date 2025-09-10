@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"embed"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -28,7 +27,6 @@ import (
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -40,16 +38,14 @@ var binData embed.FS
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
 type DpuOperatorConfigReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
 	imageManager    images.ImageManager
 	imagePullPolicy string
 	pathManager     utils.PathManager
 }
 
-func NewDpuOperatorConfigReconciler(client client.Client, scheme *runtime.Scheme, imageManager images.ImageManager) *DpuOperatorConfigReconciler {
+func NewDpuOperatorConfigReconciler(client client.Client, imageManager images.ImageManager) *DpuOperatorConfigReconciler {
 	return &DpuOperatorConfigReconciler{
 		Client:          client,
-		Scheme:          scheme,
 		imageManager:    imageManager,
 		imagePullPolicy: "IfNotPresent",
 	}
@@ -76,7 +72,7 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;delete;patch
-//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=list;get
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=*
@@ -168,7 +164,7 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 
 func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
 	mergedData := images.MergeVarsWithImages(r.imageManager, r.yamlVars())
-	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg, r.Scheme)
+	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
@@ -188,19 +184,25 @@ func (r *DpuOperatorConfigReconciler) ensureNetworkResourcesInjector(ctx context
 }
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-	logger.Info("Create the Network Function NAD")
-	nadFile := ""
-	switch cfg.Spec.Mode {
-	case "dpu":
-		nadFile = "networkfn-nad-dpu"
-	case "host":
-		nadFile = "networkfn-nad-host"
-	default:
-		err := errors.NewBadRequest(fmt.Sprintf("Invalid Mode: %s", cfg.Spec.Mode))
-		logger.Error(err, "Invalid mode specified")
+
+	// Both Host and DPU NADs are created here even though this operator can run exclusively on
+	// either Host or DPU. The pod definition must choose the correct NAD for the node that the
+	// pod will be running on (dpu would be networkfn-nad-dpu and host would be networkfn-nad-host).
+	logger.Info("Create the Network Function DPU NAD")
+	err := r.createAndApplyAllFromBinData(logger, "networkfn-nad-dpu", cfg)
+	if err != nil {
+		logger.Error(err, "Failed to create Network Function DPU NAD")
 		return err
 	}
-	return r.createAndApplyAllFromBinData(logger, nadFile, cfg)
+
+	logger.Info("Create the Network Function Host NAD")
+	err = r.createAndApplyAllFromBinData(logger, "networkfn-nad-host", cfg)
+	if err != nil {
+		logger.Error(err, "Failed to create Network Function Host NAD")
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
