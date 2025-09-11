@@ -25,6 +25,11 @@ import (
 
 // ServiceFunctionChainSpec defines the desired state of ServiceFunctionChain
 type ServiceFunctionChainSpec struct {
+	// NodeSelector specifies which nodes this ServiceFunctionChain CR should be able to create the Network Function pod.
+	// If empty, the ServiceFunctionChain will try to deploy the Network Function pod on all nodes.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
 	NetworkFunctions []NetworkFunction `json:"networkFunctions"`
 }
 
