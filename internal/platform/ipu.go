@@ -14,12 +14,14 @@ import (
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
+const IntelIpuName = "Intel IPU E2100"
+
 type IntelDetector struct {
 	name string
 }
 
 func NewIntelDetector() *IntelDetector {
-	return &IntelDetector{name: "Intel IPU E2100"}
+	return &IntelDetector{name: IntelIpuName}
 }
 
 func (d *IntelDetector) Name() string {
