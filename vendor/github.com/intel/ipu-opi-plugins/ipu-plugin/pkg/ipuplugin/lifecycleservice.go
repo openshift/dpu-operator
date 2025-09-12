@@ -54,7 +54,7 @@ const (
 	deviceId            = "0x1452"
 	vendorId            = "0x8086"
 	imcAddress          = "192.168.0.1:22"
-	ApfNumber           = 16
+	ApfNumber           = 48
 	last_byte_mac_range = 239
 )
 
