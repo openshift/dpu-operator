@@ -236,17 +236,6 @@ func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string
 }
 
 func EventuallyPodDoesNotExist(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) {
-	// First delete the pod if it exists (ignore NotFound errors)
-	err := c.Delete(context.TODO(), &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: podNamespace,
-		},
-	})
-	if err != nil && !errors.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred(), "Failed to delete pod %s", podName)
-	}
-
 	onFailure := func() {
 		fmt.Println(LogPodDiagnostics(c, podName, podNamespace))
 	}
@@ -270,6 +259,22 @@ func EventuallyPodDoesNotExist(c client.Client, podName string, podNamespace str
 
 	deletedTime := time.Now()
 	fmt.Printf("Pod '%s' deleted after %v\n", podName, deletedTime.Sub(startTime))
+}
+
+func DeleteAndEventuallyPodDoesNotExist(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) {
+	// Delete the pod if it exists (ignore NotFound errors)
+	err := c.Delete(context.TODO(), &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: podNamespace,
+		},
+	})
+	if err != nil && !errors.IsNotFound(err) {
+		Expect(err).NotTo(HaveOccurred(), "Failed to delete pod %s", podName)
+	}
+
+	// Wait for pod to be fully gone
+	EventuallyPodDoesNotExist(c, podName, podNamespace, timeout, interval)
 }
 
 func GetSecondaryNetworkIP(pod *corev1.Pod, netdevName string) (string, error) {
@@ -559,20 +564,4 @@ func SfcList(c client.Client, namespace string) *configv1.ServiceFunctionChainLi
 	err := c.List(context.TODO(), sfcLs, client.InNamespace(namespace))
 	Expect(err).NotTo(HaveOccurred())
 	return sfcLs
-}
-
-// PodExists checks if a pod exists in the specified namespace
-func PodExists(c client.Client, podName, namespace string) (bool, error) {
-	pod := &corev1.Pod{}
-	err := c.Get(context.TODO(), client.ObjectKey{
-		Name:      podName,
-		Namespace: namespace,
-	}, pod)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
 }

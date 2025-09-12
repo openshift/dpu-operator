@@ -339,8 +339,8 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			sfc = testutils.SfcNew(vars.Namespace, sfcName, nfName, imageRef)
 
 			// Clean up any existing test pods before creating new ones
-			testutils.EventuallyPodDoesNotExist(hostSideClient, testPodName, "default", testutils.TestAPITimeout*8, testutils.TestRetryInterval)
-			testutils.EventuallyPodDoesNotExist(hostSideClient, testPod2Name, "default", testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+			testutils.DeleteAndEventuallyPodDoesNotExist(hostSideClient, testPodName, "default", testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+			testutils.DeleteAndEventuallyPodDoesNotExist(hostSideClient, testPod2Name, "default", testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 
 			nodeList, err := testutils.GetDPUNodes(hostSideClient)
 			Expect(err).NotTo(HaveOccurred())

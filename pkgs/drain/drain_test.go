@@ -41,10 +41,9 @@ func testPod(node corev1.Node) *corev1.Pod {
 
 func ensureTestPodCreated(c client.Client, node corev1.Node) {
 	pod := testPod(node)
-	exists, err := testutils.PodExists(c, pod.Name, pod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+	existingPod := testutils.GetPod(c, pod.Name, pod.Namespace)
 
-	if !exists {
+	if existingPod == nil {
 		err := c.Create(context.Background(), pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -120,13 +119,13 @@ var _ = Describe("Drain Interface", Ordered, func() {
 		testDrainer.CompleteDrainNode(context.TODO(), &node)
 		Expect(isNodeSchedulable(node)).To(BeTrue(), "Node is not schedulable: "+node.Name)
 		pod := testPod(node)
-		testutils.EventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+		testutils.DeleteAndEventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 	})
 
 	AfterAll(func() {
 		// Make sure we leave the cluster in a clean state: no draining and no test pod
 		pod := testPod(node)
-		testutils.EventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+		testutils.DeleteAndEventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 		testDrainer.CompleteDrainNode(context.TODO(), &node)
 		if os.Getenv("FAST_TEST") == "false" {
 			testCluster.EnsureDeleted()
@@ -139,7 +138,7 @@ var _ = Describe("Drain Interface", Ordered, func() {
 			ensureTestPodCreated(k8sClient, node)
 			By("Cleaning up the test pod")
 			pod := testPod(node)
-			testutils.EventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+			testutils.DeleteAndEventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 		})
 	})
 
@@ -154,7 +153,7 @@ var _ = Describe("Drain Interface", Ordered, func() {
 
 		AfterAll(func() {
 			pod := testPod(node)
-			testutils.EventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+			testutils.DeleteAndEventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 			testDrainer.CompleteDrainNode(context.TODO(), &node)
 			Eventually(func() bool { return isNodeSchedulable(node) }, testutils.TestAPITimeout*4, testutils.TestRetryInterval).Should(BeTrue(), "Node is not schedulable: "+node.Name)
 		})
@@ -178,7 +177,7 @@ var _ = Describe("Drain Interface", Ordered, func() {
 
 		AfterAll(func() {
 			pod := testPod(node)
-			testutils.EventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+			testutils.DeleteAndEventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 		})
 
 		It("should mark the node as schedulable again", func() {
@@ -189,7 +188,7 @@ var _ = Describe("Drain Interface", Ordered, func() {
 			ensureTestPodCreated(k8sClient, node)
 			Eventually(func() bool { return testPodIsRunning(k8sClient, node) }, testutils.TestAPITimeout, testutils.TestRetryInterval).Should(BeTrue(), "Test pod not running after drain complete")
 			pod := testPod(node)
-			testutils.EventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
+			testutils.DeleteAndEventuallyPodDoesNotExist(k8sClient, pod.Name, pod.Namespace, testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 		})
 	})
 })
