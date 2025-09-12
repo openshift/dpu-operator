@@ -6,7 +6,7 @@ metadata:
 spec:
   # Target only nodes with the "dpu" label set to "true"
   nodeSelector:
-    dpu: "true"
+    dpu.config.openshift.io/dpuside: "dpu"
   networkFunctions:
   - name: test-nf
     image: ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest

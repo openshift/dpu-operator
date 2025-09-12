@@ -164,6 +164,9 @@ func NewTestSfc(sfcName string, nfName string) *configv1.ServiceFunctionChain {
 			Namespace: vars.Namespace,
 		},
 		Spec: configv1.ServiceFunctionChainSpec{
+			NodeSelector: map[string]string{
+				"dpu.config.openshift.io/dpuside": "dpu",
+			},
 			NetworkFunctions: []configv1.NetworkFunction{
 				{
 					Name:  nfName,
@@ -475,6 +478,9 @@ func SfcNew(namespace, sfcName, nfName, nfImage string) *configv1.ServiceFunctio
 			Namespace: namespace,
 		},
 		Spec: configv1.ServiceFunctionChainSpec{
+			NodeSelector: map[string]string{
+				"dpu.config.openshift.io/dpuside": "dpu",
+			},
 			NetworkFunctions: []configv1.NetworkFunction{
 				{
 					Name:  nfName,
