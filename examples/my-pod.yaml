@@ -7,9 +7,8 @@ metadata:
     k8s.v1.cni.cncf.io/networks: default-sriov-net
 spec:
   nodeSelector:
-    # TODO: when annotation for DPU vs. Host is added, we can use the proper annotation here.
     # kubernetes.io/hostname: worker-229
-    dpu: "true"
+    dpu.config.openshift.io/dpuside: "dpu-host"
   containers:
   - name: appcntr1
     image: ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest

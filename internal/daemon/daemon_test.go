@@ -8,10 +8,11 @@ import (
 
 	g "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/dpu-operator/api/v1"
+	v1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon"
 	mockvsp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/mock-vsp"
 	"github.com/openshift/dpu-operator/internal/images"
@@ -22,6 +23,8 @@ import (
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"github.com/spf13/afero"
 )
+
+const nodeName = "dpu-operator-test-cluster-control-plane"
 
 func createVspTestImages() images.ImageManager {
 	return images.NewDummyImageManager()
@@ -107,7 +110,7 @@ var _ = g.Describe("Full Daemon", func() {
 			}
 		}()
 
-		d = daemon.NewDaemon(fs, fakePlatform, "dpu", config, createVspTestImages(), pathManager, "test-node")
+		d = daemon.NewDaemon(fs, fakePlatform, "dpu", config, createVspTestImages(), pathManager, nodeName)
 		go func() {
 			defer close(daemonDone)
 			err := d.PrepareAndServe(ctx)
@@ -130,6 +133,44 @@ var _ = g.Describe("Full Daemon", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(dpuCR.Spec.IsDpuSide).To(BeTrue())
 				Expect(dpuCR.Spec.DpuProductName).To(Equal("Intel IPU"))
+				return nil
+			}, 30*time.Second, 2*time.Second).Should(Succeed())
+		})
+
+		g.It("Should have node labeled with dpu.config.openshift.io/dpuside", func() {
+			Eventually(func() error {
+				nodeList := &corev1.NodeList{}
+				err := k8sClient.List(context.TODO(), nodeList)
+				if err != nil {
+					return err
+				}
+
+				// In case we want to support multiple nodes for this test
+				var dpuNode *corev1.Node
+				for _, node := range nodeList.Items {
+					if node.Name == nodeName {
+						dpuNode = &node
+						break
+					}
+				}
+
+				if dpuNode == nil {
+					return fmt.Errorf("Could not find node %s", nodeName)
+				}
+
+				if dpuNode.Labels == nil {
+					return fmt.Errorf("Node has no labels on %s", nodeName)
+				}
+
+				labelValue, exists := dpuNode.Labels[daemon.DpuSideLabelKey]
+				if !exists {
+					return fmt.Errorf("Node does not have label %s", daemon.DpuSideLabelKey)
+				}
+
+				if labelValue != "dpu" {
+					return fmt.Errorf("Expected label value 'dpu', got '%s'", labelValue)
+				}
+
 				return nil
 			}, 30*time.Second, 2*time.Second).Should(Succeed())
 		})
