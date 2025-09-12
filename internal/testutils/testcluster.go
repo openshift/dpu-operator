@@ -235,6 +235,48 @@ func EventuallyPodIsRunning(c client.Client, podName string, podNamespace string
 	return pod
 }
 
+func EventuallyPodDoesNotExist(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) {
+	onFailure := func() {
+		fmt.Println(LogPodDiagnostics(c, podName, podNamespace))
+	}
+
+	startTime := time.Now()
+
+	AssertEventually(
+		func() error {
+			pod := GetPod(c, podName, podNamespace)
+			if pod != nil {
+				return fmt.Errorf("Pod %s in %s still exists", podName, podNamespace)
+			}
+			return nil
+		},
+		timeout,
+		interval,
+		5*timeout,
+		fmt.Sprintf("have pod %v in %v deleted", podName, podNamespace),
+		onFailure,
+		onFailure)
+
+	deletedTime := time.Now()
+	fmt.Printf("Pod '%s' deleted after %v\n", podName, deletedTime.Sub(startTime))
+}
+
+func DeleteAndEventuallyPodDoesNotExist(c client.Client, podName string, podNamespace string, timeout time.Duration, interval time.Duration) {
+	// Delete the pod if it exists (ignore NotFound errors)
+	err := c.Delete(context.TODO(), &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: podNamespace,
+		},
+	})
+	if err != nil && !errors.IsNotFound(err) {
+		Expect(err).NotTo(HaveOccurred(), "Failed to delete pod %s", podName)
+	}
+
+	// Wait for pod to be fully gone
+	EventuallyPodDoesNotExist(c, podName, podNamespace, timeout, interval)
+}
+
 func GetSecondaryNetworkIP(pod *corev1.Pod, netdevName string) (string, error) {
 	annotation, exists := pod.Annotations["k8s.v1.cni.cncf.io/network-status"]
 	if !exists {
