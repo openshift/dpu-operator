@@ -6,6 +6,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: vsp-sa
+  namespace: {{.Namespace}}
 roleRef:
   kind: Role
   name: vsp-role

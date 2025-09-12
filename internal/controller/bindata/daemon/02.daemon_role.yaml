@@ -28,37 +28,12 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
   - pods
-  - services
   verbs:
-  - get
-  - list
-  - watch
   - create
   - delete
-  - update
+  - get
+  - list
   - patch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - watch
-  - create
   - update
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  verbs:
-  - get
-  - list
   - watch
-  - create
-  - update
-  - delete

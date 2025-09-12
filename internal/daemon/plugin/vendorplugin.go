@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"net"
 	"strings"
@@ -10,20 +9,14 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	configv1 "github.com/openshift/dpu-operator/api/v1"
 	pb "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/utils"
-	"github.com/openshift/dpu-operator/pkgs/render"
-	"github.com/openshift/dpu-operator/pkgs/vars"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-//go:embed bindata/*
-var binData embed.FS
 
 type DpuIdentifier string
 
@@ -47,49 +40,15 @@ type GrpcPlugin struct {
 	dsClient      pb.DeviceServiceClient
 	dpuMode       bool
 	dpuIdentifier DpuIdentifier
-	vsp           VspTemplateVars
 	conn          *grpc.ClientConn
 	pathManager   utils.PathManager
 	initialized   bool
 	initMutex     sync.RWMutex
 }
 
-func NewVspTemplateVars() VspTemplateVars {
-	return VspTemplateVars{
-		VendorSpecificPluginImage: "",
-		Namespace:                 vars.Namespace,
-		ImagePullPolicy:           "Always",
-		Command:                   "[ ]",
-		Args:                      "[ ]",
-	}
-}
-
-type VspTemplateVars struct {
-	VendorSpecificPluginImage string
-	Namespace                 string
-	ImagePullPolicy           string
-	Command                   string
-	Args                      string
-}
-
-func (v VspTemplateVars) ToMap() map[string]string {
-	return map[string]string{
-		"VendorSpecificPluginImage": v.VendorSpecificPluginImage,
-		"Namespace":                 v.Namespace,
-		"ImagePullPolicy":           v.ImagePullPolicy,
-		"Command":                   v.Command,
-		"Args":                      v.Args,
-	}
-}
-
 func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
 	start := time.Now()
 	interval := 100 * time.Millisecond
-
-	err := g.deployVsp()
-	if err != nil {
-		return "", 0, err
-	}
 
 	for {
 		select {
@@ -149,43 +108,10 @@ func WithPathManager(pathManager utils.PathManager) func(*GrpcPlugin) {
 	}
 }
 
-func WithVsp(template_vars VspTemplateVars) func(*GrpcPlugin) {
-	return func(d *GrpcPlugin) {
-		d.vsp = template_vars
-		d.log.V(2).Info("Setting VSP", "vsp", d.vsp.VendorSpecificPluginImage)
-	}
-}
-
-func (gp *GrpcPlugin) deployVsp() error {
-	vspImage := gp.vsp.VendorSpecificPluginImage
-
-	// It is not mandatory that a vsp image is provided. If not, we can assume this will be handled by the user and still return a GrpcClient
-	if vspImage == "" {
-		gp.log.Info("WARNING: VSP Image not set, skipping vendor plugin container startup")
-		return nil
-	}
-
-	// Retrieve the Dpu Operator Config which owns the Dpu Daemonset so we can ensure the vsp shares the same owner reference.
-	dpuOperatorConfig := &configv1.DpuOperatorConfig{}
-	err := gp.k8sClient.Get(context.TODO(), client.ObjectKey{Name: vars.DpuOperatorConfigName, Namespace: vars.Namespace}, dpuOperatorConfig)
-	if err != nil {
-		return fmt.Errorf("encountered error when retrieving DpuOperatorConfig %s: %v", vars.DpuOperatorConfigName, err)
-	}
-
-	gp.log.Info("Deploying VSP", "vspImage", vspImage, "command", gp.vsp.Command, "args", gp.vsp.Args)
-	err = render.ApplyAllFromBinData(gp.log, "vsp-ds", gp.vsp.ToMap(), binData, gp.k8sClient, dpuOperatorConfig)
-	if err != nil {
-		return fmt.Errorf("failed to start vendor plugin container (vspImage: %s): %v", vspImage, err)
-	}
-
-	return nil
-}
-
 func NewGrpcPlugin(dpuMode bool, dpuIdentifier DpuIdentifier, client client.Client, opts ...func(*GrpcPlugin)) (*GrpcPlugin, error) {
 	gp := &GrpcPlugin{
 		dpuMode:       dpuMode,
 		dpuIdentifier: dpuIdentifier,
-		vsp:           VspTemplateVars{},
 		k8sClient:     client,
 		log:           ctrl.Log.WithName("GrpcPlugin"),
 		pathManager:   *utils.NewPathManager("/"),

@@ -3,6 +3,7 @@ package platform
 import (
 	stderrors "errors"
 	"fmt"
+	"strings"
 
 	"github.com/jaypipes/ghw"
 	"github.com/openshift/dpu-operator/api/v1"
@@ -50,6 +51,11 @@ type VendorDetector interface {
 	DpuPlatformIdentifier() plugin.DpuIdentifier
 }
 
+// SanitizeForTemplate converts identifiers to be template-safe by replacing hyphens with underscores
+func SanitizeForTemplate(identifier plugin.DpuIdentifier) string {
+	return strings.ReplaceAll(string(identifier), "-", "_")
+}
+
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
 	return &DpuDetectorManager{
 		platform: platform,
@@ -60,6 +66,19 @@ func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
 			// add more detectors here
 		},
 	}
+}
+
+func (d *DpuDetectorManager) GetVendorDirectory(dpuProductName string) (string, error) {
+	for _, detector := range d.detectors {
+		if detector.Name() == dpuProductName {
+			return string(detector.DpuPlatformIdentifier()), nil
+		}
+	}
+	return "", fmt.Errorf("unknown DPU product name: %s", dpuProductName)
+}
+
+func (d *DpuDetectorManager) GetDetectors() []VendorDetector {
+	return d.detectors
 }
 
 func (pi *DpuDetectorManager) IsDpu() (bool, error) {

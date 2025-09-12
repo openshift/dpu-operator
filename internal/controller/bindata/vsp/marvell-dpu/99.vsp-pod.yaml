@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{.VspName}}
+  namespace: {{.Namespace}}
+  labels:
+    app: vsp
+    dpu-name: {{.DpuName}}
+spec:
+  nodeName: {{.NodeName}}
+  nodeSelector:
+    kubernetes.io/hostname: {{.NodeName}}
+  hostNetwork: true
+  hostPID: true
+  serviceAccountName: vsp-sa
+  terminationGracePeriodSeconds: 180
+  restartPolicy: Always
+  containers:
+  - name: vsp
+    image: {{.marvell_dpu}}
+    imagePullPolicy: {{.ImagePullPolicy}}
+    securityContext:
+      privileged: true
+      runAsUser: 0
+    command: ["/vsp-mrvl"]
+    args: []
+    volumeMounts:
+    - mountPath: /host
+      mountPropagation: Bidirectional
+      name: host-root
+    - mountPath: /var/run/
+      name: vendor-plugin-sock
+    - mountPath: /opt/p4/p4-cp-nws/var
+      mountPropagation: Bidirectional
+      name: host-opt
+    - mountPath: /proc
+      mountPropagation: Bidirectional
+      name: host-proc
+  dnsPolicy: ClusterFirstWithHostNet
+  volumes:
+  - hostPath:
+      path: /proc
+      type: ""
+    name: host-proc
+  - hostPath:
+      path: /opt/p4/p4-cp-nws/var
+      type: ""
+    name: host-opt
+  - hostPath:
+      path: /var/run/
+      type: ""
+    name: vendor-plugin-sock
+  - hostPath:
+      path: /
+      type: ""
+    name: host-root

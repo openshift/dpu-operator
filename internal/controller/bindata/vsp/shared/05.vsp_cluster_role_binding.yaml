@@ -9,3 +9,4 @@ subjects:
 roleRef:
   name: vsp-cluster-role
   kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io

@@ -15,17 +15,32 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
   - pods
+  - pods/status
+  - serviceaccounts
   - services
+  - configmaps
+  - secrets
   verbs:
   - get
   - list
   - watch
   - create
-  - delete
   - update
-  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -38,14 +53,3 @@ rules:
   - create
   - update
   - delete
-- apiGroups:
-    - apps
-  resources:
-    - daemonsets
-  verbs:
-    - watch
-    - list
-    - get
-    - create
-    - delete
-    - update

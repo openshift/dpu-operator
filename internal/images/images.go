@@ -4,9 +4,9 @@ import "fmt"
 
 // Image environment variable names
 const (
-	VspImageIntel          = "IntelVspImage"
-	VspImageMarvell        = "MarvellVspImage"
-	VspImageIntelNetSec    = "IntelNetSecVspImage"
+	VspImageIntel          = "intel_ipu"
+	VspImageMarvell        = "marvell_dpu"
+	VspImageIntelNetSec    = "intel_netsec"
 	VspImageP4Intel        = "IntelVspP4Image"
 	VspImageMarvellCpAgent = "MarvellVspCpAgentImage"
 	DpuOperatorDaemonImage = "DpuOperatorDaemonImage"
