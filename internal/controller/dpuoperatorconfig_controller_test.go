@@ -137,6 +137,9 @@ var _ = Describe("Main Controller", Ordered, func() {
 
 				testutils.CreateNamespace(mgr.GetClient(), ns)
 				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
+
+				// Wait for DpuOperatorConfig to be Ready
+				testutils.EventuallyDpuOperatorConfigReady(mgr.GetClient(), setupLog, cr, testutils.TestAPITimeout*10, testutils.TestRetryInterval)
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := appsv1.DaemonSet{}
@@ -167,6 +170,9 @@ var _ = Describe("Main Controller", Ordered, func() {
 
 				testutils.CreateNamespace(mgr.GetClient(), ns)
 				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
+
+				// Wait for DpuOperatorConfig to be Ready
+				testutils.EventuallyDpuOperatorConfigReady(mgr.GetClient(), setupLog, cr, testutils.TestAPITimeout*10, testutils.TestRetryInterval)
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
 				daemonSet := &appsv1.DaemonSet{}

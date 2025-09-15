@@ -35,11 +35,15 @@ type DpuOperatorConfigSpec struct {
 type DpuOperatorConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Conditions is the status of the DpuOperatorConfig
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
+//+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].reason"
 
 // DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
 type DpuOperatorConfig struct {

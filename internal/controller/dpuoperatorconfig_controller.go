@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"embed"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -27,6 +28,8 @@ import (
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,6 +37,11 @@ import (
 
 //go:embed bindata/*
 var binData embed.FS
+
+type componentError struct {
+	component string
+	err       error
+}
 
 // DpuOperatorConfigReconciler reconciles a DpuOperatorConfig object
 type DpuOperatorConfigReconciler struct {
@@ -96,6 +104,8 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	// req.NamespacedName always points to the DpuOperatorConfig (owner)
+	// We reconcile the DpuOperatorConfig regardless of what triggered the reconcile
 	dpuOperatorConfig := &configv1.DpuOperatorConfig{}
 	if err := r.Get(ctx, req.NamespacedName, dpuOperatorConfig); err != nil {
 		if errors.IsNotFound(err) {
@@ -106,24 +116,89 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	err := r.ensureDpuDeamonSet(ctx, dpuOperatorConfig)
-	if err != nil {
+	logger.Info("Reconciling DpuOperatorConfig", "name", dpuOperatorConfig.Name, "namespace", dpuOperatorConfig.Namespace)
+
+	// Initialize status if needed
+	if err := r.initializeStatus(ctx, dpuOperatorConfig); err != nil {
+		logger.Error(err, "Failed to initialize status")
+		return ctrl.Result{}, err
+	}
+
+	// Track any errors during reconciliation with component information
+	var reconcileErrors []componentError
+
+	if err := r.ensureDpuDeamonSet(ctx, dpuOperatorConfig); err != nil {
 		logger.Error(err, "Failed to ensure Daemon is running")
-		return ctrl.Result{}, err
+		reconcileErrors = append(reconcileErrors, componentError{component: "DpuDaemonSet", err: err})
 	}
 
-	err = r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig)
-	if err != nil {
+	if err := r.ensureNetworkFunctioNAD(ctx, dpuOperatorConfig); err != nil {
 		logger.Error(err, "Failed to create Network Function NAD")
-		return ctrl.Result{}, err
+		reconcileErrors = append(reconcileErrors, componentError{component: "NetworkFunctionNAD", err: err})
 	}
 
-	err = r.ensureNetworkResourcesInjector(ctx, dpuOperatorConfig)
-	if err != nil {
+	if err := r.ensureNetworkResourcesInjector(ctx, dpuOperatorConfig); err != nil {
 		logger.Error(err, "Failed to ensure Network Resources Injector is running")
+		reconcileErrors = append(reconcileErrors, componentError{component: "NetworkResourcesInjector", err: err})
+	}
+
+	// Update status based on reconciliation results
+	if err := r.updateStatus(ctx, dpuOperatorConfig, reconcileErrors); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// setCondition sets the specified condition on the DpuOperatorConfig status
+func (r *DpuOperatorConfigReconciler) setCondition(dpuOperatorConfig *configv1.DpuOperatorConfig, condition metav1.Condition) {
+	meta.SetStatusCondition(&dpuOperatorConfig.Status.Conditions, condition)
+}
+
+// setReadyCondition sets the Ready condition with the given status, reason and message
+func (r *DpuOperatorConfigReconciler) setReadyCondition(dpuOperatorConfig *configv1.DpuOperatorConfig, status metav1.ConditionStatus, reason, message string) {
+	r.setCondition(dpuOperatorConfig, metav1.Condition{
+		Type:    "Ready",
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	})
+}
+
+// initializeStatus sets initial NotReady condition if no conditions exist
+func (r *DpuOperatorConfigReconciler) initializeStatus(ctx context.Context, dpuOperatorConfig *configv1.DpuOperatorConfig) error {
+	if len(dpuOperatorConfig.Status.Conditions) == 0 {
+		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionFalse, "WaitingForReconcile", "Waiting for reconcile to start DPU Daemons")
+		return r.Status().Update(ctx, dpuOperatorConfig)
+	}
+	return nil
+}
+
+// updateStatus updates the status based on reconciliation results
+func (r *DpuOperatorConfigReconciler) updateStatus(ctx context.Context, dpuOperatorConfig *configv1.DpuOperatorConfig, reconcileErrors []componentError) error {
+	logger := log.FromContext(ctx)
+
+	if len(reconcileErrors) > 0 {
+		// Set NotReady condition with the first error, including component info in reason
+		firstError := reconcileErrors[0]
+		reason := fmt.Sprintf("%sError", firstError.component)
+		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionFalse, reason, firstError.err.Error())
+		if updateErr := r.Status().Update(ctx, dpuOperatorConfig); updateErr != nil {
+			logger.Error(updateErr, "Failed to update status with error condition")
+			return updateErr
+		}
+		return firstError.err
+	}
+
+	// All components reconciled successfully
+	logger.Info("All components reconciled successfully, setting Ready condition to True")
+	r.setReadyCondition(dpuOperatorConfig, metav1.ConditionTrue, "ComponentsReady", "All DPU operator components deployed successfully")
+	if updateErr := r.Status().Update(ctx, dpuOperatorConfig); updateErr != nil {
+		logger.Error(updateErr, "Failed to update status with ready condition")
+		return updateErr
+	}
+
+	return nil
 }
 
 func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {

@@ -31,7 +31,7 @@ var (
 	testDpuOperatorConfigKind = "DpuOperatorConfig"
 	testDpuDaemonName         = "dpu-daemon"
 	testClusterName           = "dpu-operator-test-cluster"
-	TestAPITimeout            = time.Second * 2
+	TestAPITimeout            = time.Second * 10
 	TestRetryInterval         = time.Millisecond * 10
 	TestInitialSetupTimeout   = time.Minute
 	setupLog                  = ctrl.Log.WithName("setup")

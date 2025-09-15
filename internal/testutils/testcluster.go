@@ -11,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -491,7 +493,7 @@ func CreateDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 	Expect(err).NotTo(HaveOccurred())
 	found := configv1.DpuOperatorConfig{}
 	Eventually(func() error {
-		return client.Get(context.Background(), types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.GetName()}, &found)
+		return client.Get(context.Background(), types.NamespacedName{Name: cr.GetName()}, &found)
 	}, TestAPITimeout, TestRetryInterval).Should(Succeed())
 }
 
@@ -511,6 +513,17 @@ func DeleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 		}
 		return err
 	}, TestAPITimeout, TestRetryInterval).Should(Succeed())
+}
+
+func IsDpuOperatorConfigReady(c client.Client, name string) error {
+	config := GetDpuOperatorConfig(c, name)
+	if config == nil {
+		return fmt.Errorf("DpuOperatorConfig %s does not exist", name)
+	}
+	if !meta.IsStatusConditionTrue(config.Status.Conditions, "Ready") {
+		return fmt.Errorf("DpuOperatorConfig %s not ready", name)
+	}
+	return nil
 }
 
 func SfcNew(namespace, sfcName, nfName, nfImage string) *configv1.ServiceFunctionChain {
@@ -570,4 +583,83 @@ func SfcList(c client.Client, namespace string) *configv1.ServiceFunctionChainLi
 	err := c.List(context.TODO(), sfcLs, client.InNamespace(namespace))
 	Expect(err).NotTo(HaveOccurred())
 	return sfcLs
+}
+
+func GetDpuOperatorConfig(c client.Client, name string) *configv1.DpuOperatorConfig {
+	obj := client.ObjectKey{Name: name}
+	dpuOperatorConfig := &configv1.DpuOperatorConfig{}
+	err := c.Get(context.TODO(), obj, dpuOperatorConfig)
+	if err != nil {
+		return nil
+	}
+	return dpuOperatorConfig
+}
+
+func LogDpuOperatorConfigDiagnostics(c client.Client, name string) string {
+	dpuOperatorConfig := GetDpuOperatorConfig(c, name)
+	if dpuOperatorConfig == nil {
+		return fmt.Sprintf("DpuOperatorConfig '%s' not found, cannot retrieve diagnostics", name)
+	}
+
+	msg := fmt.Sprintf("DpuOperatorConfig '%s' diagnostics:\n", name)
+
+	if len(dpuOperatorConfig.Status.Conditions) > 0 {
+		msg += "Status conditions:\n"
+		for _, condition := range dpuOperatorConfig.Status.Conditions {
+			msg += fmt.Sprintf("  - %s: %s (reason: %s, message: %s)\n",
+				condition.Type, condition.Status, condition.Reason, condition.Message)
+		}
+	} else {
+		msg += "No status conditions found\n"
+	}
+
+	return msg
+}
+
+func SetDpuOperatorConfigReady(c client.Client, name string) {
+	dpuConfig := &configv1.DpuOperatorConfig{}
+	err := c.Get(context.TODO(), client.ObjectKey{Name: name}, dpuConfig)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Set Ready condition
+	meta.SetStatusCondition(&dpuConfig.Status.Conditions, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionTrue,
+		Reason:  "TestReady",
+		Message: "Manually set to Ready for test",
+	})
+
+	err = c.Status().Update(context.TODO(), dpuConfig)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func EventuallyDpuOperatorConfigReady(c client.Client, logger logr.Logger, cr *configv1.DpuOperatorConfig, timeout time.Duration, interval time.Duration) *configv1.DpuOperatorConfig {
+	var dpuOperatorConfig *configv1.DpuOperatorConfig
+
+	onFailure := func() {
+		logger.Info(LogDpuOperatorConfigDiagnostics(c, cr.GetName()))
+	}
+
+	startTime := time.Now()
+
+	// Wait for DpuOperatorConfig to exist and be Ready
+	AssertEventually(
+		func() error {
+			return IsDpuOperatorConfigReady(c, cr.GetName())
+		},
+		timeout,
+		interval,
+		5*timeout,
+		"have DpuOperatorConfig ready in namespace",
+		onFailure,
+		onFailure,
+	)
+
+	// Get the final ready config to return
+	dpuOperatorConfig = GetDpuOperatorConfig(c, cr.GetName())
+
+	readyTime := time.Now()
+	logger.Info("DpuOperatorConfig ready", "name", cr.GetName(), "totalDuration", readyTime.Sub(startTime))
+
+	return dpuOperatorConfig
 }
