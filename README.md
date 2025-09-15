@@ -104,16 +104,10 @@ Firstly, mark all nodes with the label `dpu=true` that are DPUs or Hosts with DP
 
 To tell the operator to start components the `DpuOperatorConfig` needs to be created.
 
-For 1 cluster deployment and 2 cluster deployment on the host cluster:
+For both 1 cluster deployment and 2 cluster deployment (both host and DPU clusters):
 
 ```sh
-kubectl create -f examples/host.yaml
-```
-
-For 2 cluster deployment on the DPU cluster:
-
-```sh
-kubectl create -f examples/dpu.yaml
+kubectl create -f examples/config.yaml
 ```
 
 After creating the `DpuOperatorConfig` CR, you should see the following pods:
@@ -140,8 +134,8 @@ kubectl label node worker-dpu1 dpu=true
 # For two cluster deployment the DPU nodes are done using the second cluster's kubeconfig.
 task build-image-all
 task deploy # or `task deploy-1c` for single cluster deployment
-kubectl create -f examples/host.yaml
-# For two cluster deployment, the `examples/dpu.yaml` is created on the DPU cluster.
+kubectl create -f examples/config.yaml
+# For two cluster deployment, the same config.yaml is applied to both clusters.
 # Wait for daemon/vsp pods to settle
 # Create pods and/or ServiceFunctionChain yaml
 kubectl create -f examples/my-pod.yaml
