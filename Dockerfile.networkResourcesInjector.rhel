@@ -3,7 +3,7 @@ ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /workspace
 COPY . .
-RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-network-resources-injector
+RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-network-resources-injector
 
 FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
 ARG TARGETARCH
