@@ -7,8 +7,8 @@ sleep 10
 KUBECONFIG=/root/kubeconfig.microshift oc wait --for=condition=Ready pod --all -n openshift-dpu-operator --timeout=2m
 
 
-KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/dpu.yaml
-KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/host.yaml
+KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/config.yaml
+KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/config.yaml
 
 # this sleep is currently a workaround until we have DPU CRs, and we can check the state of the CR instead
 sleep 120
