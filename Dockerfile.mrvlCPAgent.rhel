@@ -54,7 +54,7 @@ RUN \
 # As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
 
 WORKDIR /workspace
-RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o /cpagent-bin/cp-agent-run internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent-run.go
+RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o /cpagent-bin/cp-agent-run internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent-run.go
 
 # Use distroless as minimal base image to package the Marvell CP agent binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
