@@ -30,7 +30,7 @@ metadata:
             "name": "dpuoperatorconfig-sample"
           },
           "spec": {
-            "mode": "host"
+            "logLevel": 0
           }
         },
         {
@@ -46,11 +46,21 @@ metadata:
             },
             "name": "servicefunctionchain-sample"
           },
-          "spec": null
+          "spec": {
+            "networkFunctions": [
+              {
+                "image": "nginx:latest",
+                "name": "firewall"
+              }
+            ],
+            "nodeSelector": {
+              "dpu": "true"
+            }
+          }
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-09-03T16:45:10Z"
+    createdAt: "2025-09-16T08:50:55Z"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "true"
     features.operators.openshift.io/csi: "false"
@@ -114,26 +124,12 @@ spec:
           - persistentvolumeclaims
           verbs:
           - '*'
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - ""
           resources:
           - persistentvolumes
           verbs:
           - '*'
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - ""
           resources:
@@ -164,13 +160,6 @@ spec:
           - services
           verbs:
           - '*'
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - admissionregistration.k8s.io
           resources:
@@ -201,6 +190,18 @@ spec:
           - apps
           resources:
           - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
           verbs:
           - create
           - delete
@@ -314,6 +315,7 @@ spec:
           - delete
           - get
           - list
+          - patch
           - update
           - watch
         - apiGroups:
