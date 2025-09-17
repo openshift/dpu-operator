@@ -8,41 +8,6 @@ rules:
   - ""
   resources:
   - '*'
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
   - serviceaccounts
   verbs:
   - create
@@ -55,6 +20,10 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+  - persistentvolumes
+  - pods
+  - secrets
   - services
   verbs:
   - '*'
@@ -76,29 +45,7 @@ rules:
   - apps
   resources:
   - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
   - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
   - replicasets
   verbs:
   - create
@@ -112,69 +59,8 @@ rules:
   - config.openshift.io
   resources:
   - dataprocessingunits
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.openshift.io
-  resources:
-  - dataprocessingunits/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - config.openshift.io
-  resources:
-  - dataprocessingunits/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - config.openshift.io
-  resources:
   - dpuoperatorconfigs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.openshift.io
-  resources:
-  - dpuoperatorconfigs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - config.openshift.io
-  resources:
-  - dpuoperatorconfigs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - config.openshift.io
-  resources:
   - servicefunctionchains
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.openshift.io
-  resources:
   - servicefunctionchains/finalizers
   verbs:
   - create
@@ -187,6 +73,15 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - dataprocessingunits/finalizers
+  - dpuoperatorconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - dataprocessingunits/status
+  - dpuoperatorconfigs/status
   - servicefunctionchains/status
   verbs:
   - get
@@ -208,41 +103,8 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - clusterroles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - rolebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - roles
   verbs:
   - create
