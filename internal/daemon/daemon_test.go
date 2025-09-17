@@ -71,10 +71,10 @@ var _ = g.Describe("Full Daemon", func() {
 		k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
 		ns := testutils.DpuOperatorNamespace()
-		cr := testutils.DpuOperatorCR("dpu-operator-config", ns)
+		cr := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, ns)
 
 		// Clean up any existing resources first
-		existingCr := testutils.DpuOperatorCR("dpu-operator-config", ns)
+		existingCr := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, ns)
 		testutils.DeleteDpuOperatorCR(k8sClient, existingCr)
 
 		testutils.CreateNamespace(k8sClient, ns)
@@ -83,19 +83,6 @@ var _ = g.Describe("Full Daemon", func() {
 		fs := afero.NewMemMapFs()
 		utils.Touch(fs, "/dpu-cni")
 		fakePlatform = platform.NewFakePlatform("IPU Adapter E2100-CCQDA2")
-
-		// Create DpuOperatorConfig resource required by VSP plugin
-		k8sClient, err := client.New(config, client.Options{})
-		Expect(err).NotTo(HaveOccurred())
-		namespace := testutils.DpuOperatorNamespace()
-		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
-
-		// Clean up any existing resources first
-		existingDpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
-		testutils.DeleteDpuOperatorCR(k8sClient, existingDpuOperatorConfig)
-
-		testutils.CreateNamespace(k8sClient, namespace)
-		testutils.CreateDpuOperatorCR(k8sClient, dpuOperatorConfig)
 
 		mockVsp := mockvsp.NewMockVsp(mockvsp.WithPathManager(*pathManager))
 		mockVspListen, err := mockVsp.Listen()
@@ -201,11 +188,6 @@ var _ = g.Describe("Full Daemon", func() {
 		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
 		klog.Infof("Deleting DpuOperatorConfig: %s", vars.DpuOperatorConfigName)
 		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
-
-		// Also clean up the original CR
-		cr := testutils.DpuOperatorCR("dpu-operator-config", namespace)
-		klog.Info("Deleting original CR: dpu-operator-config")
-		testutils.DeleteDpuOperatorCR(k8sClient, cr)
 		klog.Infof("Deleting namespace: %s", namespace.Name)
 		testutils.DeleteNamespace(k8sClient, namespace)
 
