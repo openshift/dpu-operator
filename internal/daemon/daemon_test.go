@@ -71,14 +71,14 @@ var _ = g.Describe("Full Daemon", func() {
 		k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
 		ns := testutils.DpuOperatorNamespace()
-		cr := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, ns)
-
+		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, ns)
 		// Clean up any existing resources first
-		existingCr := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, ns)
-		testutils.DeleteDpuOperatorCR(k8sClient, existingCr)
+		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
 
 		testutils.CreateNamespace(k8sClient, ns)
-		testutils.CreateDpuOperatorCR(k8sClient, cr)
+		testutils.CreateDpuOperatorCR(k8sClient, dpuOperatorConfig)
+		// Manually set to Ready since controller manager is not running in daemon tests
+		testutils.SetDpuOperatorConfigReady(k8sClient, dpuOperatorConfig.Name)
 
 		fs := afero.NewMemMapFs()
 		utils.Touch(fs, "/dpu-cni")
