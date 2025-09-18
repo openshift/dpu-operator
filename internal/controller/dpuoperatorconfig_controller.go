@@ -32,11 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 //go:embed bindata/*
 var binData embed.FS
+
+const dpuOperatorConfigFinalizer = "config.openshift.io/dpuoperatorconfig-finalizer"
 
 type componentError struct {
 	component string
@@ -118,6 +121,29 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	logger.Info("Reconciling DpuOperatorConfig", "name", dpuOperatorConfig.Name, "namespace", dpuOperatorConfig.Namespace)
 
+	if !dpuOperatorConfig.DeletionTimestamp.IsZero() {
+		return r.handleDeletion(ctx, dpuOperatorConfig)
+	}
+
+	if !controllerutil.ContainsFinalizer(dpuOperatorConfig, dpuOperatorConfigFinalizer) {
+		logger.Info("Adding finalizer to DpuOperatorConfig")
+		controllerutil.AddFinalizer(dpuOperatorConfig, dpuOperatorConfigFinalizer)
+		if err := r.Update(ctx, dpuOperatorConfig); err != nil {
+			logger.Error(err, "Failed to add finalizer")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Ensure Ready condition is set if finalizer is present
+	if !meta.IsStatusConditionTrue(dpuOperatorConfig.Status.Conditions, "Ready") {
+		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionTrue, "FinalizerAdded", "Finalizer has been added and resource is ready")
+		if err := r.Status().Update(ctx, dpuOperatorConfig); err != nil {
+			logger.Error(err, "Failed to update Ready condition")
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Initialize status if needed
 	if err := r.initializeStatus(ctx, dpuOperatorConfig); err != nil {
 		logger.Error(err, "Failed to initialize status")
@@ -145,6 +171,29 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Update status based on reconciliation results
 	if err := r.updateStatus(ctx, dpuOperatorConfig, reconcileErrors); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *DpuOperatorConfigReconciler) handleDeletion(ctx context.Context, dpuOperatorConfig *configv1.DpuOperatorConfig) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Handling DpuOperatorConfig deletion")
+
+	if controllerutil.ContainsFinalizer(dpuOperatorConfig, dpuOperatorConfigFinalizer) {
+		logger.Info("Performing cleanup for DpuOperatorConfig")
+
+		// Perform any cleanup operations here
+		// For now, we'll just log that cleanup is complete
+		logger.Info("Cleanup completed for DpuOperatorConfig")
+
+		// Remove the finalizer to allow deletion
+		controllerutil.RemoveFinalizer(dpuOperatorConfig, dpuOperatorConfigFinalizer)
+		if err := r.Update(ctx, dpuOperatorConfig); err != nil {
+			logger.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{}, err
+		}
+		logger.Info("Finalizer removed from DpuOperatorConfig")
 	}
 
 	return ctrl.Result{}, nil

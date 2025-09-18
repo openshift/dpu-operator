@@ -8,6 +8,7 @@ import (
 	netattdefv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -60,13 +61,22 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	err = b.SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	// Note: Webhooks are not set up in tests due to envtest limitations
+	// The controller will handle finalizer addition for test scenarios
+
 	wg.Add(1)
 	go func() {
+		defer GinkgoRecover()
 		setupLog.Info("starting manager")
 		err := mgr.Start(ctx)
+		if err != nil {
+			setupLog.Error(err, "Manager failed to start")
+		}
 		Expect(err).NotTo(HaveOccurred())
 		wg.Done()
 	}()
+
+	// Wait for the manager to be elected (controller ready)
 	<-mgr.Elected()
 
 	return mgr
@@ -102,6 +112,14 @@ var _ = Describe("Main Controller", Ordered, func() {
 		err := mgr.GetClient().List(context.Background(), crList)
 		if err == nil {
 			for _, existingCr := range crList.Items {
+				// Remove finalizers first to allow deletion
+				if len(existingCr.Finalizers) > 0 {
+					existingCr.Finalizers = []string{}
+					err := mgr.GetClient().Update(context.Background(), &existingCr)
+					if err != nil && !errors.IsNotFound(err) {
+						setupLog.Error(err, "Failed to remove finalizers from existing DpuOperatorConfig", "name", existingCr.Name)
+					}
+				}
 				err := mgr.GetClient().Delete(context.Background(), &existingCr)
 				if err != nil && !errors.IsNotFound(err) {
 					setupLog.Error(err, "Failed to delete existing DpuOperatorConfig", "name", existingCr.Name)
@@ -191,6 +209,40 @@ var _ = Describe("Main Controller", Ordered, func() {
 				ns := testutils.DpuOperatorNamespace()
 				cr = testutils.DpuOperatorCR("operator-config", ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
+			})
+		})
+
+		Context("When testing finalizer functionality", func() {
+			var cr *configv1.DpuOperatorConfig
+
+			It("should be Ready when DpuOperatorConfig is created", func() {
+				ns := testutils.DpuOperatorNamespace()
+				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
+
+				// Ensure any existing CR is cleaned up first
+				existingCr := testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
+				testutils.DeleteDpuOperatorCR(mgr.GetClient(), existingCr)
+
+				testutils.CreateNamespace(mgr.GetClient(), ns)
+				testutils.CreateDpuOperatorCR(mgr.GetClient(), cr)
+
+				testutils.EventuallyDpuOperatorConfigReady(mgr.GetClient(), setupLog, cr, testutils.TestAPITimeout, testutils.TestRetryInterval)
+			})
+
+			It("should remove finalizer and allow deletion when DpuOperatorConfig is deleted", func() {
+				ns := testutils.DpuOperatorNamespace()
+
+				fetchedCR := &configv1.DpuOperatorConfig{}
+				err := mgr.GetClient().Get(context.Background(), types.NamespacedName{
+					Name:      testDpuOperatorConfigName,
+					Namespace: ns.Name,
+				}, fetchedCR)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(meta.IsStatusConditionTrue(fetchedCR.Status.Conditions, "Ready")).To(BeTrue())
+
+				err = mgr.GetClient().Delete(context.Background(), fetchedCR)
+				Expect(err).NotTo(HaveOccurred())
+				testutils.EventuallyDpuOperatorConfigDeleted(mgr.GetClient(), testDpuOperatorConfigName, ns.Name, testutils.TestAPITimeout*2, testutils.TestRetryInterval)
 			})
 		})
 	})
