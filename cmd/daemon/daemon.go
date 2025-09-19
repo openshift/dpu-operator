@@ -17,8 +17,6 @@ import (
 )
 
 func main() {
-	var mode string
-	flag.StringVar(&mode, "mode", "", "Mode for the daemon, can be either host or dpu")
 	opts := zap.Options{
 		Development: true,
 		Level:       zapcore.DebugLevel,
@@ -35,7 +33,7 @@ func main() {
 	nodeName := os.Getenv("K8S_NODE")
 
 	platform := &platform.HardwarePlatform{}
-	d := daemon.NewDaemon(afero.NewOsFs(), platform, mode, ctrl.GetConfigOrDie(), imageManager, utils.NewPathManager("/"), nodeName)
+	d := daemon.NewDaemon(afero.NewOsFs(), platform, ctrl.GetConfigOrDie(), imageManager, utils.NewPathManager("/"), nodeName)
 	if err := d.PrepareAndServe(context.Background()); err != nil {
 		log.Error(err, "Failed to run daemon")
 		panic(err)

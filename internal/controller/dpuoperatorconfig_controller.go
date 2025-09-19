@@ -231,7 +231,6 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 	data := map[string]string{
 		"Namespace":       vars.Namespace,
 		"ImagePullPolicy": r.imagePullPolicy,
-		"Mode":            "auto",
 		"ResourceName":    "openshift.io/dpu", // FIXME: Hardcode for now
 		"CniDir":          p,
 	}

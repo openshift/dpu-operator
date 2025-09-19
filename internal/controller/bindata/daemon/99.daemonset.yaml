@@ -56,9 +56,6 @@ spec:
           mountPath: /proc
         - name: sys
           mountPath: /sys
-        args:
-        - --mode
-        - {{.Mode}}
       volumes:
         - name: devicesock
           hostPath:

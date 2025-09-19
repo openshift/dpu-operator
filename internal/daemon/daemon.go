@@ -44,7 +44,6 @@ type ManagedDpu struct {
 }
 
 type Daemon struct {
-	mode              string
 	pm                *utils.PathManager
 	log               logr.Logger
 	imageManager      images.ImageManager
@@ -58,11 +57,10 @@ type Daemon struct {
 	nodeName          string
 }
 
-func NewDaemon(fs afero.Fs, p platform.Platform, mode string, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
+func NewDaemon(fs afero.Fs, p platform.Platform, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
 	log := ctrl.Log.WithName("Daemon")
 	return Daemon{
 		fs:                fs,
-		mode:              mode,
 		pm:                pathManager,
 		log:               log,
 		imageManager:      imageManager,
