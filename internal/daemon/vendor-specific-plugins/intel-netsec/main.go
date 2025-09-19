@@ -650,17 +650,10 @@ func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *
 // setVlanIdsSpoofChk function to set the VLAN IDs for host facing interfaces such that each container
 // will have a unique VLAN ID for isolating traffic. This is to ensure that each VF must be
 // forwarded to the NetSec Acclerator to be processed.
-func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
-	vsp.log.Info("setVlanIdsSpoofChk(): Setting VLAN IDs for VFs", "NumVFs", numVfs)
+func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pcieAddr string, numVfs int) error {
+	vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): Setting VLAN IDs, Spoof Check off, Trust on for VFs", "PCIeAddress", pcieAddr, "NumVFs", numVfs)
 	var ifName string
 	var err error
-	var pcieAddr string
-
-	if vsp.isDPUMode {
-		pcieAddr = IntelNetSecDpuBackplanef2PCIeAddress
-	} else {
-		pcieAddr = vsp.dpuPcieAddress
-	}
 
 	ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(pcieAddr)
 	if err != nil {
@@ -712,6 +705,8 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
 		// As per ip-link (8) Spoof Check is used to enable/disable the spoof check on the VF.
 		// When enabled, the VF will only accept packets with the source MAC address matching the VF's
 		// MAC address. When disabled, the VF will accept packets with any source MAC address.
+		// This is needed since the MAC address will be of the internal interface ports of the network functions
+		// and not the MAC address of the VF.
 		if err := netlink.LinkSetVfSpoofchk(link, vfID, false); err != nil {
 			vsp.log.Error(err, "Failed to set spoof check off for VF", "VfID", vfID, "InterfaceName", ifName)
 			return err
@@ -742,11 +737,53 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChk(numVfs int) error {
 			Allocated:  false,
 		}
 
-		vsp.log.Info("setVlanIdsSpoofChk(): Set VLAN ID for VF", "VFID", vfID, "VlanID", vlan, "InterfaceName", ifName, "PCIeAddress", pcieAddr)
-		vsp.log.Info("setVlanIdsSpoofChk(): VF Device Info", "VFKey", key, "VfDeviceInfo", vsp.vfDevs[key])
+		vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): Set VLAN ID for VF", "VFID", vfID, "VlanID", vlan, "InterfaceName", ifName, "PCIeAddress", pcieAddr)
+		vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): VF Device Info", "VFKey", key, "VfDeviceInfo", vsp.vfDevs[key])
 	}
 
 	return err
+}
+
+func (vsp *intelNetSecVspServer) setSpoofChkExternalPorts(pcieAddr string, numVfs int) error {
+	vsp.log.Info("setSpoofChkExternalPorts(): Setting Spoof Check off for VFs", "PCIeAddress", pcieAddr, "NumVFs", numVfs)
+
+	ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(pcieAddr)
+	if err != nil {
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
+		return err
+	}
+
+	if len(ifNames) != 1 {
+		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", pcieAddr, ifNames)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
+		return err
+	}
+
+	ifName := ifNames[0]
+
+	for vfID := 0; vfID < numVfs; vfID++ {
+		link, err := netlink.LinkByName(ifName)
+		if err != nil {
+			vsp.log.Error(err, "Failed to get link by name", "IfName", ifName)
+			return err
+		}
+
+		// This is the equivalent of "ip link set dev <PF> vf <ID> spoofchk <VLAN>"
+		// SetSriovVlanId sets the Spoof Check for a specific virtual function (VF)
+		// As per ip-link (8) Spoof Check is used to enable/disable the spoof check on the VF.
+		// When enabled, the VF will only accept packets with the source MAC address matching the VF's
+		// MAC address. When disabled, the VF will accept packets with any source MAC address.
+		// This is needed since the MAC address will be of the internal interface ports of the network functions
+		// and not the MAC address of the VF.
+		if err := netlink.LinkSetVfSpoofchk(link, vfID, false); err != nil {
+			vsp.log.Error(err, "Failed to set spoof check off for VF", "VfID", vfID, "InterfaceName", ifName)
+			return err
+		}
+
+		vsp.log.Info("setSpoofChkExternalPorts(): Set spoof check off for VF", "InterfaceName", ifName, "VfID", vfID)
+	}
+
+	return nil
 }
 
 // SetNumVfs function to set the number of VFs with the given context and VfCount
@@ -757,27 +794,39 @@ func (vsp *intelNetSecVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) 
 	if vsp.isDPUMode {
 		err = vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuBackplanef2PCIeAddress, int(in.VfCnt))
 		if err != nil {
-			vsp.log.Error(err, "Error setting number of VFs", "VfCnt", in.VfCnt, "PcieAddress", IntelNetSecDpuBackplanef2PCIeAddress)
+			vsp.log.Error(err, "Error setting number of VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuBackplanef2PCIeAddress, "VfCnt", in.VfCnt)
+			return &pb.VfCount{VfCnt: 0}, err
+		}
+
+		err = vsp.setVlanIdsSpoofChkInternalPorts(IntelNetSecDpuBackplanef2PCIeAddress, int(in.VfCnt))
+		if err != nil {
+			vsp.log.Error(err, "Error setting VLAN IDs for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuBackplanef2PCIeAddress, "VfCnt", in.VfCnt)
 			return &pb.VfCount{VfCnt: 0}, err
 		}
 
 		err = vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
 		if err != nil {
-			vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
+			vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
+			return &pb.VfCount{VfCnt: 0}, err
+		}
+
+		err = vsp.setSpoofChkExternalPorts(IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
+		if err != nil {
+			vsp.log.Error(err, "Error setting spoof check off for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
 			return &pb.VfCount{VfCnt: 0}, err
 		}
 	} else {
 		err = vspnetutils.SetSriovNumVfs(vsp.fs, vsp.dpuPcieAddress, int(in.VfCnt))
 		if err != nil {
-			vsp.log.Error(err, "Error setting number of VFs", "VfCnt", in.VfCnt, "PcieAddress", vsp.dpuPcieAddress)
+			vsp.log.Error(err, "Error setting number of VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", vsp.dpuPcieAddress, "VfCnt", in.VfCnt)
 			return &pb.VfCount{VfCnt: 0}, err
 		}
-	}
 
-	err = vsp.setVlanIdsSpoofChk(int(in.VfCnt))
-	if err != nil {
-		vsp.log.Error(err, "Error setting VLAN IDs for VFs", "VfCnt", in.VfCnt, "isDPUMode", vsp.isDPUMode)
-		return &pb.VfCount{VfCnt: 0}, err
+		err = vsp.setVlanIdsSpoofChkInternalPorts(vsp.dpuPcieAddress, int(in.VfCnt))
+		if err != nil {
+			vsp.log.Error(err, "Error setting VLAN IDs for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", vsp.dpuPcieAddress, "VfCnt", in.VfCnt)
+			return &pb.VfCount{VfCnt: 0}, err
+		}
 	}
 
 	vsp.vfCnt = int(in.VfCnt)
