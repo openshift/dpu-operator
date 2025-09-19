@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const ReadyConditionType = "Ready"
+
 type DpuIdentifier string
 
 type VendorPlugin interface {
