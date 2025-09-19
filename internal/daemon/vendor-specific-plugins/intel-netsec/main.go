@@ -901,8 +901,6 @@ func WithPathManager(pathManager utils.PathManager) func(*intelNetSecVspServer) 
 }
 
 func NewIntelNetSecVspServer(opts ...func(*intelNetSecVspServer)) *intelNetSecVspServer {
-	var mode string
-	flag.StringVar(&mode, "mode", "", "Mode for the daemon, can be either host or dpu")
 	options := zap.Options{
 		Development: true,
 		Level:       zapcore.InfoLevel,

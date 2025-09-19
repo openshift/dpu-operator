@@ -790,8 +790,6 @@ func WithPathManager(pathManager utils.PathManager) func(*mrvlVspServer) {
 }
 
 func NewMarvellVspServer(opts ...func(*mrvlVspServer)) *mrvlVspServer {
-	var mode string
-	flag.StringVar(&mode, "mode", "", "Mode for the daemon, can be either host or dpu")
 	options := zap.Options{
 		Development: true,
 		Level:       zapcore.DebugLevel,
