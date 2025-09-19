@@ -149,6 +149,7 @@ tasks:
     cmds:
       - task: deploy-clusters
       - task: fast-e2e-test
+      - sh hack/e2e-test-post.sh
 
   fast-e2e-test:
     cmds:
