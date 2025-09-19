@@ -173,14 +173,14 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				var newCondition metav1.Condition
 				if managedDpu.Plugin.IsInitialized() {
 					newCondition = metav1.Condition{
-						Type:    "Ready",
+						Type:    plugin.ReadyConditionType,
 						Status:  metav1.ConditionTrue,
 						Reason:  "Initialized",
 						Message: "DPU plugin is initialized and ready.",
 					}
 				} else {
 					newCondition = metav1.Condition{
-						Type:    "Ready",
+						Type:    plugin.ReadyConditionType,
 						Status:  metav1.ConditionFalse,
 						Reason:  "NotInitialized",
 						Message: "DPU plugin is not yet initialized.",
@@ -299,11 +299,11 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 	identifier := dpuCR.Name
 
 	// Check if CR exists in the cluster
-	existingCR := &configv1.DataProcessingUnit{}
+	currentDpuCR := &configv1.DataProcessingUnit{}
 	err := d.client.Get(context.TODO(), client.ObjectKey{
 		Name:      identifier,
 		Namespace: dpuCR.Namespace,
-	}, existingCR)
+	}, currentDpuCR)
 
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
@@ -329,20 +329,22 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 	}
 
 	// CR exists, update it to reflect all fields
-	needsSpecUpdate := !reflect.DeepEqual(existingCR.Spec, dpuCR.Spec)
-	needsStatusUpdate := !reflect.DeepEqual(existingCR.Status, dpuCR.Status)
+	needsSpecUpdate := !reflect.DeepEqual(currentDpuCR.Spec, dpuCR.Spec)
+	// For status, compare conditions  rather than using reflect.DeepEqual
+	// which fails due to LastTransitionTime and other Kubernetes metadata differences
+	needsStatusUpdate := d.conditionsNeedUpdate(currentDpuCR.Status.Conditions, dpuCR.Status.Conditions)
 
 	if needsSpecUpdate {
-		existingCR.Spec = dpuCR.Spec
-		err := d.client.Update(context.TODO(), existingCR)
+		currentDpuCR.Spec = dpuCR.Spec
+		err := d.client.Update(context.TODO(), currentDpuCR)
 		if err != nil {
 			return fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
 		}
 	}
 
 	if needsStatusUpdate {
-		existingCR.Status = dpuCR.Status
-		err := d.client.Status().Update(context.TODO(), existingCR)
+		currentDpuCR.Status = dpuCR.Status
+		err := d.client.Status().Update(context.TODO(), currentDpuCR)
 		if err != nil {
 			return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 		}
@@ -353,6 +355,31 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 	}
 
 	return nil
+}
+
+// conditionsNeedUpdate compares the latest condition and returns true if it differs.
+// This comparison ignores lastTransitionTime differences that don't reflect actual condition changes.
+func (d *Daemon) conditionsNeedUpdate(current, desired []metav1.Condition) bool {
+	// Get the latest desired condition (assuming it's the last one or find by type)
+	// In this case, we're looking for the conditions which is what the daemon sets
+	latestDesired := meta.FindStatusCondition(desired, plugin.ReadyConditionType)
+	if latestDesired == nil {
+		// No Ready condition in desired, but we might have one in current. If we do, then update.
+		return meta.FindStatusCondition(current, plugin.ReadyConditionType) != nil
+	}
+
+	// Find the corresponding current condition
+	latestCurrent := meta.FindStatusCondition(current, plugin.ReadyConditionType)
+	if latestCurrent == nil {
+		// Condition doesn't exist in current, update is needed
+		return true
+	}
+
+	// Compare the fields (ignoring lastTransitionTime)
+	return latestCurrent.Status != latestDesired.Status ||
+		latestCurrent.Reason != latestDesired.Reason ||
+		latestCurrent.Message != latestDesired.Message ||
+		latestCurrent.ObservedGeneration != latestDesired.ObservedGeneration
 }
 
 func (d *Daemon) updateManagedDpus(detectedDpusList []*platform.DetectedDpuWithPlugin) {

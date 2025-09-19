@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
-	"github.com/openshift/dpu-operator/api/v1"
+	v1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/utils"
@@ -148,7 +148,7 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 				Status: v1.DataProcessingUnitStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:               "Ready",
+							Type:               plugin.ReadyConditionType,
 							Status:             metav1.ConditionFalse,
 							Reason:             "Initializing",
 							Message:            "DPU resource is being initialized.",
@@ -198,7 +198,7 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 					Status: v1.DataProcessingUnitStatus{
 						Conditions: []metav1.Condition{
 							{
-								Type:               "Ready",
+								Type:               plugin.ReadyConditionType,
 								Status:             metav1.ConditionFalse,
 								Reason:             "Initializing",
 								Message:            "DPU resource is being initialized.",
