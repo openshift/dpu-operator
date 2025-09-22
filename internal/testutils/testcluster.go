@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
+	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -520,7 +521,7 @@ func IsDpuOperatorConfigReady(c client.Client, name string) error {
 	if config == nil {
 		return fmt.Errorf("DpuOperatorConfig %s does not exist", name)
 	}
-	if !meta.IsStatusConditionTrue(config.Status.Conditions, "Ready") {
+	if !meta.IsStatusConditionTrue(config.Status.Conditions, plugin.ReadyConditionType) {
 		return fmt.Errorf("DpuOperatorConfig %s not ready", name)
 	}
 	return nil
@@ -623,7 +624,7 @@ func SetDpuOperatorConfigReady(c client.Client, name string) {
 
 	// Set Ready condition
 	meta.SetStatusCondition(&dpuConfig.Status.Conditions, metav1.Condition{
-		Type:    "Ready",
+		Type:    plugin.ReadyConditionType,
 		Status:  metav1.ConditionTrue,
 		Reason:  "TestReady",
 		Message: "Manually set to Ready for test",
