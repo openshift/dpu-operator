@@ -123,6 +123,14 @@ vsp-x4bdh                                         1/1     Running   0          2
 
 ```
 
+This can be undone by deleting the top level operator config CR:
+
+```sh
+kubectl delete -f examples/config.yaml
+```
+
+This action restores the system to its original state, a process that can be lengthy depending on the configuration. It is intended only for uninstallation or for developer workflows requiring a clean deployment. Forcing deletion risks of leaving the cluster in an inconsistent state.
+
 ### Developer Workflow
 
 A typical developer would run the following commands to test changes to the operator:
