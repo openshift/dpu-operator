@@ -597,16 +597,34 @@ func GetDpuOperatorConfig(c client.Client, name string) *configv1.DpuOperatorCon
 }
 
 func LogDpuOperatorConfigDiagnostics(c client.Client, name string) string {
-	dpuOperatorConfig := GetDpuOperatorConfig(c, name)
-	if dpuOperatorConfig == nil {
+	dpuConfig := GetDpuOperatorConfig(c, name)
+	if dpuConfig == nil {
 		return fmt.Sprintf("DpuOperatorConfig '%s' not found, cannot retrieve diagnostics", name)
 	}
 
 	msg := fmt.Sprintf("DpuOperatorConfig '%s' diagnostics:\n", name)
 
-	if len(dpuOperatorConfig.Status.Conditions) > 0 {
+	if !dpuConfig.DeletionTimestamp.IsZero() {
+		msg += fmt.Sprintf("  - Deletion timestamp: %s\n", dpuConfig.DeletionTimestamp.Format("15:04:05"))
+	} else {
+		msg += "  - No deletion timestamp set\n"
+	}
+
+	if len(dpuConfig.Finalizers) > 0 {
+		msg += "  - Finalizers present:\n"
+		for _, finalizer := range dpuConfig.Finalizers {
+			msg += fmt.Sprintf("    - %s\n", finalizer)
+		}
+	} else {
+		msg += "  - No finalizers present\n"
+	}
+
+	msg += fmt.Sprintf("  - Generation: %d\n", dpuConfig.Generation)
+	msg += fmt.Sprintf("  - ResourceVersion: %s\n", dpuConfig.ResourceVersion)
+
+	if len(dpuConfig.Status.Conditions) > 0 {
 		msg += "Status conditions:\n"
-		for _, condition := range dpuOperatorConfig.Status.Conditions {
+		for _, condition := range dpuConfig.Status.Conditions {
 			msg += fmt.Sprintf("  - %s: %s (reason: %s, message: %s)\n",
 				condition.Type, condition.Status, condition.Reason, condition.Message)
 		}
@@ -663,4 +681,37 @@ func EventuallyDpuOperatorConfigReady(c client.Client, logger logr.Logger, cr *c
 	logger.Info("DpuOperatorConfig ready", "name", cr.GetName(), "totalDuration", readyTime.Sub(startTime))
 
 	return dpuOperatorConfig
+}
+
+func EventuallyDpuOperatorConfigDeleted(c client.Client, name string, namespace string, timeout time.Duration, interval time.Duration) {
+	onFailure := func() {
+		fmt.Println(LogDpuOperatorConfigDiagnostics(c, name))
+	}
+
+	startTime := time.Now()
+
+	AssertEventually(
+		func() error {
+			dpuConfig := &configv1.DpuOperatorConfig{}
+			err := c.Get(context.Background(), types.NamespacedName{
+				Name:      name,
+				Namespace: namespace,
+			}, dpuConfig)
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("error checking DpuOperatorConfig %s in %s: %v", name, namespace, err)
+			}
+			return fmt.Errorf("DpuOperatorConfig %s in %s still exists", name, namespace)
+		},
+		timeout,
+		interval,
+		5*timeout,
+		fmt.Sprintf("have DpuOperatorConfig %v in %v deleted", name, namespace),
+		onFailure,
+		onFailure)
+
+	deletedTime := time.Now()
+	fmt.Printf("DpuOperatorConfig '%s' deleted after %v\n", name, deletedTime.Sub(startTime))
 }
