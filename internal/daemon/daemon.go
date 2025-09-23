@@ -311,6 +311,12 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 			// TODO FIXME: client Create/Update will update the dpuCR with metafields such as resourceVersion. Meaning that the dpuCR pointer cannot be
 			// reused to create a new DPU CR. For now, we do a deep copy of the dpuCR and use that to update the status.
 			dpuCRCopy := dpuCR.DeepCopy()
+
+			// Set owner reference to DpuOperatorConfig
+			if err := d.setOwnerReference(dpuCRCopy); err != nil {
+				return fmt.Errorf("Failed to set owner reference for DPU CR %s: %v", identifier, err)
+			}
+
 			err := d.client.Create(context.TODO(), dpuCRCopy)
 			if err != nil {
 				return fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
@@ -504,6 +510,25 @@ func (d *Daemon) updateNodeLabels() error {
 			return fmt.Errorf("Failed to update DPU side label on node %s: %v", d.nodeName, err)
 		}
 		d.log.Info("Updated DPU side label on node", "nodeName", d.nodeName, "labelValue", labelValue)
+	}
+
+	return nil
+}
+
+// setOwnerReference sets the DpuOperatorConfig as the owner of the DataProcessingUnit CR
+func (d *Daemon) setOwnerReference(dpuCR *configv1.DataProcessingUnit) error {
+	// Find the DpuOperatorConfig that should own this DPU CR
+	dpuOperatorConfigList := &configv1.DpuOperatorConfigList{}
+	err := d.client.List(context.TODO(), dpuOperatorConfigList)
+	if err != nil {
+		return fmt.Errorf("failed to list DpuOperatorConfigs: %v", err)
+	}
+
+	dpuOperatorConfig := &dpuOperatorConfigList.Items[0]
+
+	// Set the owner reference
+	if err := ctrl.SetControllerReference(dpuOperatorConfig, dpuCR, d.client.Scheme()); err != nil {
+		return fmt.Errorf("failed to set controller reference: %v", err)
 	}
 
 	return nil
