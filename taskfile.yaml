@@ -66,6 +66,8 @@ tasks:
       - NS=$(KUBECONFIG={{.KUBECONFIG}} oc get ns openshift-dpu-operator)
         if [[ -n "$NS" ]]; then false else true fi
     cmds:
+      # this will block untill everything is cleaned up and bringing system back into a clean state as if the operator was never installed
+      - KUBECONFIG={{.KUBECONFIG}} oc delete -f examples/config.yaml || true
       - bin/kustomize build config/default | KUBECONFIG={{.KUBECONFIG}} oc delete --ignore-not-found=true -f -
       - KUBECONFIG={{.KUBECONFIG}} oc wait --for=delete ns openshift-dpu-operator --timeout=300s
       - echo "Namespace 'openshift-dpu-operator' has been removed."
