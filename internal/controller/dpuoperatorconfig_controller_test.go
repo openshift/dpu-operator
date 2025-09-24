@@ -8,7 +8,6 @@ import (
 	netattdefv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -173,6 +172,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 				ns := testutils.DpuOperatorNamespace()
 				cr = testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
+				testutils.EventuallyNoDpuOperatorConfig(mgr.GetClient(), testutils.TestAPITimeout*2, testutils.TestRetryInterval)
 			})
 		})
 
@@ -205,6 +205,7 @@ var _ = Describe("Main Controller", Ordered, func() {
 				ns := testutils.DpuOperatorNamespace()
 				cr = testutils.DpuOperatorCR("operator-config", ns)
 				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
+				testutils.EventuallyNoDpuOperatorConfig(mgr.GetClient(), testutils.TestAPITimeout*2, testutils.TestRetryInterval)
 			})
 		})
 
@@ -225,20 +226,11 @@ var _ = Describe("Main Controller", Ordered, func() {
 				testutils.EventuallyDpuOperatorConfigReady(mgr.GetClient(), setupLog, cr, testutils.TestAPITimeout, testutils.TestRetryInterval)
 			})
 
-			It("should remove finalizer and allow deletion when DpuOperatorConfig is deleted", func() {
+			It("should delete DpuOperatorConfig successfully", func() {
 				ns := testutils.DpuOperatorNamespace()
-
-				fetchedCR := &configv1.DpuOperatorConfig{}
-				err := mgr.GetClient().Get(context.Background(), types.NamespacedName{
-					Name:      testDpuOperatorConfigName,
-					Namespace: ns.Name,
-				}, fetchedCR)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(meta.IsStatusConditionTrue(fetchedCR.Status.Conditions, "Ready")).To(BeTrue())
-
-				err = mgr.GetClient().Delete(context.Background(), fetchedCR)
-				Expect(err).NotTo(HaveOccurred())
-				testutils.EventuallyDpuOperatorConfigDeleted(mgr.GetClient(), testDpuOperatorConfigName, ns.Name, testutils.TestAPITimeout*2, testutils.TestRetryInterval)
+				cr := testutils.DpuOperatorCR(testDpuOperatorConfigName, ns)
+				testutils.DeleteDpuOperatorCR(mgr.GetClient(), cr)
+				testutils.EventuallyNoDpuOperatorConfig(mgr.GetClient(), testutils.TestAPITimeout*2, testutils.TestRetryInterval)
 			})
 		})
 	})

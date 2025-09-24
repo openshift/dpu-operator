@@ -189,6 +189,11 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 		skipTests := false
 
+		g.AfterEach(func() {
+			// Ensure cleanup after each webhook test
+			testutils.EventuallyNoDpuOperatorConfig(dpuSideClient, testutils.TestAPITimeout, testutils.TestRetryInterval)
+		})
+
 		g.It("should handle precondition of existing DpuOperatorConfig to prepare test environment", func() {
 			dpuOperatorConfig0 := &configv1.DpuOperatorConfig{}
 			err := dpuSideClient.Get(context.TODO(), configv1.DpuOperatorConfigNamespacedName, dpuOperatorConfig0)
