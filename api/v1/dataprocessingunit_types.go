@@ -47,8 +47,7 @@ type DataProcessingUnitStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:shortName=dpu
-//+kubebuilder:resource:scope=Cluster
+//+kubebuilder:resource:scope=Cluster,shortName=dpu
 //+kubebuilder:printcolumn:name="DPU Product",type="string",JSONPath=".spec.dpuProductName"
 //+kubebuilder:printcolumn:name="DPU Side",type="boolean",JSONPath=".spec.isDpuSide"
 //+kubebuilder:printcolumn:name="Node Name",type="string",JSONPath=".spec.nodeName"
