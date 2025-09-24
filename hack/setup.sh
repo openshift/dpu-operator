@@ -34,14 +34,15 @@ KUBECONFIG=/root/kubeconfig.microshift oc label nodes --all dpu=true
 KUBECONFIG=/root/kubeconfig.microshift oc create -f examples/config.yaml
 KUBECONFIG=/root/kubeconfig.ocpcluster oc create -f examples/config.yaml
 
-# Wait for DpuOperatorConfig to be Ready on both clusters
-echo "Waiting for DpuOperatorConfig to be Ready on microshift cluster..."
-KUBECONFIG=/root/kubeconfig.microshift oc wait --for=condition=Ready dpuoperatorconfig/dpu-operator-config -n openshift-dpu-operator --timeout=1m
 echo "Waiting for DpuOperatorConfig to be Ready on OCP cluster..."
 KUBECONFIG=/root/kubeconfig.ocpcluster oc wait --for=condition=Ready dpuoperatorconfig/dpu-operator-config -n openshift-dpu-operator --timeout=1m
-
-wait_for_dpu /root/kubeconfig.microshift
+echo "Waiting for DPU to be Ready on OCP cluster..."
 wait_for_dpu /root/kubeconfig.ocpcluster
+
+echo "Waiting for DpuOperatorConfig to be Ready on microshift cluster..."
+KUBECONFIG=/root/kubeconfig.microshift oc wait --for=condition=Ready dpuoperatorconfig/dpu-operator-config -n openshift-dpu-operator --timeout=1m
+echo "Waiting for DPU to be Ready on microshift cluster..."
+wait_for_dpu /root/kubeconfig.microshift
 
 KUBECONFIG=/root/kubeconfig.ocpcluster oc wait --for=condition=Ready pod --all -n openshift-dpu-operator --timeout=5m
 KUBECONFIG=/root/kubeconfig.microshift oc wait --for=condition=Ready pod --all -n openshift-dpu-operator --timeout=5m
