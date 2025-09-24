@@ -28,6 +28,11 @@ type DataProcessingUnitConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// DpuSelector specifies which DPUs this DpuConfig CR should target.
+	// If empty, the DpuConfig will target all DPUs.
+	// +optional
+	DpuSelector *metav1.LabelSelector `json:"dpuSelector,omitempty"`
+
 	// Foo is an example field of DataProcessingUnitConfig. Edit dataprocessingunitconfig_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
 }
