@@ -11,6 +11,8 @@ spec:
     kind: DataProcessingUnit
     listKind: DataProcessingUnitList
     plural: dataprocessingunits
+    shortNames:
+    - dpu
     singular: dataprocessingunit
   scope: Cluster
   versions:
