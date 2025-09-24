@@ -215,12 +215,8 @@ operator-sdk:
 	go run tools/task/task.go operator-sdk
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
-	$(OPERATOR_SDK) bundle validate ./bundle
-	cp bundle/manifests/* manifests/stable
+bundle:
+	go run tools/task/task.go bundle
 
 .PHONY: prow-ci-bundle-check
 prow-ci-bundle-check: bundle
