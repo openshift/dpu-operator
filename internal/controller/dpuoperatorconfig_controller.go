@@ -27,7 +27,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -52,13 +52,18 @@ type DpuOperatorConfigReconciler struct {
 	imageManager    images.ImageManager
 	imagePullPolicy string
 	pathManager     utils.PathManager
+
+	// Track created resources per DpuOperatorConfig for cleanup
+	resourceRenderer *render.ResourceRenderer
 }
 
 func NewDpuOperatorConfigReconciler(client client.Client, imageManager images.ImageManager) *DpuOperatorConfigReconciler {
+	configKey := fmt.Sprintf("%s/%s", vars.Namespace, vars.DpuOperatorConfigName)
 	return &DpuOperatorConfigReconciler{
-		Client:          client,
-		imageManager:    imageManager,
-		imagePullPolicy: "IfNotPresent",
+		Client:           client,
+		imageManager:     imageManager,
+		imagePullPolicy:  "IfNotPresent",
+		resourceRenderer: render.NewResourceRenderer(configKey),
 	}
 }
 
@@ -111,7 +116,7 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// We reconcile the DpuOperatorConfig regardless of what triggered the reconcile
 	dpuOperatorConfig := &configv1.DpuOperatorConfig{}
 	if err := r.Get(ctx, req.NamespacedName, dpuOperatorConfig); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.Info("DpuOperatorConfig resource not found. Ignoring.")
 			return ctrl.Result{}, nil
 		}
@@ -183,8 +188,12 @@ func (r *DpuOperatorConfigReconciler) handleDeletion(ctx context.Context, dpuOpe
 	if controllerutil.ContainsFinalizer(dpuOperatorConfig, dpuOperatorConfigFinalizer) {
 		logger.Info("Performing cleanup for DpuOperatorConfig")
 
-		// Perform any cleanup operations here
-		// For now, we'll just log that cleanup is complete
+		// Clean up tracked resources in reverse order
+		if err := r.cleanupTrackedResources(ctx, dpuOperatorConfig, logger); err != nil {
+			logger.Error(err, "Failed to cleanup tracked resources")
+			return ctrl.Result{}, err
+		}
+
 		logger.Info("Cleanup completed for DpuOperatorConfig")
 
 		// Remove the finalizer to allow deletion
@@ -197,6 +206,14 @@ func (r *DpuOperatorConfigReconciler) handleDeletion(ctx context.Context, dpuOpe
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *DpuOperatorConfigReconciler) cleanupTrackedResources(ctx context.Context, dpuOperatorConfig *configv1.DpuOperatorConfig, logger logr.Logger) error {
+	if r.resourceRenderer == nil {
+		logger.Info("No resource renderer found, nothing to clean up")
+		return nil
+	}
+	return r.resourceRenderer.CleanupResourcesInReverseOrder(ctx, r.Client, logger)
 }
 
 // setCondition sets the specified condition on the DpuOperatorConfig status
@@ -289,7 +306,7 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 
 func (r *DpuOperatorConfigReconciler) createAndApplyAllFromBinData(logger logr.Logger, binDataPath string, cfg *configv1.DpuOperatorConfig) error {
 	mergedData := images.MergeVarsWithImages(r.imageManager, r.yamlVars())
-	return render.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg)
+	return r.resourceRenderer.ApplyAllFromBinData(logger, binDataPath, mergedData, binData, r.Client, cfg)
 }
 
 func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
