@@ -11,6 +11,8 @@ spec:
     kind: DataProcessingUnitConfig
     listKind: DataProcessingUnitConfigList
     plural: dataprocessingunitconfigs
+    shortNames:
+    - dpuconfig
     singular: dataprocessingunitconfig
   scope: Namespaced
   versions:

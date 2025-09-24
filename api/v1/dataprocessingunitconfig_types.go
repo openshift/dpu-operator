@@ -40,6 +40,7 @@ type DataProcessingUnitConfigStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=dpuconfig
 
 // DataProcessingUnitConfig is the Schema for the dataprocessingunitconfigs API.
 type DataProcessingUnitConfig struct {
