@@ -58,6 +58,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - dataprocessingunitconfigs
   - dataprocessingunits
   - dpuoperatorconfigs
   - servicefunctionchains
@@ -73,6 +74,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - dataprocessingunitconfigs/finalizers
   - dataprocessingunits/finalizers
   - dpuoperatorconfigs/finalizers
   verbs:
@@ -80,6 +82,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - dataprocessingunitconfigs/status
   - dataprocessingunits/status
   - dpuoperatorconfigs/status
   - servicefunctionchains/status
