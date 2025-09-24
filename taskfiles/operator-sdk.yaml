@@ -52,3 +52,4 @@ tasks:
         else
           ln -sf $(which opm) {{.BINDIR}}/opm
         fi
+
