@@ -20,6 +20,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -33,11 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-const dataProcessingUnitFinalizer = "config.openshift.io/dataprocessingunit-finalizer"
 
 //go:embed bindata
 var dpuBinData embed.FS
@@ -99,40 +97,23 @@ func (r *DataProcessingUnitReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	logger.Info("Reconciling DataProcessingUnit", "name", dpu.Name, "nodeName", dpu.Spec.NodeName, "dpuProductName", dpu.Spec.DpuProductName)
 
+	// Handle deletion
 	if dpu.GetDeletionTimestamp() != nil {
 		return r.handleDeletion(ctx, dpu)
 	}
 
+	// Get the single DpuOperatorConfig CR to use as owner for VSP resources
+	dpuOperatorConfig, err := r.getSoleDpuOperatorConfig(ctx, dpu.Namespace)
+	if err != nil {
+		logger.Error(err, "Failed to get DpuOperatorConfig")
+		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+	}
+
 	// Ensure VSP resources exist
-	err = r.ensureVSPResources(ctx, dpu)
+	err = r.ensureVSPResources(ctx, dpu, dpuOperatorConfig)
 	if err != nil {
 		logger.Error(err, "Failed to ensure VSP resources")
 		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *DataProcessingUnitReconciler) handleDeletion(ctx context.Context, dpu *configv1.DataProcessingUnit) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-	logger.Info("Handling DataProcessingUnit deletion")
-
-	if controllerutil.ContainsFinalizer(dpu, dataProcessingUnitFinalizer) {
-		logger.Info("Performing cleanup for DataProcessingUnit")
-
-		if err := r.cleanupVSPResources(ctx, dpu, logger); err != nil {
-			logger.Error(err, "Failed to cleanup VSP resources")
-			return ctrl.Result{}, err
-		}
-
-		logger.Info("Cleanup completed for DataProcessingUnit")
-
-		controllerutil.RemoveFinalizer(dpu, dataProcessingUnitFinalizer)
-		if err := r.Update(ctx, dpu); err != nil {
-			logger.Error(err, "Failed to remove finalizer")
-			return ctrl.Result{}, err
-		}
-		logger.Info("Finalizer removed from DataProcessingUnit")
 	}
 
 	return ctrl.Result{}, nil
@@ -147,18 +128,8 @@ func (r *DataProcessingUnitReconciler) cleanupVSPResources(ctx context.Context, 
 	return renderer.CleanupResourcesInReverseOrder(ctx, r.Client, logger)
 }
 
-func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, dpu *configv1.DataProcessingUnit) error {
+func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, dpu *configv1.DataProcessingUnit, dpuOperatorConfig *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
-
-	// Add finalizer if not present, just before creating VSP resources
-	if !controllerutil.ContainsFinalizer(dpu, dataProcessingUnitFinalizer) {
-		logger.Info("Adding finalizer to DataProcessingUnit before creating VSP resources")
-		controllerutil.AddFinalizer(dpu, dataProcessingUnitFinalizer)
-		err := r.Update(ctx, dpu)
-		if err != nil {
-			return fmt.Errorf("failed to add finalizer: %v", err)
-		}
-	}
 
 	// Create VSP template variables
 	vspImage, err := r.getVSPImageForDPU(dpu)
@@ -178,19 +149,19 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 	}
 	templateVars := images.MergeVarsWithImages(r.imageManager, additionalVars)
 
-	// Apply shared VSP resources (ServiceAccount, Roles, etc.) - owned by DataProcessingUnit
+	// Apply shared VSP resources (ServiceAccount, Roles, etc.) - owned by DpuOperatorConfig
 	// TODO: refcount so that we clean up when the last one is removed
-	err = r.applyVSPResourcesWithTracking(logger, "vsp/shared", templateVars, dpu)
+	err = r.applyVSPResourcesWithTracking(logger, "vsp/shared", templateVars, dpuOperatorConfig, dpu.Name)
 	if err != nil {
 		return fmt.Errorf("failed to apply shared VSP resources: %v", err)
 	}
 
-	// Apply vendor-specific VSP resources (Pod) - owned by DataProcessingUnit
+	// Apply vendor-specific VSP resources (Pod) - owned by DpuOperatorConfig
 	vendorDir, err := r.getVendorDirectory(dpu)
 	if err != nil {
 		return fmt.Errorf("failed to get vendor directory for DPU type %s: %v", dpu.Spec.DpuProductName, err)
 	}
-	err = r.applyVSPResourcesWithTracking(logger, vendorDir, templateVars, dpu)
+	err = r.applyVSPResourcesWithTracking(logger, vendorDir, templateVars, dpuOperatorConfig, dpu.Name)
 	if err != nil {
 		return fmt.Errorf("failed to apply vendor-specific VSP resources: %v", err)
 	}
@@ -199,16 +170,16 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 	return nil
 }
 
-func (r *DataProcessingUnitReconciler) applyVSPResourcesWithTracking(logger logr.Logger, binDataPath string, data map[string]string, dpu *configv1.DataProcessingUnit) error {
+func (r *DataProcessingUnitReconciler) applyVSPResourcesWithTracking(logger logr.Logger, binDataPath string, data map[string]string, owner client.Object, dpuName string) error {
 	// Get or create VSP resource renderer for this DataProcessingUnit
-	renderer, exists := r.vspResourceRenderers[dpu.Name]
+	renderer, exists := r.vspResourceRenderers[dpuName]
 	if !exists {
-		dpuKey := dpu.Name
+		dpuKey := dpuName
 		renderer = render.NewResourceRenderer(dpuKey)
-		r.vspResourceRenderers[dpu.Name] = renderer
+		r.vspResourceRenderers[dpuName] = renderer
 	}
 
-	return renderer.ApplyAllFromBinData(logger, binDataPath, data, dpuBinData, r.Client, dpu)
+	return renderer.ApplyAllFromBinData(logger, binDataPath, data, dpuBinData, r.Client, owner)
 }
 
 func (r *DataProcessingUnitReconciler) getVSPName(dpu *configv1.DataProcessingUnit) string {
@@ -241,6 +212,32 @@ func (r *DataProcessingUnitReconciler) getVSPImageForDPU(dpu *configv1.DataProce
 }
 
 // SetupWithManager sets up the controller with the Manager.
+func (r *DataProcessingUnitReconciler) handleDeletion(ctx context.Context, dpu *configv1.DataProcessingUnit) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Handling DataProcessingUnit deletion")
+
+	// Clean up VSP resources
+	if err := r.cleanupVSPResources(ctx, dpu, logger); err != nil {
+		logger.Error(err, "Failed to cleanup VSP resources")
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("Cleanup completed for DataProcessingUnit")
+	return ctrl.Result{}, nil
+}
+
+func (r *DataProcessingUnitReconciler) getSoleDpuOperatorConfig(ctx context.Context, namespace string) (*configv1.DpuOperatorConfig, error) {
+	dpuOperatorConfigList := &configv1.DpuOperatorConfigList{}
+	err := r.List(ctx, dpuOperatorConfigList, client.InNamespace(namespace))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list DpuOperatorConfig: %v", err)
+	}
+	if len(dpuOperatorConfigList.Items) == 0 {
+		return nil, fmt.Errorf("no DpuOperatorConfig found in namespace %s", namespace)
+	}
+	return &dpuOperatorConfigList.Items[0], nil
+}
+
 func (r *DataProcessingUnitReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&configv1.DataProcessingUnit{}).
