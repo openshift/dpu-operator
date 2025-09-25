@@ -29,6 +29,7 @@ RUN yum update -y \
        pciutils \
        iputils \
        iproute \
+       ethtool \
     && yum clean all \
     && rm -rf /var/cache/dnf
 
