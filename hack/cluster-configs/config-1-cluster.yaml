@@ -1,0 +1,42 @@
+clusters:
+  - name : "ocpcluster"
+    api_vip: "192.168.122.99"
+    ingress_vip: "192.168.122.101"
+    kubeconfig: "/root/kubeconfig.ocpcluster"
+    version: "4.19.0-nightly"
+    network_api_port: "{{api_network()}}"
+    postconfig:
+    - name: "dpu_operator_host"
+      dpu_operator_path: "../../"
+    - name: "monitoring_config"
+    masters:
+    - name: "{{cluster_name}}-master-1"
+      kind: "vm"
+      node: "localhost"
+      ip: "192.168.122.2"
+      disk_size: 32
+    - name: "{{cluster_name}}-master-2"
+      kind: "vm"
+      node: "localhost"
+      ip: "192.168.122.3"
+      disk_size: 32
+    - name: "{{cluster_name}}-master-3"
+      kind: "vm"
+      node: "localhost"
+      ip: "192.168.122.4"
+      disk_size: 32
+    workers:
+    - name: "worker-{{worker_number(0)}}"
+      kind: "physical"
+      node: "{{worker_name(0)}}" 
+      bmc:
+        user: "root"
+        password: "calvin"
+        url: "{{bmc(0)}}"
+    - name: "worker-{{worker_number(1)}}"
+      kind: "physical"
+      node: "{{worker_name(1)}}" 
+      bmc:
+        user: "root"
+        password: "0penBmc"
+        url: "{{bmc(1)}}"

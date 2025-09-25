@@ -1,6 +1,24 @@
 version: '3'
 
 tasks:
+  deploy-1-cluster:
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-1-cluster.yaml deploy
+
+  clean-1-cluster:
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-1-cluster.yaml deploy -f
+
   deploy-2-clusters:
     deps:
       - task: prepare-e2e-test

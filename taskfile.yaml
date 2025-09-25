@@ -150,6 +150,13 @@ tasks:
       - task: deploy-2-clusters
       - task: fast-e2e-test
 
+  e2e-test-1-cluster:
+    deps:
+      - task: kustomize
+    cmds:
+      - task: deploy-1-cluster
+      - task: fast-e2e-test
+
   fast-e2e-test:
     cmds:
       - task: redeploy
