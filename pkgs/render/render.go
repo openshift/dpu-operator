@@ -217,7 +217,7 @@ func (rr *ResourceRenderer) CleanupResourcesInReverseOrder(ctx context.Context, 
 			logger.Info("Initiated deletion of resource", "resourceKey", resourceKey)
 
 			// Wait for the resource to be actually deleted
-			waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+			waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 300*time.Second, true, func(ctx context.Context) (bool, error) {
 				checkObj := resource.DeepCopyObject().(client.Object)
 				err := c.Get(ctx, types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}, checkObj)
 				if apierrors.IsNotFound(err) {
