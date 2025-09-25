@@ -147,7 +147,7 @@ tasks:
     deps:
       - task: kustomize
     cmds:
-      - task: deploy-clusters
+      - task: deploy-2-clusters
       - task: fast-e2e-test
 
   fast-e2e-test:
