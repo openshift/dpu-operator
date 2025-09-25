@@ -78,6 +78,27 @@ func applyObjectFromBinData(logger logr.Logger, filePath string, data map[string
 		}
 	}
 	logger.Info("Preparing CR", "kind", obj.GetKind())
+
+	// Check if resource already exists first
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(obj.GroupVersionKind())
+	err = c.Get(context.TODO(), client.ObjectKey{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}, existing)
+
+	if err == nil {
+		// Resource exists, return it without trying to update
+		logger.Info("Resource already exists, skipping update", "kind", obj.GetKind(), "name", obj.GetName())
+		return existing, nil
+	} else if !apierrors.IsNotFound(err) {
+		logger.Error(err, "Failed to check existing resource", "kind", obj.GetKind(), "name", obj.GetName())
+		return nil, fmt.Errorf("failed to check existing resource: %v", err)
+	}
+
+	logger.Info("Resource does not exist, creating it", "kind", obj.GetKind(), "name", obj.GetName())
+
+	// Resource doesn't exist, apply it
 	if err := apply.ApplyObject(context.TODO(), c, obj); err != nil {
 		// When resources (for example the VSP) is deployed multiple times in the case of 1 cluster,
 		// we want to ignore already exists errors. Also handle conflict errors when resources are
