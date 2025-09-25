@@ -21,6 +21,7 @@ require (
 	github.com/openshift/dpu-operator/api v0.0.0-20250219232844-d9d4ba9f399c
 	github.com/openshift/dpu-operator/dpu-api v0.0.0-20241023094403-a185e0f16e84
 	github.com/opiproject/opi-api v0.0.0-20240808163627-6cd218088dda
+	github.com/safchain/ethtool v0.3.0
 	github.com/spf13/afero v1.12.0
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.1
@@ -177,7 +178,6 @@ require (
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sajari/fuzzy v1.0.0 // indirect
 	github.com/samber/lo v1.47.0 // indirect
