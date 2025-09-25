@@ -48,13 +48,14 @@ const (
 	DpuRpmDeviceID string = "a063"
 	NfName         string = "mrvl-nf1"
 	isNf           bool   = false
+	isMacLearning  bool   = true
 )
 
 // multiple dataplane can be added using mrvldp interface functions
 type mrvldp interface {
 	AddPortToDataPlane(bridgeName string, portName string, vfPCIAddres string, isDPDK bool) error
 	DeletePortFromDataPlane(bridgeName string, portName string) error
-	InitDataPlane(bridgeName string) error
+	InitDataPlane(bridgeName string, isMacLearning bool) error
 	ReadAllPortFromDataPlane(bridgeName string) (string, error)
 	DeleteDataplane(bridgeName string) error
 	AddFlowRuleToDataPlane(bridgeName string, inPort string, outPort string, dstMac string) error
@@ -270,7 +271,7 @@ func (vsp *mrvlVspServer) doInit(dpuMode bool) (*pb.IpPort, error) {
 		}
 		// Initialize Marvell Data Path
 		vsp.bridgeName = "br-mrv0" // TODO: example name discuss on it
-		if err := vsp.mrvlDP.InitDataPlane(vsp.bridgeName); err != nil {
+		if err := vsp.mrvlDP.InitDataPlane(vsp.bridgeName, isMacLearning); err != nil {
 			klog.Errorf("Error occurred in initializing Data Path: %v", err)
 			vsp.Stop()
 			return nil, err
@@ -297,6 +298,8 @@ func (vsp *mrvlVspServer) doInit(dpuMode bool) (*pb.IpPort, error) {
 // It will return the IpPort and error
 func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
 	klog.Infof("Received Init() request: DpuMode: %v", in.DpuMode)
+	// To set the isMacLearning variable from the InitRequest
+	// vsp.isMacLearning = in.IsMacLearning
 	result, err := vsp.doInit(in.DpuMode)
 	klog.Infof("Received Init() request done: DpuMode: %v, IpPort: %v, err: %v", in.DpuMode, result, err)
 	return result, err
