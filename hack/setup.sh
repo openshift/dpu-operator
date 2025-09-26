@@ -8,24 +8,23 @@ wait_for_dpu() {
     return 1
   fi
 
-  local start_time=$(date +%s)
+  echo "Checking for DPU resources..."
 
-  local dpu_name
-  while true; do
-    dpu_name=$(oc --kubeconfig "$kubeconfig_path" get dpu -o name 2>/dev/null | head -n 1)
-    if [[ -n "$dpu_name" ]]; then
-      echo -e "\nDPU resource found: $dpu_name"
-      break
-    fi
-    echo -n "."
-    sleep 1
-  done
+  # Check for DPU count immediately
+  local dpu_count
+  dpu_count=$(oc --kubeconfig "$kubeconfig_path" get dpu -o name 2>/dev/null | wc -l)
 
-  oc --kubeconfig "$kubeconfig_path" wait "$dpu_name" --for=condition=Ready=True --timeout=5m
+  if [[ "$dpu_count" -lt 1 ]]; then
+    echo "Error: No DPU resources found. Expected at least 1 DPU." >&2
+    return 1
+  fi
 
-  local end_time=$(date +%s)
-  local duration=$((end_time - start_time))
-  echo "Total wait time: ${duration} seconds."
+  echo "Found $dpu_count DPU resource(s)"
+
+  # Wait for all DPUs to be ready
+  oc --kubeconfig "$kubeconfig_path" wait dpu --all --for=condition=Ready=True --timeout=5m
+
+  echo "All DPU resources are ready."
 }
 
 KUBECONFIG=/root/kubeconfig.ocpcluster oc get nodes -l node-role.kubernetes.io/master!= -o jsonpath='{.items[*].metadata.name}' | KUBECONFIG=/root/kubeconfig.ocpcluster xargs -I {} oc label node {} dpu=true

@@ -27,6 +27,14 @@ spec:
         securityContext:
           privileged: true
         imagePullPolicy: {{.ImagePullPolicy}}
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 1
+          periodSeconds: 2
+          timeoutSeconds: 1
+          failureThreshold: 2
         env:
         - name: POD_NAME
           valueFrom:

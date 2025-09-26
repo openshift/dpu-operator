@@ -27,9 +27,11 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -256,15 +258,75 @@ func (r *DpuOperatorConfigReconciler) updateStatus(ctx context.Context, dpuOpera
 		return firstError.err
 	}
 
-	// All components reconciled successfully
-	logger.Info("All components reconciled successfully, setting Ready condition to True")
-	r.setReadyCondition(dpuOperatorConfig, metav1.ConditionTrue, "ComponentsReady", "All DPU operator components deployed successfully")
+	// All components reconciled successfully, now check if daemons are actually ready
+	logger.Info("All components reconciled successfully, checking daemon readiness")
+
+	daemonReady, message, err := r.checkDaemonSetReady(ctx, dpuOperatorConfig)
+	if err != nil {
+		logger.Error(err, "Failed to check DaemonSet readiness")
+		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionFalse, "DaemonSetCheckError", err.Error())
+		if updateErr := r.Status().Update(ctx, dpuOperatorConfig); updateErr != nil {
+			logger.Error(updateErr, "Failed to update status with daemon check error")
+			return updateErr
+		}
+		return err
+	}
+
+	if !daemonReady {
+		logger.Info("DaemonSet not ready yet", "message", message)
+		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionFalse, "DaemonSetNotReady", message)
+		if updateErr := r.Status().Update(ctx, dpuOperatorConfig); updateErr != nil {
+			logger.Error(updateErr, "Failed to update status with daemon not ready")
+			return updateErr
+		}
+		return nil // Not an error, just not ready yet
+	}
+
+	// All components deployed and daemons are ready
+	logger.Info("All components deployed and daemons are ready, setting Ready condition to True")
+	r.setReadyCondition(dpuOperatorConfig, metav1.ConditionTrue, "ComponentsReady", "All DPU operator components deployed and daemons are ready")
 	if updateErr := r.Status().Update(ctx, dpuOperatorConfig); updateErr != nil {
 		logger.Error(updateErr, "Failed to update status with ready condition")
 		return updateErr
 	}
 
 	return nil
+}
+
+// checkDaemonSetReady checks if the DPU daemon DaemonSet is ready with all pods running and ready
+func (r *DpuOperatorConfigReconciler) checkDaemonSetReady(ctx context.Context, dpuOperatorConfig *configv1.DpuOperatorConfig) (bool, string, error) {
+	logger := log.FromContext(ctx)
+
+	// Get the DaemonSet
+	daemonSet := &appsv1.DaemonSet{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      "dpu-daemon",
+		Namespace: dpuOperatorConfig.Namespace,
+	}, daemonSet)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, "DaemonSet not found", nil
+		}
+		return false, "Error getting DaemonSet", err
+	}
+
+	// Check DaemonSet status
+	desired := daemonSet.Status.DesiredNumberScheduled
+	ready := daemonSet.Status.NumberReady
+
+	logger.Info("DaemonSet status", "desired", desired, "ready", ready)
+
+	if desired == 0 {
+		return false, "No DPU nodes found (DesiredNumberScheduled=0)", nil
+	}
+
+	if ready < desired {
+		return false, fmt.Sprintf("DaemonSet not ready: %d/%d pods ready", ready, desired), nil
+	}
+
+	// All pods are ready
+	return true, fmt.Sprintf("DaemonSet ready: %d/%d pods ready", ready, desired), nil
 }
 
 func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -55,6 +57,7 @@ type Daemon struct {
 	dpuDetectorManger *platform.DpuDetectorManager
 	managedDpus       map[string]*ManagedDpu
 	nodeName          string
+	detectionRunOnce  int32 // atomic flag to track if detection loop has run at least once
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
@@ -117,93 +120,25 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	managerCtx, cancelManagers := context.WithCancel(ctx)
 	defer cancelManagers()
 
+	// Start readiness probe server
+	readinessDone := make(chan struct{})
+	managerDone = append(managerDone, readinessDone)
+	go func() {
+		defer close(readinessDone)
+		d.runReadinessServer(managerCtx, errChan)
+	}()
+
 	d.log.Info("Entering main daemon loop")
+
+	// Run detection immediately on startup
+	if err := d.runDetectionCycle(managerCtx, &managerDone, errChan); err != nil {
+		return err
+	}
 
 	for {
 		select {
 		case <-ticker.C:
-			detectedDpusList, err := d.dpuDetectorManger.DetectAll(d.imageManager, d.client, *d.pm, d.nodeName)
-			if err != nil {
-				d.log.Error(err, "Got error while detecting DPUs")
-				return err
-			}
-
-			// Update managed DPUs with newly detected ones
-			d.updateManagedDpus(detectedDpusList)
-
-			if len(d.managedDpus) > 1 {
-				var keys []string
-				for key := range d.managedDpus {
-					keys = append(keys, key)
-				}
-				err := fmt.Errorf("Detected %d DPUs, but only one is currently supported", len(d.managedDpus))
-				d.log.Error(err, "Got error while detecting DPUs", "dpuKeys", keys)
-				return err
-			}
-
-			// Create managers for DPUs that don't have them yet
-			for identifier, managedDpu := range d.managedDpus {
-				if managedDpu.Manager == nil {
-					sideManager, err := d.createSideManager(managedDpu.DpuCR, managedDpu.Plugin)
-					if err != nil {
-						d.log.Error(err, "Got error while creating side manager")
-						return err
-					}
-
-					// Store the manager in the ManagedDpu
-					managedDpu.Manager = sideManager
-					d.managers = append(d.managers, sideManager)
-
-					done := make(chan struct{})
-					managerDone = append(managerDone, done)
-					go func(mgr SideManager, identifier string, doneChannel chan struct{}) {
-						defer close(doneChannel)
-						err := d.runSideManager(mgr, identifier, managerCtx)
-						if err != nil {
-							select {
-							case errChan <- err:
-							default:
-							}
-						}
-					}(sideManager, identifier, done)
-				}
-			}
-
-			for _, managedDpu := range d.managedDpus {
-				var newCondition metav1.Condition
-				if managedDpu.Plugin.IsInitialized() {
-					newCondition = metav1.Condition{
-						Type:    plugin.ReadyConditionType,
-						Status:  metav1.ConditionTrue,
-						Reason:  "Initialized",
-						Message: "DPU plugin is initialized and ready.",
-					}
-				} else {
-					newCondition = metav1.Condition{
-						Type:    plugin.ReadyConditionType,
-						Status:  metav1.ConditionFalse,
-						Reason:  "NotInitialized",
-						Message: "DPU plugin is not yet initialized.",
-					}
-				}
-				// Always set a transition time
-				newCondition.LastTransitionTime = metav1.Now()
-
-				// Use the helper to add or update the condition
-				meta.SetStatusCondition(&managedDpu.DpuCR.Status.Conditions, newCondition)
-			}
-
-			// Sync DPU CRs with the current state
-			err = d.SyncDpuCRs()
-			if err != nil {
-				d.log.Error(err, "Failed to sync DPU CRs")
-				return err
-			}
-
-			// Update node labels based on detected DPUs
-			err = d.updateNodeLabels()
-			if err != nil {
-				d.log.Error(err, "Failed to update node labels")
+			if err := d.runDetectionCycle(managerCtx, &managerDone, errChan); err != nil {
 				return err
 			}
 		case err := <-errChan:
@@ -532,4 +467,158 @@ func (d *Daemon) setOwnerReference(dpuCR *configv1.DataProcessingUnit) error {
 	}
 
 	return nil
+}
+
+// setDetectionRunOnce marks that detection has completed successfully at least once
+func (d *Daemon) setDetectionRunOnce(completed bool) {
+	var value int32
+	if completed {
+		value = 1
+	}
+	atomic.StoreInt32(&d.detectionRunOnce, value)
+}
+
+// hasDetectionRunOnce returns true if detection has completed successfully at least once
+func (d *Daemon) hasDetectionRunOnce() bool {
+	return atomic.LoadInt32(&d.detectionRunOnce) == 1
+}
+
+// runDetectionCycle runs a single detection cycle
+func (d *Daemon) runDetectionCycle(managerCtx context.Context, managerDone *[]chan struct{}, errChan chan error) error {
+	detectedDpusList, err := d.dpuDetectorManger.DetectAll(d.imageManager, d.client, *d.pm, d.nodeName)
+	if err != nil {
+		d.log.Error(err, "Got error while detecting DPUs")
+		return err
+	}
+
+	// Update managed DPUs with newly detected ones
+	d.updateManagedDpus(detectedDpusList)
+
+	if len(d.managedDpus) > 1 {
+		var keys []string
+		for key := range d.managedDpus {
+			keys = append(keys, key)
+		}
+		err := fmt.Errorf("Detected %d DPUs, but only one is currently supported", len(d.managedDpus))
+		d.log.Error(err, "Got error while detecting DPUs", "dpuKeys", keys)
+		return err
+	}
+
+	// Create managers for DPUs that don't have them yet
+	for identifier, managedDpu := range d.managedDpus {
+		if managedDpu.Manager == nil {
+			sideManager, err := d.createSideManager(managedDpu.DpuCR, managedDpu.Plugin)
+			if err != nil {
+				d.log.Error(err, "Got error while creating side manager")
+				return err
+			}
+
+			// Store the manager in the ManagedDpu
+			managedDpu.Manager = sideManager
+			d.managers = append(d.managers, sideManager)
+
+			done := make(chan struct{})
+			*managerDone = append(*managerDone, done)
+			go func(mgr SideManager, identifier string, doneChannel chan struct{}) {
+				defer close(doneChannel)
+				err := d.runSideManager(mgr, identifier, managerCtx)
+				if err != nil {
+					select {
+					case errChan <- err:
+					default:
+					}
+				}
+			}(sideManager, identifier, done)
+		}
+	}
+
+	// Update DPU conditions
+	for _, managedDpu := range d.managedDpus {
+		var newCondition metav1.Condition
+		if managedDpu.Plugin.IsInitialized() {
+			newCondition = metav1.Condition{
+				Type:    plugin.ReadyConditionType,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Initialized",
+				Message: "DPU plugin is initialized and ready.",
+			}
+		} else {
+			newCondition = metav1.Condition{
+				Type:    plugin.ReadyConditionType,
+				Status:  metav1.ConditionFalse,
+				Reason:  "NotInitialized",
+				Message: "DPU plugin is not yet initialized.",
+			}
+		}
+		// Always set a transition time
+		newCondition.LastTransitionTime = metav1.Now()
+
+		// Use the helper to add or update the condition
+		meta.SetStatusCondition(&managedDpu.DpuCR.Status.Conditions, newCondition)
+	}
+
+	// Sync DPU CRs with the current state
+	err = d.SyncDpuCRs()
+	if err != nil {
+		d.log.Error(err, "Failed to sync DPU CRs")
+		return err
+	}
+
+	// Update node labels based on detected DPUs
+	err = d.updateNodeLabels()
+	if err != nil {
+		d.log.Error(err, "Failed to update node labels")
+		return err
+	}
+
+	// Mark that detection has completed successfully (after all syncing is done)
+	d.setDetectionRunOnce(true)
+
+	return nil
+}
+
+// runReadinessServer runs the HTTP server for readiness probe following the same pattern as other managers
+func (d *Daemon) runReadinessServer(ctx context.Context, errChan chan error) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/readyz", d.readinessHandler)
+
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	d.log.Info("Starting readiness probe server on port 8080")
+
+	// Start server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			d.log.Error(err, "Failed to start readiness probe server")
+			select {
+			case errChan <- err:
+			default:
+			}
+		}
+	}()
+
+	// Handle context cancellation
+	<-ctx.Done()
+	d.log.Info("Shutting down readiness probe server")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		d.log.Error(err, "Failed to shutdown readiness probe server gracefully")
+	}
+}
+
+// readinessHandler handles the readiness probe endpoint
+func (d *Daemon) readinessHandler(w http.ResponseWriter, r *http.Request) {
+	if d.hasDetectionRunOnce() {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ready"))
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("not ready - detection and sync not completed yet"))
+	}
 }
