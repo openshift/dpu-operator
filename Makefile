@@ -100,8 +100,8 @@ manifests:
 	go run tools/task/task.go manifests
 
 .PHONY: prow-ci-manifests-check
-prow-ci-manifests-check: manifests
-	go run tools/task/task.go prow-ci-manifests-check
+prow-ci-manifests-check:
+	go run tools/task/task.go check-manifests
 
 # TODO: Remove when CI uses go-task instead
 .PHONY: vendor
@@ -115,13 +115,13 @@ generate:
 
 # TODO: Remove when CI uses go-task instead
 .PHONY: generate-check
-generate-check: controller-gen
-	./scripts/check-gittree-for-diff.sh make generate
+generate-check:
+	go run tools/task/task.go check-generate
 
 # TODO: Remove when CI uses go-task instead
 .PHONY: vendor-check
 vendor-check:
-	./scripts/check-gittree-for-diff.sh make vendor
+	go run tools/task/task.go check-vendor
 
 # TODO: Remove when CI uses go-task instead
 .PHONY: fmt
@@ -131,7 +131,7 @@ fmt: ## Run go fmt against code.
 # TODO: Remove when CI uses go-task instead
 .PHONY: fmt-check
 fmt-check:
-	go run tools/task/task.go fmt-check
+	go run tools/task/task.go check-fmt
 
 # TODO: Remove when CI uses go-task instead
 .PHONY: vet
@@ -215,28 +215,12 @@ operator-sdk:
 	go run tools/task/task.go operator-sdk
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
-	$(OPERATOR_SDK) bundle validate ./bundle
-	cp bundle/manifests/* manifests/stable
+bundle:
+	go run tools/task/task.go bundle
 
-.PHONY: prow-ci-bundle-check
-prow-ci-bundle-check: bundle
-	@changed_files=$$(git diff --name-only); \
-	non_timestamp_change=0; \
-	for file in $$changed_files; do \
-		diff_output=$$(git diff -U0 -- $$file); \
-		if echo "$$diff_output" | grep '^[+-]' | grep -Ev '^(--- a/|\+\+\+ b/)' | grep -v "createdAt" | grep -q "."; then \
-			echo "$$diff_output"; \
-			non_timestamp_change=1; \
-		fi; \
-	done; \
-	if [ $$non_timestamp_change -ne 0 ]; then \
-		echo "Please run 'make bundle', detected non timestamp changes"; \
-		exit 1; \
-	fi
+.PHONY: bundle-check
+bundle-check:
+	go run tools/task/task.go check-bundle
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

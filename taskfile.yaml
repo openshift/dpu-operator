@@ -41,6 +41,9 @@ includes:
   proto:
     taskfile: ./taskfiles/proto.yaml
     flatten: true
+  check:
+    taskfile: ./taskfiles/check.yaml
+    flatten: true
   
 tasks:
   bindir:
@@ -185,16 +188,6 @@ tasks:
       - task: undeploy
       - task: deploy
 
-  podman-check:
-    cmds:
-      - |
-        if which podman > /dev/null; then
-          echo "Podman is available"
-        else
-          echo "Error: Podman is not available"
-          exit 1
-        fi
-
   ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
   manifests:
     deps:
@@ -202,18 +195,17 @@ tasks:
     cmds:
       - GOFLAGS='' {{.BINDIR}}/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-  prow-ci-manifests-check:
+  bundle:
+    deps:
+      - task: manifests
+      - task: kustomize
+      - task: operator-sdk
     cmds:
-      - |
-        changed_files=$(git diff --name-only)
-        for file in $changed_files; do
-          diff_output=$(git diff -- $file)
-          echo "$diff_output"
-        done
-        if [ -n "$changed_files" ]; then
-          echo "Please run 'make manifests', the following files changed: $changed_files"
-          exit 1
-        fi
+      - "{{.BINDIR}}/operator-sdk generate kustomize manifests -q"
+      - cd config/manager && ../../{{.BINDIR}}/kustomize edit set image controller=${IMG:-controller:latest}
+      - "{{.BINDIR}}/kustomize build config/manifests | {{.BINDIR}}/operator-sdk generate bundle -q --overwrite --version ${VERSION:-4.20.0}"
+      - "{{.BINDIR}}/operator-sdk bundle validate ./bundle"
+      - cp bundle/manifests/* manifests/stable
 
   ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
   generate:
@@ -231,14 +223,6 @@ tasks:
     cmds:
       - go fmt ./...
       - cd api && go fmt ./...
-
-  fmt-check:
-    cmds:
-      - |
-        files=$(find . -name "*.go" -not -path "./vendor/*" -not -path "./dpu-api/vendor/*")
-        output=$(gofmt -d $files)
-        [ -n "$output" ] && echo "$output"
-        [ -z "$output" ]
 
   vet:
     cmds:

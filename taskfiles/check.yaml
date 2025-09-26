@@ -1,0 +1,96 @@
+version: '3'
+
+tasks:
+  check-gittree-for-diff:
+    vars:
+      TASK_NAME: '{{.CLI_ARGS | default "echo"}}'
+    cmds:
+      - |
+        # Copy to temp directory and run task there, then compare
+        DIR="$(mktemp -t -d dpu-operator-check-gittree-for-diff.XXXX)"
+        echo "Copying current state to temp directory: $DIR"
+        cp -ar ./ "$DIR/"
+
+        echo "Running 'task {{.TASK_NAME}}' in temp directory: $DIR"
+        pushd "$DIR/" 1>/dev/null
+        go run tools/task/task.go {{.TASK_NAME}}
+        popd 1>/dev/null
+
+        # Check for differences (excluding bin/ directory)
+        if ! diff -r --exclude=bin . "$DIR/" > /dev/null 2>&1; then
+          echo "There are differences after running 'task {{.TASK_NAME}}':"
+          diff -r --exclude=bin . "$DIR/" || true
+          rm -rf "$DIR/"
+          exit 1
+        fi
+
+        # Clean up
+        rm -rf "$DIR/"
+        echo "Check passed - no differences found after running 'task {{.TASK_NAME}}'"
+
+  check-generate:
+    deps:
+      - task: controller-gen
+    cmds:
+      - task: check-gittree-for-diff
+        vars:
+          CLI_ARGS: "generate"
+
+  check-vendor:
+    cmds:
+      - task: check-gittree-for-diff
+        vars:
+          CLI_ARGS: "vendor"
+
+  check-bundle:
+    cmds:
+      - task: bundle
+      - |
+        # Restore original createdAt timestamps from git diff to avoid timestamp-only changes
+        echo "Checking for timestamp-only changes in CSV files..."
+        git diff --name-only | while read file; do
+          if echo "$file" | grep -q "dpu-operator.clusterserviceversion.yaml"; then
+            echo "Processing $file for timestamp restoration..."
+            original_timestamp=$(git diff "$file" | grep "^-.*createdAt:" | sed 's/^-.*createdAt: "//' | sed 's/".*//')
+            if [ -n "$original_timestamp" ]; then
+              echo "Restoring original timestamp: $original_timestamp"
+              sed -i "s/createdAt: \".*\"/createdAt: \"$original_timestamp\"/" "$file"
+            else
+              echo "No original timestamp found for $file"
+            fi
+          fi
+        done
+        echo "Timestamp restoration completed."
+      - task: clean-repo-check
+
+  podman-check:
+    cmds:
+      - |
+        if which podman > /dev/null; then
+          echo "Podman is available"
+        else
+          echo "Error: Podman is not available"
+          exit 1
+        fi
+
+  check-fmt:
+    cmds:
+      - |
+        files=$(find . -name "*.go" -not -path "./vendor/*" -not -path "./dpu-api/vendor/*")
+        output=$(gofmt -d $files)
+        [ -n "$output" ] && echo "$output"
+        [ -z "$output" ]
+
+  check-manifests:
+    cmds:
+      - task: check-gittree-for-diff
+        vars:
+          CLI_ARGS: "manifests"
+
+  check:
+    cmds:
+      - task: check-fmt
+      - task: check-vendor
+      - task: check-bundle
+      - task: check-manifests
+      - task: check-generate
