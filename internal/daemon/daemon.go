@@ -34,6 +34,7 @@ type SideManager interface {
 	SetupDevices() error
 	Listen() (net.Listener, error)
 	Serve(ctx context.Context, listen net.Listener) error
+	CheckPing() bool
 }
 
 // ManagedDpu represents a DPU with all its runtime state and management components
@@ -172,11 +173,20 @@ func (d *Daemon) Serve(ctx context.Context) error {
 			for _, managedDpu := range d.managedDpus {
 				var newCondition metav1.Condition
 				if managedDpu.Plugin.IsInitialized() {
-					newCondition = metav1.Condition{
-						Type:    plugin.ReadyConditionType,
-						Status:  metav1.ConditionTrue,
-						Reason:  "Initialized",
-						Message: "DPU plugin is initialized and ready.",
+					if managedDpu.Manager.CheckPing() {
+						newCondition = metav1.Condition{
+							Type:    plugin.ReadyConditionType,
+							Status:  metav1.ConditionTrue,
+							Reason:  "Initialized",
+							Message: "DPU plugin is initialized and ping successful.",
+						}
+					} else {
+						newCondition = metav1.Condition{
+							Type:    plugin.ReadyConditionType,
+							Status:  metav1.ConditionFalse,
+							Reason:  "PingFailed",
+							Message: "DPU plugin is initialized but ping failed.",
+						}
 					}
 				} else {
 					newCondition = metav1.Condition{

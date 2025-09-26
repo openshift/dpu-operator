@@ -52,3 +52,18 @@ message Device {
 message DeviceListResponse {
   map<string, Device> devices = 1;
 }
+
+service HeartbeatService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {
+  int64 timestamp = 1;
+  string sender_id = 2;
+}
+
+message PingResponse {
+  int64 timestamp = 1;
+  string responder_id = 2;
+  bool healthy = 3;
+}
