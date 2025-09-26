@@ -19,6 +19,7 @@ import (
 	ovsdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/ovs-dp"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	"github.com/safchain/ethtool"
 	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap/zapcore"
@@ -117,6 +118,12 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 		peerLink, _ = netlink.LinkByName(dpInterfaceName)
 	}
 
+	eth_handle, err := ethtool.NewEthtool()
+	if err != nil {
+		return err
+	}
+	defer eth_handle.Close()
+
 	if nfLink == nil || peerLink == nil {
 		vethLink := &netlink.Veth{
 			LinkAttrs: netlink.LinkAttrs{Name: secInterfaceName},
@@ -130,6 +137,31 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 			return err
 		}
 		peerLink, err = netlink.LinkByName(dpInterfaceName)
+		if err != nil {
+			return err
+		}
+
+		/* We will attach the veth pair to the OVS bridge. Veth pairs don't offload the
+		 * calculation of the checksum, and neither will the OVS bridge fill in the
+		 * checksum. The result is a broken checksum. Disable offloading.
+		 *
+		 * This might be a SDP driver problem, because Phantomlake has a similar setup
+		 * with veth interfaces and OVS and does not have this problem. So this may be
+		 * only a workaround.
+		 *
+		 * Also enable "rx" offloading, although, that may not be required (but is
+		 * probably harmless anyway). */
+		err = eth_handle.Change(secInterfaceName, map[string]bool{
+			"tx": false,
+			"rx": false,
+		})
+		if err != nil {
+			return err
+		}
+		err = eth_handle.Change(dpInterfaceName, map[string]bool{
+			"tx": false,
+			"rx": false,
+		})
 		if err != nil {
 			return err
 		}
