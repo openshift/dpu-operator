@@ -37,3 +37,12 @@ tasks:
       GOARCH: '{{.GOARCH}}'
     cmds:
       - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/nri.{{.GOARCH}} cmd/nri/networkresourcesinjector.go
+
+  build-bin-all:
+    deps:
+      - build-bin-manager
+      - build-bin-daemon
+      - build-bin-intel-vsp
+      - build-bin-marvell-vsp
+      - build-bin-intel-netsec-vsp
+      - build-bin-network-resources-injector
