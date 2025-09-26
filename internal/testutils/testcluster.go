@@ -683,35 +683,60 @@ func EventuallyDpuOperatorConfigReady(c client.Client, logger logr.Logger, cr *c
 	return dpuOperatorConfig
 }
 
-func EventuallyDpuOperatorConfigDeleted(c client.Client, name string, namespace string, timeout time.Duration, interval time.Duration) {
+func EventuallyNoDpuOperatorConfig(c client.Client, timeout time.Duration, interval time.Duration) {
+	formatCRDetails := func(cr configv1.DpuOperatorConfig) string {
+		detail := fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if len(cr.Finalizers) > 0 {
+			detail += fmt.Sprintf(" (finalizers: %v)", cr.Finalizers)
+		}
+		if cr.DeletionTimestamp != nil {
+			detail += fmt.Sprintf(" (deletion started: %v)", cr.DeletionTimestamp)
+		}
+		return detail
+	}
+
 	onFailure := func() {
-		fmt.Println(LogDpuOperatorConfigDiagnostics(c, name))
+		crList := &configv1.DpuOperatorConfigList{}
+		err := c.List(context.Background(), crList)
+		if err != nil {
+			fmt.Printf("Failed to list DpuOperatorConfigs for diagnostics: %v\n", err)
+			return
+		}
+		if len(crList.Items) > 0 {
+			fmt.Printf("Found %d DpuOperatorConfig CRs:\n", len(crList.Items))
+			for _, cr := range crList.Items {
+				fmt.Printf("  - %s\n", formatCRDetails(cr))
+				fmt.Println(LogDpuOperatorConfigDiagnostics(c, cr.Name))
+			}
+		}
 	}
 
 	startTime := time.Now()
 
 	AssertEventually(
 		func() error {
-			dpuConfig := &configv1.DpuOperatorConfig{}
-			err := c.Get(context.Background(), types.NamespacedName{
-				Name:      name,
-				Namespace: namespace,
-			}, dpuConfig)
-			if errors.IsNotFound(err) {
-				return nil
-			}
+			crList := &configv1.DpuOperatorConfigList{}
+			err := c.List(context.Background(), crList)
 			if err != nil {
-				return fmt.Errorf("error checking DpuOperatorConfig %s in %s: %v", name, namespace, err)
+				return fmt.Errorf("failed to list DpuOperatorConfigs: %v", err)
 			}
-			return fmt.Errorf("DpuOperatorConfig %s in %s still exists", name, namespace)
+
+			if len(crList.Items) > 0 {
+				var details []string
+				for _, cr := range crList.Items {
+					details = append(details, formatCRDetails(cr))
+				}
+				return fmt.Errorf("found %d DpuOperatorConfig CRs still present: %v", len(crList.Items), details)
+			}
+			return nil
 		},
 		timeout,
 		interval,
-		5*timeout,
-		fmt.Sprintf("have DpuOperatorConfig %v in %v deleted", name, namespace),
+		timeout,
+		"have no DpuOperatorConfig CRs present",
 		onFailure,
 		onFailure)
 
-	deletedTime := time.Now()
-	fmt.Printf("DpuOperatorConfig '%s' deleted after %v\n", name, deletedTime.Sub(startTime))
+	cleanupTime := time.Now()
+	fmt.Printf("All DpuOperatorConfigs cleaned up after %v\n", cleanupTime.Sub(startTime))
 }

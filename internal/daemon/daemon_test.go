@@ -188,6 +188,7 @@ var _ = g.Describe("Full Daemon", func() {
 		dpuOperatorConfig := testutils.DpuOperatorCR(vars.DpuOperatorConfigName, namespace)
 		klog.Infof("Deleting DpuOperatorConfig: %s", vars.DpuOperatorConfigName)
 		testutils.DeleteDpuOperatorCR(k8sClient, dpuOperatorConfig)
+		testutils.EventuallyNoDpuOperatorConfig(k8sClient, testutils.TestAPITimeout*2, testutils.TestRetryInterval)
 		klog.Infof("Deleting namespace: %s", namespace.Name)
 		testutils.DeleteNamespace(k8sClient, namespace)
 
