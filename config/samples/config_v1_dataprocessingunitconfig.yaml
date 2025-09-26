@@ -1,0 +1,9 @@
+apiVersion: config.openshift.io/v1
+kind: DataProcessingUnitConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: dpu-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: dataprocessingunitconfig-sample
+spec:
+  # TODO(user): Add fields here
