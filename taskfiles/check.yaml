@@ -16,10 +16,10 @@ tasks:
         go run tools/task/task.go {{.TASK_NAME}}
         popd 1>/dev/null
 
-        # Check for differences
-        if ! diff -r . "$DIR/" > /dev/null 2>&1; then
+        # Check for differences (excluding bin/ directory)
+        if ! diff -r --exclude=bin . "$DIR/" > /dev/null 2>&1; then
           echo "There are differences after running 'task {{.TASK_NAME}}':"
-          diff -r . "$DIR/" || true
+          diff -r --exclude=bin . "$DIR/" || true
           rm -rf "$DIR/"
           exit 1
         fi
