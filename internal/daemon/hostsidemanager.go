@@ -256,6 +256,22 @@ func (d *HostSideManager) Ping() bool {
 	return true
 }
 
+func (d *HostSideManager) StartPing(ctx context.Context) error {
+	d.log.Info("Starting ping client")
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			d.Ping()
+		case <-ctx.Done():
+			d.log.Info("Stopped ping client")
+			return ctx.Err()
+		}
+	}
+}
+
 func (d *HostSideManager) CheckPing() bool {
 	// Check if last successful ping was within 5 seconds
 	d.pingMutex.RLock()
@@ -358,20 +374,12 @@ func (d *HostSideManager) Serve(ctx context.Context, listener net.Listener) erro
 
 	wg.Add(1)
 	go func() {
-		d.log.Info("Starting ping client")
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
-		defer wg.Done()
-
-		for {
-			select {
-			case <-ticker.C:
-				d.Ping()
-			case <-ctx.Done():
-				d.log.Info("Stopped ping client")
-				return
-			}
+		if err := d.StartPing(ctx); err != nil {
+			done <- err
+		} else {
+			done <- nil
 		}
+		wg.Done()
 	}()
 
 	// Block on any go routines writing to the done channel when an error occurs or they
