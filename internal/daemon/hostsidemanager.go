@@ -221,6 +221,18 @@ func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Re
 	return nil, nil
 }
 
+func (d *HostSideManager) setPing(ping time.Time) {
+	d.pingMutex.Lock()
+	d.lastSuccessfulPing = ping
+	d.pingMutex.Unlock()
+}
+
+func (d *HostSideManager) getPing() time.Time {
+	d.pingMutex.RLock()
+	defer d.pingMutex.RUnlock()
+	return d.lastSuccessfulPing
+}
+
 func (d *HostSideManager) Ping() bool {
 	err := d.connectWithRetry()
 	if err != nil {
@@ -248,9 +260,7 @@ func (d *HostSideManager) Ping() bool {
 	}
 
 	// Record successful ping
-	d.pingMutex.Lock()
-	d.lastSuccessfulPing = time.Now()
-	d.pingMutex.Unlock()
+	d.setPing(time.Now())
 
 	d.log.V(1).Info("Ping successful")
 	return true
@@ -274,9 +284,7 @@ func (d *HostSideManager) StartPing(ctx context.Context) error {
 
 func (d *HostSideManager) CheckPing() bool {
 	// Check if last successful ping was within 5 seconds
-	d.pingMutex.RLock()
-	lastPing := d.lastSuccessfulPing
-	d.pingMutex.RUnlock()
+	lastPing := d.getPing()
 
 	// If we never had a successful ping, return false
 	if lastPing.IsZero() {

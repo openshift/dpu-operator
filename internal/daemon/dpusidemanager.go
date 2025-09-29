@@ -62,13 +62,23 @@ func (s *DpuSideManager) DeleteBridgePort(context context.Context, bpr *pb.Delet
 	return &emptypb.Empty{}, err
 }
 
+func (s *DpuSideManager) setPing(ping time.Time) {
+	s.pingMutex.Lock()
+	s.lastPingTime = ping
+	s.pingMutex.Unlock()
+}
+
+func (s *DpuSideManager) getPing() time.Time {
+	s.pingMutex.RLock()
+	defer s.pingMutex.RUnlock()
+	return s.lastPingTime
+}
+
 func (s *DpuSideManager) Ping(ctx context.Context, req *pb2.PingRequest) (*pb2.PingResponse, error) {
 	s.log.V(1).Info("Received heartbeat ping", "from", req.SenderId, "timestamp", req.Timestamp)
 
 	// Record the time we received this ping
-	s.pingMutex.Lock()
-	s.lastPingTime = time.Now()
-	s.pingMutex.Unlock()
+	s.setPing(time.Now())
 
 	return &pb2.PingResponse{
 		Timestamp:   time.Now().UnixNano(),
@@ -79,9 +89,7 @@ func (s *DpuSideManager) Ping(ctx context.Context, req *pb2.PingRequest) (*pb2.P
 
 func (s *DpuSideManager) CheckPing() bool {
 	// Check if we received a ping from the host within the last minute
-	s.pingMutex.RLock()
-	lastPing := s.lastPingTime
-	s.pingMutex.RUnlock()
+	lastPing := s.getPing()
 
 	// If we never received a ping, return false
 	if lastPing.IsZero() {
