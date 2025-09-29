@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/4.20:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
 
 ARG P4_NAME=fxp-net_linux-networking
 ENV P4_NAME $P4_NAME
