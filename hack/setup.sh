@@ -8,8 +8,8 @@
 K8S_CLI="${K8S_CLI:-oc}"
 
 # Kubeconfig file paths
-KUBECONFIG_OCP="/root/kubeconfig.ocpcluster"
-KUBECONFIG_MICROSHIFT="/root/kubeconfig.microshift"
+KUBECONFIG_OCP="${KUBECONFIG_HOST:-/root/kubeconfig.ocpcluster}"
+KUBECONFIG_MICROSHIFT="${KUBECONFIG_DPU:-/root/kubeconfig.microshift}"
 
 # ------------------------------------------------------------------------------
 # Functions

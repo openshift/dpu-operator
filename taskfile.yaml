@@ -24,6 +24,8 @@ vars:
   SETUP_ENVTEST_VERSION: release-0.16
   OPERATOR_SDK_VERSION: v1.37.0
   OPM_VERSION: v1.23.0
+  KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
+  KUBECONFIG_DPU: "/root/kubeconfig.microshift"
 
 includes:
   images:
@@ -73,9 +75,6 @@ tasks:
       - echo "Namespace 'openshift-dpu-operator' has been removed."
 
   undeploy:
-    vars:
-      KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
-      KUBECONFIG_DPU: "/root/kubeconfig.microshift"
     deps:
       - task: undeploy-helper
         vars:
@@ -85,8 +84,6 @@ tasks:
           KUBECONFIG: '{{.KUBECONFIG_HOST}}'
 
   undeploy-1c:
-    vars:
-      KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
     deps:
       - task: undeploy-helper
         vars:
@@ -118,12 +115,12 @@ tasks:
     cmds:
       - task: undeploy
         vars:
-          KUBECONFIG_DPU: "/root/kubeconfig.microshift"
-          KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
-      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.microshift" oc apply -f -
-      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
-      - KUBECONFIG="/root/kubeconfig.microshift" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
-      - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+          KUBECONFIG_DPU: "{{.KUBECONFIG_DPU}}"
+          KUBECONFIG_HOST: "{{.KUBECONFIG_HOST}}"
+      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_DPU}}" oc apply -f -
+      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_HOST}}" oc apply -f -
+      - KUBECONFIG="{{.KUBECONFIG_DPU}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+      - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
   deploy-1c:
     deps:
@@ -131,9 +128,9 @@ tasks:
     cmds:
       - task: undeploy-1c
         vars:
-          KUBECONFIG_HOST: "/root/kubeconfig.ocpcluster"
-      - bin/kustomize build bin | KUBECONFIG="/root/kubeconfig.ocpcluster" oc apply -f -
-      - KUBECONFIG="/root/kubeconfig.ocpcluster" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+          KUBECONFIG_HOST: "{{.KUBECONFIG_HOST}}"
+      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_HOST}}" oc apply -f -
+      - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
   prepare-e2e-test:
     cmds:
@@ -160,7 +157,7 @@ tasks:
   fast-e2e-test:
     cmds:
       - task: redeploy
-      - sh hack/setup.sh
+      - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} KUBECONFIG_DPU={{.KUBECONFIG_DPU}} sh hack/setup.sh
       - task: run-e2e-test
 
   run-e2e-test:
