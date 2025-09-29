@@ -33,19 +33,22 @@ import (
 type DpuSideManager struct {
 	pb.UnimplementedBridgePortServiceServer
 	pb2.UnimplementedDeviceServiceServer
+	pb2.UnimplementedHeartbeatServiceServer
 
-	vsp         plugin.VendorPlugin
-	dp          deviceplugin.DevicePlugin
-	addr        string
-	port        int32
-	log         logr.Logger
-	server      *grpc.Server
-	cniserver   *cniserver.Server
-	manager     ctrl.Manager
-	macStore    map[string][]string
-	startedWg   sync.WaitGroup
-	config      *rest.Config
-	pathManager utils.PathManager
+	vsp          plugin.VendorPlugin
+	dp           deviceplugin.DevicePlugin
+	addr         string
+	port         int32
+	log          logr.Logger
+	server       *grpc.Server
+	cniserver    *cniserver.Server
+	manager      ctrl.Manager
+	macStore     map[string][]string
+	startedWg    sync.WaitGroup
+	config       *rest.Config
+	pathManager  utils.PathManager
+	lastPingTime time.Time
+	pingMutex    sync.RWMutex
 }
 
 func (s *DpuSideManager) CreateBridgePort(context context.Context, bpr *pb.CreateBridgePortRequest) (*pb.BridgePort, error) {
@@ -57,6 +60,44 @@ func (s *DpuSideManager) DeleteBridgePort(context context.Context, bpr *pb.Delet
 	s.log.Info("Passing DeleteBridgePort", "name", bpr.Name)
 	err := s.vsp.DeleteBridgePort(bpr)
 	return &emptypb.Empty{}, err
+}
+
+func (s *DpuSideManager) setPing(ping time.Time) {
+	s.pingMutex.Lock()
+	s.lastPingTime = ping
+	s.pingMutex.Unlock()
+}
+
+func (s *DpuSideManager) getPing() time.Time {
+	s.pingMutex.RLock()
+	defer s.pingMutex.RUnlock()
+	return s.lastPingTime
+}
+
+func (s *DpuSideManager) Ping(ctx context.Context, req *pb2.PingRequest) (*pb2.PingResponse, error) {
+	s.log.V(1).Info("Received heartbeat ping", "from", req.SenderId, "timestamp", req.Timestamp)
+
+	// Record the time we received this ping
+	s.setPing(time.Now())
+
+	return &pb2.PingResponse{
+		Timestamp:   time.Now().UnixNano(),
+		ResponderId: "dpu-daemon",
+		Healthy:     true,
+	}, nil
+}
+
+func (s *DpuSideManager) CheckPing() bool {
+	// Check if we received a ping from the host within the last minute
+	lastPing := s.getPing()
+
+	// If we never received a ping, return false
+	if lastPing.IsZero() {
+		return false
+	}
+
+	// Return true if last ping was within 1 minute, otherwise false
+	return time.Since(lastPing) < time.Minute
 }
 
 func NewDpuSideManager(vsp plugin.VendorPlugin, config *rest.Config, opts ...func(*DpuSideManager)) (*DpuSideManager, error) {
@@ -147,6 +188,7 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 	}
 
 	pb.RegisterBridgePortServiceServer(d.server, d)
+	pb2.RegisterHeartbeatServiceServer(d.server, d)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", d.addr, d.port))
 	if err != nil {

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
+	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
@@ -27,22 +29,26 @@ import (
 )
 
 type HostSideManager struct {
-	dev           bool
-	log           logr.Logger
-	conn          *grpc.ClientConn
-	client        pb.BridgePortServiceClient
-	config        *rest.Config
-	vsp           plugin.VendorPlugin
-	dp            deviceplugin.DevicePlugin
-	addr          string
-	port          int32
-	cniserver     *cniserver.Server
-	sm            sriov.Manager
-	manager       ctrl.Manager
-	startedWg     sync.WaitGroup
-	pathManager   utils.PathManager
-	stopRequested bool
-	dpListener    net.Listener
+	dev                bool
+	log                logr.Logger
+	conn               *grpc.ClientConn
+	client             pb.BridgePortServiceClient
+	heartbeatClient    pb2.HeartbeatServiceClient
+	clientMutex        sync.Mutex
+	lastSuccessfulPing time.Time
+	pingMutex          sync.RWMutex
+	config             *rest.Config
+	vsp                plugin.VendorPlugin
+	dp                 deviceplugin.DevicePlugin
+	addr               string
+	port               int32
+	cniserver          *cniserver.Server
+	sm                 sriov.Manager
+	manager            ctrl.Manager
+	startedWg          sync.WaitGroup
+	pathManager        utils.PathManager
+	stopRequested      bool
+	dpListener         net.Listener
 }
 
 func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -143,6 +149,9 @@ func (d *HostSideManager) WithManager(manager ctrl.Manager) *HostSideManager {
 }
 
 func (d *HostSideManager) connectWithRetry() error {
+	d.clientMutex.Lock()
+	defer d.clientMutex.Unlock()
+
 	if d.conn != nil {
 		return nil
 	}
@@ -170,6 +179,7 @@ func (d *HostSideManager) connectWithRetry() error {
 	d.log.Info("Dial succeeded", "addr", d.addr, "port", d.port)
 	d.conn = conn
 	d.client = pb.NewBridgePortServiceClient(conn)
+	d.heartbeatClient = pb2.NewHeartbeatServiceClient(conn)
 	return nil
 }
 
@@ -211,6 +221,80 @@ func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Re
 	return nil, nil
 }
 
+func (d *HostSideManager) setPing(ping time.Time) {
+	d.pingMutex.Lock()
+	d.lastSuccessfulPing = ping
+	d.pingMutex.Unlock()
+}
+
+func (d *HostSideManager) getPing() time.Time {
+	d.pingMutex.RLock()
+	defer d.pingMutex.RUnlock()
+	return d.lastSuccessfulPing
+}
+
+func (d *HostSideManager) Ping() bool {
+	err := d.connectWithRetry()
+	if err != nil {
+		d.log.V(1).Info("Failed to connect", "error", err)
+		return false
+	}
+
+	if d.heartbeatClient == nil {
+		d.log.V(1).Info("Heartbeat client not initialized")
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req := &pb2.PingRequest{
+		Timestamp: time.Now().UnixNano(),
+		SenderId:  "host-daemon",
+	}
+
+	_, err = d.heartbeatClient.Ping(ctx, req)
+	if err != nil {
+		d.log.V(1).Info("Ping failed", "error", err)
+		return false
+	}
+
+	// Record successful ping
+	d.setPing(time.Now())
+
+	d.log.V(1).Info("Ping successful")
+	return true
+}
+
+func (d *HostSideManager) StartPing(ctx context.Context) error {
+	d.log.Info("Starting ping client")
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			d.Ping()
+		case <-ctx.Done():
+			d.log.Info("Stopped ping client")
+			return ctx.Err()
+		}
+	}
+}
+
+func (d *HostSideManager) CheckPing() bool {
+	// Check if last successful ping was within 5 seconds
+	lastPing := d.getPing()
+
+	// If we never had a successful ping, return false
+	if lastPing.IsZero() {
+		return false
+	}
+
+	// Return true if last successful ping was within 5 seconds
+	return time.Since(lastPing) < 5*time.Second
+}
+
 func (d *HostSideManager) Listen() (net.Listener, error) {
 	var err error
 	d.startedWg.Add(1)
@@ -248,7 +332,7 @@ func (d *HostSideManager) ListenAndServe(ctx context.Context) error {
 func (d *HostSideManager) Serve(ctx context.Context, listener net.Listener) error {
 	var wg sync.WaitGroup
 	var err error
-	done := make(chan error, 3)
+	done := make(chan error, 4)
 
 	// Context for graceful shutdown
 	go func() {
@@ -293,6 +377,16 @@ func (d *HostSideManager) Serve(ctx context.Context, listener net.Listener) erro
 			done <- nil
 		}
 		d.log.Info("Stopped manager")
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		if err := d.StartPing(ctx); err != nil {
+			done <- err
+		} else {
+			done <- nil
+		}
 		wg.Done()
 	}()
 
