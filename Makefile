@@ -63,7 +63,7 @@ default: build
 # TODO: remove this when we don't call this target directly anymore
 .PHONY: deploy_clusters
 deploy_clusters:
-	go run tools/task/task.go deploy-clusters
+	go run tools/task/task.go deploy-2-clusters
 
 .PHONY: ginkgo
 ginkgo:

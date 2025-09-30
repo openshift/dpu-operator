@@ -1,15 +1,33 @@
 version: '3'
 
 tasks:
-  deploy-clusters:
+  deploy-1-cluster:
     deps:
       - task: prepare-e2e-test
     cmds:
-      - task: clean-clusters
-      - task: deploy-clusters-both-phase-1
-      - task: deploy-clusters-host-phase-2
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-1-cluster.yaml deploy
 
-  clean-clusters:
+  clean-1-cluster:
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - >
+        cd cluster-deployment-automation;
+        source /tmp/cda-venv/bin/activate;
+        ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-1-cluster.yaml deploy -f
+
+  deploy-2-clusters:
+    deps:
+      - task: prepare-e2e-test
+    cmds:
+      - task: clean-2-clusters
+      - task: deploy-2-clusters-both-phase-1
+      - task: deploy-2-clusters-host-phase-2
+
+  clean-2-clusters:
     deps:
       - task: prepare-e2e-test
     cmds:
@@ -18,7 +36,7 @@ tasks:
         source /tmp/cda-venv/bin/activate;
         ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy -f
 
-  deploy-clusters-dpu-phase-all:
+  deploy-2-clusters-dpu-phase-all:
     internal: true
     deps:
       - task: prepare-e2e-test
@@ -28,7 +46,7 @@ tasks:
         source /tmp/cda-venv/bin/activate;
         ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
 
-  deploy-clusters-host-phase-1:
+  deploy-2-clusters-host-phase-1:
     internal: true
     deps:
       - task: prepare-e2e-test
@@ -38,7 +56,7 @@ tasks:
         source /tmp/cda-venv/bin/activate;
         ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps pre,masters 
 
-  deploy-clusters-host-phase-2:
+  deploy-2-clusters-host-phase-2:
     internal: true
     deps:
       - task: prepare-e2e-test
@@ -48,19 +66,19 @@ tasks:
         source /tmp/cda-venv/bin/activate;
         ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy --steps workers,post 
 
-  deploy-clusters-both-phase-1:
+  deploy-2-clusters-both-phase-1:
     internal: true
     deps:
-      - task: deploy-clusters-host-phase-1
-      - task: deploy-clusters-dpu-phase-all
+      - task: deploy-2-clusters-host-phase-1
+      - task: deploy-2-clusters-dpu-phase-all
 
 
 # The following two targets are useful for manually deploying part of the env
   deploy-cluster-host:
     cmds:
-      - task: deploy-clusters-host-phase-1
-      - task: deploy-clusters-host-phase-2
+      - task: deploy-2-clusters-host-phase-1
+      - task: deploy-2-clusters-host-phase-2
 
   deploy-cluster-dpu:
     cmds:
-      - task: deploy-clusters-dpu-phase-all
+      - task: deploy-2-clusters-dpu-phase-all
