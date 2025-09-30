@@ -19,4 +19,3 @@ tft:
             sriov: "true"
         secondary_network_nad: "default-sriov-net"
 kubeconfig: "/root/kubeconfig.ocpcluster"
-kubeconfig_infra: "/root/kubeconfig.microshift"
