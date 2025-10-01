@@ -59,7 +59,7 @@ func extractDockerfileParts(dockerfileContent string) (DockerfileData, error) {
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		if strings.HasPrefix(trimmed, "COPY") && strings.Contains(trimmed, "--from=builder") {
+		if strings.HasPrefix(trimmed, "COPY") && strings.Contains(trimmed, "--from=builder") && strings.Contains(trimmed, "/workspace/bin/") {
 			copyCommand := strings.Replace(trimmed, "--from=builder", "", 1)
 			copyCommand = strings.Replace(copyCommand, "/workspace/bin/", "bin/", 1)
 			copyCommands = append(copyCommands, copyCommand)
