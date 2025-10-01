@@ -12,15 +12,21 @@ COPY . .
 
 # Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
 # As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
-RUN mkdir -p /bin && \
-    GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-marvell-vsp
+RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-marvell-vsp
+
+RUN set -x && \
+    touch /workspace/bin/cp-agent-image.txt && \
+    echo '[Service]' > /workspace/cp-agent.service && \
+    echo "Environment=IMAGE='$(cat /workspace/bin/cp-agent-image.txt)'" >> /workspace/cp-agent.service && \
+    cat ./internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent.service >> /workspace/cp-agent.service && \
+    cat /workspace/cp-agent.service
 
 # Use distroless as minimal base image to package the Marvell VSP binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM registry.ci.openshift.org/ocp/4.20:base-rhel9
 ARG TARGETARCH
 COPY --from=builder /workspace/bin/vsp-mrvl.${TARGETARCH} /vsp-mrvl
-COPY --from=builder /workspace/bin/cp-agent.service /
+COPY --from=builder /workspace/cp-agent.service /
 ENV DEBIAN_FRONTEND=noninteractive
 RUN yum update -y \
     && yum install -y \
