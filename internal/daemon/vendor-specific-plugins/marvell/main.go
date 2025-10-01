@@ -101,6 +101,15 @@ type mrvlVspServer struct {
 	isNF          bool
 }
 
+func ethtool_disable_offload(ifname string) {
+	cmd := exec.Command("ethtool", "-K", ifname, "tx", "off", "rx", "off")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Infof("ethtool for %s failed: %v", ifname, err)
+		/* Let's ignore the error here. It is unclear whether this is always needed. */
+	}
+}
+
 // createVethPair function to create a veth pair with the given index and InterfaceInfo
 func (vsp *mrvlVspServer) createVethPair(index int) error {
 	//secInterfaceName is the name of the interface on the Network Function side
@@ -133,6 +142,19 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 		if err != nil {
 			return err
 		}
+
+		/* We will attach the veth pair to the OVS bridge. Veth pairs don't offload the
+		 * calculation of the checksum, and neither will the OVS bridge fill in the
+		 * checksum. The result is a broken checksum. Disable offloading.
+		 *
+		 * This might be a SDP driver problem, because Phantomlake has a similar setup
+		 * with veth interfaces and OVS and does not have this problem. So this may be
+		 * only a workaround.
+		 *
+		 * Also disable "rx" offloading, although, that may not be required (but is
+		 * probably harmless anyway). */
+		ethtool_disable_offload(secInterfaceName)
+		ethtool_disable_offload(dpInterfaceName)
 	}
 
 	if err := netlink.LinkSetUp(nfLink); err != nil {
