@@ -1,6 +1,7 @@
 package mrvlutils
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"net"
@@ -24,6 +25,9 @@ const (
 	MrvlRVUPF2Id           = "a0ef"
 	SysBusPci       string = "/sys/bus/pci/devices"
 )
+
+//go:embed cp-agent.service.template
+var cpAgentServiceTemplate string
 
 var ErrNoSuchDevice = errors.New("no such device")
 
@@ -347,14 +351,27 @@ func SetupHostInterface() error {
 }
 
 func SetupDpuService() error {
-	cmd := "cp /cp-agent.service /host/etc/systemd/system/cp-agent.service"
-	err := exec.Command("bash", "-c", cmd).Run()
+	return SetupDpuServiceWithImage("")
+}
+
+func SetupDpuServiceWithImage(cpAgentImage string) error {
+	// Replace %IMAGE% placeholder with actual image
+	imageToUse := cpAgentImage
+	if imageToUse == "" {
+		// Fallback to environment variable if not provided as parameter
+		imageToUse = os.Getenv("MarvellVspCpAgentImage")
+	}
+
+	content := strings.ReplaceAll(cpAgentServiceTemplate, "%IMAGE%", imageToUse)
+
+	// Write the processed content to the target location
+	err := os.WriteFile("/host/etc/systemd/system/cp-agent.service", []byte(content), 0644)
 	if err != nil {
-		klog.Errorf("Failed to copy cp-agent.service: %v", err)
+		klog.Errorf("Failed to write cp-agent.service: %v", err)
 		return err
 	}
 
-	cmd = "chroot /host systemctl enable cp-agent"
+	cmd := "chroot /host systemctl enable cp-agent"
 	err = exec.Command("bash", "-c", cmd).Run()
 	if err != nil {
 		klog.Errorf("Failed to enable cp-agent.service: %v", err)

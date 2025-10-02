@@ -24,6 +24,9 @@ spec:
       runAsUser: 0
     command: ["/vsp-mrvl"]
     args: []
+    env:
+    - name: MarvellVspCpAgentImage
+      value: "{{.MarvellVspCpAgentImage}}"
     volumeMounts:
     - mountPath: /host
       mountPropagation: Bidirectional
