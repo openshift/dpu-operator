@@ -238,7 +238,7 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 
 	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfPcieAddr)
 	if err != nil {
-		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
+		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", vfPcieAddr)
 		return err
 	}
 
@@ -302,6 +302,22 @@ func (vsp *intelNetSecVspServer) createVethPairs() error {
 	return nil
 }
 
+func (vsp *intelNetSecVspServer) setExternalPortNumVfs(numVfs int) error {
+	err := vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuSFPf1PCIeAddress, numVfs)
+	if err != nil {
+		vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
+		return err
+	}
+
+	err = vsp.setSpoofChkExternalPorts(IntelNetSecDpuSFPf1PCIeAddress, numVfs)
+	if err != nil {
+		vsp.log.Error(err, "Error setting spoof check off for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
+		return err
+	}
+
+	return nil
+}
+
 func (vsp *intelNetSecVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
 	var err error
 	vsp.log.Info("Received Init() request", "DpuMode", in.DpuMode, "DpuIdentifier", in.DpuIdentifier)
@@ -324,6 +340,12 @@ func (vsp *intelNetSecVspServer) Init(ctx context.Context, in *pb.InitRequest) (
 		err = vsp.createVethPairs()
 		if err != nil {
 			vsp.log.Error(err, "Error creating veth pairs")
+			return nil, err
+		}
+
+		err = vsp.setExternalPortNumVfs(MaxChains)
+		if err != nil {
+			vsp.log.Error(err, "Error setting number of VFs for external port")
 			return nil, err
 		}
 
@@ -801,18 +823,6 @@ func (vsp *intelNetSecVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) 
 		err = vsp.setVlanIdsSpoofChkInternalPorts(IntelNetSecDpuBackplanef2PCIeAddress, int(in.VfCnt))
 		if err != nil {
 			vsp.log.Error(err, "Error setting VLAN IDs for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuBackplanef2PCIeAddress, "VfCnt", in.VfCnt)
-			return &pb.VfCount{VfCnt: 0}, err
-		}
-
-		err = vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
-		if err != nil {
-			vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
-			return &pb.VfCount{VfCnt: 0}, err
-		}
-
-		err = vsp.setSpoofChkExternalPorts(IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
-		if err != nil {
-			vsp.log.Error(err, "Error setting spoof check off for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
 			return &pb.VfCount{VfCnt: 0}, err
 		}
 	} else {
