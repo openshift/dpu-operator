@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
@@ -18,6 +20,8 @@ const (
 	NetSysDir            = "/sys/class/net"
 	pcidevPrefix         = "device"
 	netDevVfDevicePrefix = "virtfn"
+	retryInterval        = 500 * time.Millisecond
+	retryCount           = 5
 )
 
 type VethPairKey struct {
@@ -268,4 +272,52 @@ func DeleteInterfaceFromOvSBridge(bridgeName string, ifname string) error {
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, ifname)
 	klog.Infof("DeleteInterfaceFromOvSBridge(): %s", cmd.String())
 	return cmd.Run()
+}
+
+// WaitForVfNetDevReady waits for a VF network device to be ready and available.
+// It retries getting the netdev name from the PCIe address. Returns the list of interface names once they are available, or an error if timeout is reached.
+func WaitForVfNetDevReady(platform platform.Platform, pcieAddr string) (string, error) {
+	var lastErr error
+	var ifName string
+
+	klog.V(2).Infof("WaitForVfNetDevReady(): waiting for VF netdev to appear for PCIe address %s (retries: %d, interval: %v)", pcieAddr, retryCount, retryInterval)
+
+	for i := 0; i < retryCount; i++ {
+		ifName, lastErr = platform.GetNetDevNameFromPCIeAddr(pcieAddr)
+		if lastErr == nil {
+			klog.V(2).Infof("WaitForVfNetDevReady(): VF netdev ready for PCIe address %s: %v (attempt %d/%d)", pcieAddr, ifName, i+1, retryCount)
+			return ifName, nil
+		}
+
+		if i < retryCount-1 {
+			klog.V(2).Infof("WaitForVfNetDevReady(): VF netdev not ready for PCIe address %s, retrying... (attempt %d/%d, last error: %v)", pcieAddr, i+1, retryCount, lastErr)
+			time.Sleep(retryInterval)
+		}
+	}
+
+	return "", fmt.Errorf("timeout waiting for VF netdev to appear for PCIe address %s after %d retries: %w", pcieAddr, retryCount, lastErr)
+}
+
+// WaitForVfPciAddressReady waits for a VF PCI address to be available after SR-IOV VF creation.
+// It retries getting the VF PCIe address from the VF index. Returns the PCIe address once it is available, or an error if timeout is reached.
+func WaitForVfPciAddressReady(fs afero.Fs, pfName string, vfId int) (string, error) {
+	var lastErr error
+	var pciAddr string
+
+	klog.V(2).Infof("WaitForVfPciAddressReady(): waiting for VF PCI address for PF %s VF %d (retries: %d, interval: %v)", pfName, vfId, retryCount, retryInterval)
+
+	for i := 0; i < retryCount; i++ {
+		pciAddr, lastErr = VfPCIAddressFromVfIndex(fs, pfName, vfId)
+		if lastErr == nil && pciAddr != "" {
+			klog.V(2).Infof("WaitForVfPciAddressReady(): VF PCI address ready: %s (attempt %d/%d)", pciAddr, i+1, retryCount)
+			return pciAddr, nil
+		}
+
+		if i < retryCount-1 {
+			klog.V(2).Infof("WaitForVfPciAddressReady(): VF PCI address not ready for PF %s VF %d, retrying... (attempt %d/%d, last error: %v)", pfName, vfId, i+1, retryCount, lastErr)
+			time.Sleep(retryInterval)
+		}
+	}
+
+	return "", fmt.Errorf("timeout waiting for VF PCI address for PF %s VF %d after %d retries: %w", pfName, vfId, retryCount, lastErr)
 }
