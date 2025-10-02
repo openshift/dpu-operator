@@ -177,21 +177,8 @@ tasks:
         vars:
           NAME: dpu-daemon
 
-  build-cpagent-service:
-    internal: true
-    vars:
-      IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
-      CPIMAGE: "Environment=IMAGE='{{.IMAGE}}'"
-      CPFILE: 'internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent.service'
-    cmds:
-    - mkdir -p bin
-    - echo "[Service]" > bin/cp-agent.service
-    - echo '{{.CPIMAGE}}' >> bin/cp-agent.service
-    - cat '{{.CPFILE}}' >> bin/cp-agent.service
-
   build-image-marvell-vsp:
     deps:
-      - task: build-cpagent-service
       - task: build-bin-marvell-vsp
         vars:
           GOARCH: arm64

@@ -26,6 +26,8 @@ spec:
           value: {{ .RegistryURL }}/intel-vsp-p4:dev
         - name: marvell_dpu
           value: {{ .RegistryURL }}/mrvl-vsp:dev
+        - name: MarvellVspCpAgentImage
+          value: {{ .RegistryURL }}/mrvl-cpagent:dev
         - name: intel_netsec
           value: {{ .RegistryURL }}/intel-netsec-vsp:dev
         - name: IMAGE_PULL_POLICIES
