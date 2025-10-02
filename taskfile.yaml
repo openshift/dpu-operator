@@ -155,12 +155,18 @@ tasks:
       - task: kustomize
     cmds:
       - task: deploy-1-cluster
-      - task: fast-e2e-test
+      - task: fast-e2e-test-1c
 
   fast-e2e-test:
     cmds:
       - task: redeploy
       - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} KUBECONFIG_DPU={{.KUBECONFIG_DPU}} sh hack/setup.sh
+      - task: run-e2e-test
+
+  fast-e2e-test-1c:
+    cmds:
+      - task: redeploy-1c
+      - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} sh hack/setup.sh
       - task: run-e2e-test
 
   run-e2e-test:
@@ -193,6 +199,12 @@ tasks:
       - task: build-image-all
       - task: undeploy
       - task: deploy
+
+  redeploy-1c:
+    cmds:
+      - task: build-image-all
+      - task: undeploy-1c
+      - task: deploy-1c
 
   ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
   manifests:
