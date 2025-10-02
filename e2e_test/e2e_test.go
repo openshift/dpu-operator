@@ -54,17 +54,23 @@ func getMaxDpuResources(cli client.Client) int {
 	err := cli.List(context.TODO(), &nodeList)
 	Expect(err).NotTo(HaveOccurred())
 
-	var maxDPU resource.Quantity
+	var totalDpuSideResources resource.Quantity
 
 	for _, node := range nodeList.Items {
+		// Only account for nodes that are DPUs.
+		if dpuSide, ok := node.Labels["dpu.config.openshift.io/dpuside"]; !ok || dpuSide != "dpu" {
+			fmt.Printf("Node %s is not a DPU, dpuSide label is %s, skipping...\n", node.Name, dpuSide)
+			continue
+		}
+
+		// Tally up all the DPU resources on all the DPU nodes.
 		if val, ok := node.Status.Allocatable[corev1.ResourceName("openshift.io/dpu")]; ok {
-			if val.Cmp(maxDPU) > 0 {
-				maxDPU = val
-			}
+			fmt.Printf("Node %s has %d DPU resources\n", node.Name, val.Value())
+			totalDpuSideResources.Add(val)
 		}
 	}
 
-	v64 := maxDPU.Value()
+	v64 := totalDpuSideResources.Value()
 	v := int(v64)
 	Expect(int64(v)).To(Equal(v64))
 	return v
