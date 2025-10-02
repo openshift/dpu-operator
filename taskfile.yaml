@@ -170,6 +170,8 @@ tasks:
     cmds:
       - >
         FAST_TEST=true
+        KUBECONFIG_HOST={{.KUBECONFIG_HOST}}
+        KUBECONFIG_DPU={{.KUBECONFIG_DPU}}
         REGISTRY={{.REGISTRY}}
         NF_INGRESS_IP=10.20.30.2
         EXTERNAL_CLIENT_DEV=eno12409

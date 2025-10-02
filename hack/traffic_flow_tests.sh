@@ -15,14 +15,6 @@ if [ -z "$worker" ]; then
   exit 1
 fi
 
-export KUBECONFIG=/root/kubeconfig.microshift
-nodes=$(oc get nodes)
-export acc=$(echo "$nodes" | grep -oP '^\d+-acc')
-if [ -z "$acc" ]; then
-  echo "Error: acc is empty"
-  exit 1
-fi
-
 temp_file=$(mktemp)
 
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > $temp_file

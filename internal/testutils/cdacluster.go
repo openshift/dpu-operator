@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"fmt"
 	"os"
 
 	"k8s.io/client-go/rest"
@@ -8,21 +9,13 @@ import (
 )
 
 type CdaCluster struct {
-	Name           string
-	HostConfigPath string
-	DpuConfigPath  string
 }
 
-func (t *CdaCluster) EnsureExists() (*rest.Config, *rest.Config, error) {
-	hostConfig, err := t.createClient("/root/kubeconfig.ocpcluster")
-	if err != nil {
-		return nil, nil, err
+func (t *CdaCluster) EnsureExists(kubeconfigPath string) (*rest.Config, error) {
+	if _, err := os.Stat(kubeconfigPath); err == nil {
+		return t.createClient(kubeconfigPath)
 	}
-	dpuConfig, err := t.createClient("/root/kubeconfig.microshift")
-	if err != nil {
-		return nil, nil, err
-	}
-	return hostConfig, dpuConfig, nil
+	return nil, fmt.Errorf("kubeconfig %s not found", kubeconfigPath)
 }
 
 func (t *CdaCluster) createClient(kubeconfigPath string) (*rest.Config, error) {

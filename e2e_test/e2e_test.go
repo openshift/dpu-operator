@@ -38,6 +38,8 @@ var (
 )
 
 const (
+	defaultOCPKubeconfig = "/root/kubeconfig.ocpcluster"
+	defaultDpuKubeconfig = "/root/kubeconfig.microshift"
 	// TODO: reduce to 2 seconds
 	timeout                  = 1 * time.Minute
 	timeout_sfc_pod_running  = 2 * time.Minute
@@ -149,6 +151,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 		hostClientSet                      *kubernetes.Clientset
 		dpuClientSet                       *kubernetes.Clientset
 		restoreDpuOperatorConfigInAfterAll func()
+		isTwoClusterDeployment             bool
 	)
 
 	g.AfterAll(func() {
@@ -160,25 +163,57 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 
 	g.BeforeEach(func() {
 		var err error
-		cluster := testutils.CdaCluster{
-			Name:           "",
-			HostConfigPath: "hack/cluster-configs/config-dpu-host.yaml",
-			DpuConfigPath:  "hack/cluster-configs/config-dpu.yaml",
+		cluster := testutils.CdaCluster{}
+
+		hostKubeconfig, err := getEnv("KUBECONFIG_HOST")
+		if err != nil {
+			fmt.Printf("Could not get Kubeconfig for Host, using default at %s Error: %v\n", defaultOCPKubeconfig, err)
+			hostKubeconfig = defaultOCPKubeconfig
 		}
-		hostRestConfig, dpuRestConfig, err = cluster.EnsureExists()
+
+		dpuKubeconfig, err := getEnv("KUBECONFIG_DPU")
+		if err != nil {
+			fmt.Printf("Could not get Kubeconfig for DPU, using default at %s Error: %v\n", defaultDpuKubeconfig, err)
+			dpuKubeconfig = defaultDpuKubeconfig
+		}
+
+		_, err = os.Stat(hostKubeconfig)
 		Expect(err).NotTo(HaveOccurred())
+
+		hostRestConfig, err = cluster.EnsureExists(hostKubeconfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		if _, err := os.Stat(dpuKubeconfig); err == nil {
+			isTwoClusterDeployment = true
+			dpuRestConfig, err = cluster.EnsureExists(dpuKubeconfig)
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			// For 1 cluster deployment, the host and dpu side rest configs are the same.
+			isTwoClusterDeployment = false
+			dpuRestConfig = hostRestConfig
+		}
 
 		hostSideClient, err = client.New(hostRestConfig, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
 
-		dpuSideClient, err = client.New(dpuRestConfig, client.Options{Scheme: scheme.Scheme})
-		Expect(err).NotTo(HaveOccurred())
+		if isTwoClusterDeployment {
+			dpuSideClient, err = client.New(dpuRestConfig, client.Options{Scheme: scheme.Scheme})
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			// For 1 cluster deployment, the host and dpu side clients are the same.
+			dpuSideClient = hostSideClient
+		}
 
 		hostClientSet, err = kubernetes.NewForConfig(hostRestConfig)
 		Expect(err).NotTo(HaveOccurred())
 
-		dpuClientSet, err = kubernetes.NewForConfig(dpuRestConfig)
-		Expect(err).NotTo(HaveOccurred())
+		if isTwoClusterDeployment {
+			dpuClientSet, err = kubernetes.NewForConfig(dpuRestConfig)
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			// For 1 cluster deployment, the host and dpu side client sets are the same.
+			dpuClientSet = hostClientSet
+		}
 
 	})
 
@@ -347,7 +382,7 @@ var _ = g.Describe("E2E integration testing", g.Ordered, func() {
 			testutils.DeleteAndEventuallyPodDoesNotExist(hostSideClient, testPodName, "default", testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 			testutils.DeleteAndEventuallyPodDoesNotExist(hostSideClient, testPod2Name, "default", testutils.TestAPITimeout*8, testutils.TestRetryInterval)
 
-			nodeList, err := testutils.GetDPUNodes(hostSideClient)
+			nodeList, err := testutils.GetDPUHostNodes(hostSideClient)
 			Expect(err).NotTo(HaveOccurred())
 			pod := testutils.NewTestPod(testPodName, nodeList[0].Name)
 			pod2 := testutils.NewTestPod(testPod2Name, nodeList[0].Name)

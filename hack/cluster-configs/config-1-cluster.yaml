@@ -33,7 +33,7 @@ clusters:
         user: "root"
         password: "calvin"
         url: "{{bmc(0)}}"
-    - name: "worker-{{worker_number(1)}}"
+    - name: "worker-dpu-{{worker_number(1)}}"
       kind: "physical"
       node: "{{worker_name(1)}}" 
       bmc:

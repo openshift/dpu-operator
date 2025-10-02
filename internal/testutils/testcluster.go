@@ -97,9 +97,21 @@ func ExecInPod(clientset kubernetes.Interface, config *rest.Config, pod *corev1.
 	return stdout.String(), nil
 }
 
+func GetDPUHostNodes(c client.Client) ([]corev1.Node, error) {
+	nodeList := &corev1.NodeList{}
+	labelSelector := client.MatchingLabels{"dpu.config.openshift.io/dpuside": "dpu-host"}
+
+	err := c.List(context.TODO(), nodeList, labelSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeList.Items, nil
+}
+
 func GetDPUNodes(c client.Client) ([]corev1.Node, error) {
 	nodeList := &corev1.NodeList{}
-	labelSelector := client.MatchingLabels{"dpu": "true"}
+	labelSelector := client.MatchingLabels{"dpu.config.openshift.io/dpuside": "dpu"}
 
 	err := c.List(context.TODO(), nodeList, labelSelector)
 	if err != nil {
