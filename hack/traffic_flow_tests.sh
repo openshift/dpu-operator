@@ -2,16 +2,15 @@
 
 set -e
 
-# bash hack/prepare-venv.sh
+export KUBECONFIG="${KUBECONFIG_HOST:-/root/kubeconfig.ocpcluster}"
 
 cd kubernetes-traffic-flow-tests
 source /tmp/tft-venv/bin/activate
 
-export KUBECONFIG=/root/kubeconfig.ocpcluster
-nodes=$(oc get nodes)
-export worker=$(echo "$nodes" | grep -oP '^worker-[^\s]*')
+# Get the first worker node with label dpu.config.openshift.io/dpuside=dpu-host
+export worker=$(oc get nodes -l "dpu.config.openshift.io/dpuside=dpu-host" -o jsonpath='{.items[0].metadata.name}')
 if [ -z "$worker" ]; then
-  echo "Error: worker is empty"
+  echo "Error: No worker node found with label dpu.config.openshift.io/dpuside=dpu-host"
   exit 1
 fi
 

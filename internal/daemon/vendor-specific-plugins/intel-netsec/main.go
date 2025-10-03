@@ -113,34 +113,20 @@ func (vsp *intelNetSecVspServer) configureCommChannelIPs(dpuMode bool) (pb.IpPor
 	var err error
 	if dpuMode {
 		// All NetSec DPU devices have the same internal PCIe Addresses. Netdev names can change with each RHEL release.
-		ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuBackplanef2PCIeAddress)
+		ifName, err = vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuBackplanef2PCIeAddress)
 		if err != nil {
 			vsp.log.Error(err, "Error getting netdev name from PCIe address in DPU mode", "PCIeAddress", IntelNetSecDpuBackplanef2PCIeAddress)
 			return pb.IpPort{}, err
 		}
 
-		if len(ifNames) != 1 {
-			err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", IntelNetSecDpuBackplanef2PCIeAddress, ifNames)
-			vsp.log.Error(err, "Error getting netdev name from PCIe address in DPU mode", "PCIeAddress", IntelNetSecDpuBackplanef2PCIeAddress)
-			return pb.IpPort{}, err
-		}
-
-		ifName = ifNames[0]
 		addr = IPv6AddrDpu
 	} else {
-		ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vsp.dpuPcieAddress)
+		ifName, err = vsp.platform.GetNetDevNameFromPCIeAddr(vsp.dpuPcieAddress)
 		if err != nil {
 			vsp.log.Error(err, "Error getting netdev name from PCIe address in Host mode", "PCIeAddress", vsp.dpuPcieAddress)
 			return pb.IpPort{}, err
 		}
 
-		if len(ifNames) != 1 {
-			err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vsp.dpuPcieAddress, ifNames)
-			vsp.log.Error(err, "Error getting netdev name from PCIe address in Host mode", "PCIeAddress", vsp.dpuPcieAddress)
-			return pb.IpPort{}, err
-		}
-
-		ifName = ifNames[0]
 		addr = IPv6AddrHost
 	}
 
@@ -215,38 +201,26 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 	// 1. IntelNetSecDpuSFPf0PCIeAddress can be used for the cluster network.
 	// 2. IntelNetSecDpuSFPf1PCIeAddress we use the second 25Gbe interface for now.
 	// With 1) you can't have the same interface on 2 bridges.
-	sfpPortIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuSFPf1PCIeAddress)
+	sfpPortIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(IntelNetSecDpuSFPf1PCIeAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
 		return err
 	}
-
-	if len(sfpPortIfNames) != 1 {
-		return fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", IntelNetSecDpuSFPf1PCIeAddress, sfpPortIfNames)
-	}
-
-	sfpPortIfName := sfpPortIfNames[0]
 
 	// The following code takes the second SFP port's first VF and adds this VF to the OvS bridge.
 	// The reason why a VF is chosen is to support VLAN use cases and multiple independent chains.
 	// TODO: When more chains are supported we need to put the following in a loop
-	vfPcieAddr, err := vspnetutils.VfPCIAddressFromVfIndex(vsp.fs, sfpPortIfName, 0)
+	vfPcieAddr, err := vspnetutils.WaitForVfPciAddressReady(vsp.fs, sfpPortIfName, 0)
 	if err != nil {
-		vsp.log.Error(err, "Error getting VF PCI address", "VFID", 0, "InterfaceName", sfpPortIfName)
+		vsp.log.Error(err, "Error getting VF PCI address", "VFID", 0, "sfpPortIfName", sfpPortIfName)
 		return err
 	}
 
-	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfPcieAddr)
+	vfIfName, err := vspnetutils.WaitForVfNetDevReady(vsp.platform, vfPcieAddr)
 	if err != nil {
-		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "PCIeAddress", IntelNetSecDpuSFPf1PCIeAddress)
+		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "vfPcieAddr", vfPcieAddr)
 		return err
 	}
-
-	if len(vfIfNames) != 1 {
-		return fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vfPcieAddr, vfIfNames)
-	}
-
-	vfIfName := vfIfNames[0]
 
 	sfpPortlink, err := netlink.LinkByName(sfpPortIfName)
 	if err != nil {
@@ -279,11 +253,11 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 
 	err = vspnetutils.AddInterfaceToOvSBridge(bridgeName, vfIfName)
 	if err != nil {
-		vsp.log.Error(err, "Error occurred in adding SFP Port Interface to Bridge", "BridgeName", bridgeName, "SfpPortIfName", sfpPortIfNames[0])
+		vsp.log.Error(err, "Error occurred in adding SFP Port Interface to Bridge", "BridgeName", bridgeName, "sfpPortIfName", sfpPortIfName)
 		return err
 	}
 
-	vsp.log.Info("SFP Port Interface Added to Bridge Successfully", "BridgeName", bridgeName, "SfpPortIfName", sfpPortIfNames[0])
+	vsp.log.Info("SFP Port Interface Added to Bridge Successfully", "BridgeName", bridgeName, "sfpPortIfName", sfpPortIfName)
 	return nil
 }
 
@@ -299,6 +273,22 @@ func (vsp *intelNetSecVspServer) createVethPairs() error {
 	}
 
 	vsp.log.Info("createVethPairs(): Created veth pairs", "Count", len(vsp.vethTunnelPairDevs))
+	return nil
+}
+
+func (vsp *intelNetSecVspServer) setExternalPortNumVfs(numVfs int) error {
+	err := vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuSFPf1PCIeAddress, numVfs)
+	if err != nil {
+		vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
+		return err
+	}
+
+	err = vsp.setSpoofChkExternalPorts(IntelNetSecDpuSFPf1PCIeAddress, numVfs)
+	if err != nil {
+		vsp.log.Error(err, "Error setting spoof check off for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
+		return err
+	}
+
 	return nil
 }
 
@@ -324,6 +314,12 @@ func (vsp *intelNetSecVspServer) Init(ctx context.Context, in *pb.InitRequest) (
 		err = vsp.createVethPairs()
 		if err != nil {
 			vsp.log.Error(err, "Error creating veth pairs")
+			return nil, err
+		}
+
+		err = vsp.setExternalPortNumVfs(MaxChains)
+		if err != nil {
+			vsp.log.Error(err, "Error setting number of VFs for external port")
 			return nil, err
 		}
 
@@ -409,19 +405,11 @@ func (vsp *intelNetSecVspServer) getConnectedVf(OPIBridgePortName string) (*vspn
 		return nil, err
 	}
 
-	pfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(backPlanePcieAddr)
+	pfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(backPlanePcieAddr)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", backPlanePcieAddr)
 		return nil, err
 	}
-
-	if len(pfIfNames) != 1 {
-		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", backPlanePcieAddr, pfIfNames)
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", backPlanePcieAddr)
-		return nil, err
-	}
-
-	pfIfName := pfIfNames[0]
 
 	// For Intel NetSec, PF ID is always 0 and VF ID is mapped one to one.
 	key := vspnetutils.VfDeviceKey{
@@ -454,19 +442,11 @@ func (vsp *intelNetSecVspServer) CreateBridgePort(ctx context.Context, in *opi.C
 		return nil, err
 	}
 
-	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
+	vfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
 	}
-
-	if len(vfIfNames) != 1 {
-		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vfDevice.PciAddress, vfIfNames)
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
-		return nil, err
-	}
-
-	vfIfName := vfIfNames[0]
 
 	err = vspnetutils.AddInterfaceToOvSBridge(OvSBridgeName, vfIfName)
 	if err != nil {
@@ -503,19 +483,11 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 		return nil, err
 	}
 
-	vfIfNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
+	vfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
 	}
-
-	if len(vfIfNames) != 1 {
-		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", vfDevice.PciAddress, vfIfNames)
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
-		return nil, err
-	}
-
-	vfIfName := vfIfNames[0]
 
 	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, vfIfName)
 	if err != nil {
@@ -650,24 +622,16 @@ func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *
 // setVlanIdsSpoofChk function to set the VLAN IDs for host facing interfaces such that each container
 // will have a unique VLAN ID for isolating traffic. This is to ensure that each VF must be
 // forwarded to the NetSec Acclerator to be processed.
-func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pcieAddr string, numVfs int) error {
-	vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): Setting VLAN IDs, Spoof Check off, Trust on for VFs", "PCIeAddress", pcieAddr, "NumVFs", numVfs)
+func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pfPcieAddr string, numVfs int) error {
+	vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): Setting VLAN IDs, Spoof Check off, Trust on for VFs", "pfPcieAddr", pfPcieAddr, "NumVFs", numVfs)
 	var ifName string
 	var err error
 
-	ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(pcieAddr)
+	ifName, err = vsp.platform.GetNetDevNameFromPCIeAddr(pfPcieAddr)
 	if err != nil {
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "pfPcieAddr", pfPcieAddr)
 		return err
 	}
-
-	if len(ifNames) != 1 {
-		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", pcieAddr, ifNames)
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
-		return err
-	}
-
-	ifName = ifNames[0]
 
 	// WORKAROUND: Set the PF hardware mode to VEPA (Virtual Ethernet Port Aggregator)
 	// Only needed on the host because the NetSec Accelerator will switch packets, but the
@@ -719,7 +683,7 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pcieAddr string
 			return err
 		}
 
-		pcieAddr, err := vspnetutils.VfPCIAddressFromVfIndex(vsp.fs, ifName, vfID)
+		pcieAddr, err := vspnetutils.WaitForVfPciAddressReady(vsp.fs, ifName, vfID)
 		if err != nil {
 			vsp.log.Error(err, "Error getting VF PCI address", "VFID", vfID, "InterfaceName", ifName)
 			return err
@@ -744,22 +708,14 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pcieAddr string
 	return err
 }
 
-func (vsp *intelNetSecVspServer) setSpoofChkExternalPorts(pcieAddr string, numVfs int) error {
-	vsp.log.Info("setSpoofChkExternalPorts(): Setting Spoof Check off for VFs", "PCIeAddress", pcieAddr, "NumVFs", numVfs)
+func (vsp *intelNetSecVspServer) setSpoofChkExternalPorts(pfPcieAddr string, numVfs int) error {
+	vsp.log.Info("setSpoofChkExternalPorts(): Setting Spoof Check off for VFs", "pfPcieAddr", pfPcieAddr, "NumVFs", numVfs)
 
-	ifNames, err := vsp.platform.GetNetDevNameFromPCIeAddr(pcieAddr)
+	ifName, err := vsp.platform.GetNetDevNameFromPCIeAddr(pfPcieAddr)
 	if err != nil {
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
+		vsp.log.Error(err, "Error getting netdev name from PCIe address", "pfPcieAddr", pfPcieAddr)
 		return err
 	}
-
-	if len(ifNames) != 1 {
-		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", pcieAddr, ifNames)
-		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", pcieAddr)
-		return err
-	}
-
-	ifName := ifNames[0]
 
 	for vfID := 0; vfID < numVfs; vfID++ {
 		link, err := netlink.LinkByName(ifName)
@@ -801,18 +757,6 @@ func (vsp *intelNetSecVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) 
 		err = vsp.setVlanIdsSpoofChkInternalPorts(IntelNetSecDpuBackplanef2PCIeAddress, int(in.VfCnt))
 		if err != nil {
 			vsp.log.Error(err, "Error setting VLAN IDs for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuBackplanef2PCIeAddress, "VfCnt", in.VfCnt)
-			return &pb.VfCount{VfCnt: 0}, err
-		}
-
-		err = vspnetutils.SetSriovNumVfs(vsp.fs, IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
-		if err != nil {
-			vsp.log.Error(err, "Error occurred in setting number of VFs for SFP Port", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
-			return &pb.VfCount{VfCnt: 0}, err
-		}
-
-		err = vsp.setSpoofChkExternalPorts(IntelNetSecDpuSFPf1PCIeAddress, MaxChains)
-		if err != nil {
-			vsp.log.Error(err, "Error setting spoof check off for VFs", "isDPUMode", vsp.isDPUMode, "PcieAddress", IntelNetSecDpuSFPf1PCIeAddress, "MaxChains", MaxChains)
 			return &pb.VfCount{VfCnt: 0}, err
 		}
 	} else {

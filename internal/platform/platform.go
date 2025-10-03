@@ -17,7 +17,8 @@ type Platform interface {
 	NetDevs() ([]*ghw.NIC, error)
 	Product() (*ghw.ProductInfo, error)
 	ReadDeviceSerialNumber(pciDevice *ghw.PCIDevice) (string, error)
-	GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error)
+	GetNetDevNamesFromPCIeAddr(pcieAddress string) ([]string, error)
+	GetNetDevNameFromPCIeAddr(pcieAddress string) (string, error)
 }
 
 type HardwarePlatform struct{}
@@ -42,9 +43,9 @@ func (hp *HardwarePlatform) NetDevs() ([]*ghw.NIC, error) {
 	return netInfo.NICs, nil
 }
 
-// GetNetDevNameFromPCIeAddr retrieves the network device name associated with a given PCIe address.
+// GetNetDevNamesFromPCIeAddr retrieves the network device name associated with a given PCIe address.
 // This can fail if the given PCIe address is not a NetDev or the driver is not loaded correctly.
-func (hp *HardwarePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error) {
+func (hp *HardwarePlatform) GetNetDevNamesFromPCIeAddr(pcieAddress string) ([]string, error) {
 	nics, err := hp.NetDevs()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network devices: %w", err)
@@ -53,12 +54,27 @@ func (hp *HardwarePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]str
 	var ifaces []string
 	for _, nic := range nics {
 		if nic.PCIAddress != nil && *nic.PCIAddress == pcieAddress {
-			klog.V(2).Infof("GetNetDevNameFromPCIeAddr(): found DPU network device %s %s", nic.Name, *nic.PCIAddress)
+			klog.V(2).Infof("GetNetDevNamesFromPCIeAddr(): found DPU network device %s %s", nic.Name, *nic.PCIAddress)
 			ifaces = append(ifaces, nic.Name)
 		}
 	}
 
 	return ifaces, nil
+}
+
+// GetNetDevNameFromPCIeAddr returns the name of the single network device associated with a given PCIe address.
+func (hp *HardwarePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) (string, error) {
+	ifNames, err := hp.GetNetDevNamesFromPCIeAddr(pcieAddress)
+	if err != nil {
+		return "", err
+	}
+
+	if len(ifNames) != 1 {
+		err = fmt.Errorf("expected exactly 1 interface for PCIe address %s, got %v", pcieAddress, ifNames)
+		return "", err
+	}
+
+	return ifNames[0], nil
 }
 
 func (hp *HardwarePlatform) Product() (*ghw.ProductInfo, error) {
@@ -157,8 +173,12 @@ func (p *FakePlatform) RemoveAllPciDevices() {
 	p.devices = make([]*ghw.PCIDevice, 0)
 }
 
-func (p *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) ([]string, error) {
+func (p *FakePlatform) GetNetDevNamesFromPCIeAddr(pcieAddress string) ([]string, error) {
 	return nil, fmt.Errorf("Not implemented")
+}
+
+func (p *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) (string, error) {
+	return "", fmt.Errorf("Not implemented")
 }
 
 func (p *FakePlatform) AddPciDevice(dev *ghw.PCIDevice) {

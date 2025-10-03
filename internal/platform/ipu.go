@@ -55,7 +55,7 @@ func (d *IntelDetector) IsDPU(platform Platform, pci ghw.PCIDevice, dpuDevices [
 		return false, nil
 	}
 
-	netdevNames, err := platform.GetNetDevNameFromPCIeAddr(pci.Address)
+	netdevNames, err := platform.GetNetDevNamesFromPCIeAddr(pci.Address)
 	if err != nil {
 		return false, fmt.Errorf("Error getting network device name for PCI address %s: %v", pci.Address, err)
 	}
