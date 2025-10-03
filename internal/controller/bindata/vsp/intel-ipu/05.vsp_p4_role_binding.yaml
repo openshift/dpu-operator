@@ -1,0 +1,13 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: vsp-p4-role-binding
+  namespace: {{.Namespace}}
+subjects:
+- kind: ServiceAccount
+  name: vsp-p4-sa
+roleRef:
+  kind: Role
+  name: vsp-p4-role
+  apiGroup: rbac.authorization.k8s.io
+
