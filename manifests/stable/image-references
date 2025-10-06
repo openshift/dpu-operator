@@ -11,13 +11,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/dpu-daemon:latest
-  # The following images don't exist yet. For now, comment them out to
-  # not break the build.
-  # https://github.com/openshift-eng/art-tools/blob/ade5d7adf6b3fb4094f25cdd5dfce96453eb103d/doozer/doozerlib/backend/rebaser.py#L2033
-  #- name: dpu-network-resources-injector
-  #  from:
-  #    kind: DockerImage
-  #    name: quay.io/openshift/dpu-network-resources-injector:latest
+  - name: dpu-network-resources-injector
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-network-resources-injector:latest
   - name: dpu-intel-ipu-vsp
     from:
       kind: DockerImage
@@ -26,15 +23,15 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/dpu-intel-ipu-p4sdk:latest
-  #- name: dpu-marvell-vsp
-  #  from:
-  #    kind: DockerImage
-  #    name: quay.io/openshift/dpu-marvell-vsp:latest
-  #- name: dpu-marvell-cp-agent
-  #  from:
-  #    kind: DockerImage
-  #    name: quay.io/openshift/dpu-marvell-cp-agent:latest
-  #- name: dpu-intel-netsec-vsp
-  #  from:
-  #    kind: DockerImage
-  #    name: quay.io/openshift/dpu-intel-netsec-vsp:latest
+  - name: dpu-marvell-vsp
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-marvell-vsp:latest
+  - name: dpu-marvell-cp-agent
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-marvell-cp-agent:latest
+  - name: dpu-intel-netsec-vsp
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-intel-netsec-vsp:latest
