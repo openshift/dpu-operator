@@ -264,7 +264,7 @@ func (d *HostSideManager) Ping() bool {
 	// Record successful ping
 	d.setPing(time.Now())
 
-	d.log.V(1).Info("Ping successful")
+	d.log.V(2).Info("Ping successful")
 	return true
 }
 
