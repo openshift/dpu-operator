@@ -59,15 +59,18 @@ type Manager interface {
 }
 
 type sriovManager struct {
-	nLink sriovutils.NetlinkManager
-	utils pciUtils
+	nLink     sriovutils.NetlinkManager
+	utils     pciUtils
+	allocator *sriovutils.PCIAllocator
 }
 
 // NewSriovManager returns an instance of SriovManager
 func NewSriovManager() *sriovManager {
+	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
 	return &sriovManager{
-		nLink: &sriovutils.MyNetlink{},
-		utils: &pciUtilsImpl{},
+		nLink:     &sriovutils.MyNetlink{},
+		utils:     &pciUtilsImpl{},
+		allocator: allocator,
 	}
 }
 
@@ -359,7 +362,7 @@ func (s *sriovManager) ResetVFConfig(conf *cnitypes.NetConf) error {
 func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error) {
 	klog.Info("CmdAdd called")
 
-	netConf, err := sriovconfig.LoadConf(req.CNIConf)
+	netConf, err := sriovconfig.LoadConf(req.CNIConf, sm.allocator)
 	if err != nil {
 		return nil, fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
 	}
@@ -494,8 +497,7 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 
 	// Mark the pci address as in use.
 	klog.Infof("Mark the PCI address as in use %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
-	if err = allocator.SaveAllocatedPCI(netConf.DeviceID, req.Netns); err != nil {
+	if err = sm.allocator.SaveAllocatedPCI(netConf.DeviceID, req.Netns); err != nil {
 		return nil, fmt.Errorf("error saving the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
 
@@ -574,8 +576,7 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 
 	// Mark the pci address as released
 	klog.Infof("Mark the PCI address as released %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
-	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
+	if err = sm.allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
 		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
 

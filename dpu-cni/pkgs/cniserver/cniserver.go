@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/gorilla/mux"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnihelper"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
-	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"k8s.io/klog/v2"
 )
@@ -30,6 +30,7 @@ type Server struct {
 	cniCmdAddHandler processRequestFunc
 	cniCmdDelHandler processRequestFunc
 	pathManager      utils.PathManager
+	cniMutex         sync.Mutex
 }
 
 // Start starts the server and begins serving on the given listener
@@ -72,31 +73,6 @@ func (s *Server) ShutdownAndWait() {
 	s.Shutdown(ctx)
 }
 
-func processRequest(request *cnitypes.Request) (*cni100.Result, error) {
-	// FIXME: Do actual work here.
-	klog.Infof("DEBUG: %v", request)
-
-	req, err := cniRequestToPodRequest(request)
-	if err != nil {
-		return nil, err
-	}
-	defer req.Cancel()
-	defer cniRequestEnvCleanup()
-
-	var res *cni100.Result = nil
-	sm := sriov.NewSriovManager()
-	if req.Command == cnitypes.CNIAdd {
-		res, err = sm.CmdAdd(req)
-	} else if req.Command == cnitypes.CNIDel {
-		err = sm.CmdDel(req)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
 // Split the "CNI_ARGS" environment variable's value into a map.  CNI_ARGS
 // contains arbitrary key/value pairs separated by ';' and is for runtime or
 // plugin specific uses.  Kubernetes passes the pod namespace and name in
@@ -120,6 +96,9 @@ func gatherCNIArgs(env map[string]string) (map[string]string, error) {
 
 // cniRequestSetEnv sets the CNI environment variables. This is needed when delegating IPAM plugins.
 // Please see vendor/github.com/containernetworking/cni/pkg/invoke/delegate.go:delegateCommon()
+// Environment variables process wide, which means go routines can suffer from race conditions if these env variables set
+// without proper mutual exclusion. Hence we need to use a CNI wide lock to protect the environment variables.
+// Unfortunately this means that CNI requests will need to be serialised.
 func cniRequestSetEnv(req *cnitypes.PodRequest) {
 	os.Setenv("CNI_COMMAND", req.Command)
 	os.Setenv("CNI_CONTAINERID", req.ContainerId)
@@ -172,8 +151,6 @@ func cniRequestToPodRequest(cr *cnitypes.Request) (*cnitypes.PodRequest, error) 
 	if err != nil {
 		return nil, err
 	}
-
-	cniRequestSetEnv(req)
 
 	req.PodNamespace, ok = cniArgs["K8S_POD_NAMESPACE"]
 	if !ok {
@@ -246,6 +223,12 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 	defer req.Cancel()
+
+	s.cniMutex.Lock()
+	defer s.cniMutex.Unlock()
+
+	cniRequestSetEnv(req)
+	defer cniRequestEnvCleanup()
 
 	var result *cni100.Result = nil
 	if req.Command == cnitypes.CNIAdd {
