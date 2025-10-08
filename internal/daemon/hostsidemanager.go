@@ -207,17 +207,19 @@ func (d *HostSideManager) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Re
 }
 
 func (d *HostSideManager) cniCmdDelHandler(req *cnitypes.PodRequest) (*cni100.Result, error) {
-	err := d.sm.CmdDel(req)
+	vfReleased, err := d.sm.CmdDel(req)
 	if err != nil {
 		return nil, errors.New("SRIOV manager failed in del handler")
 	}
-	pf := 0
-	vf := req.CNIConf.VFID
-	mac := req.CNIConf.OrigVfState.EffectiveMAC
-	// TODO: fix setting Vlan based on network definition in CR
-	vlan := 2 // *req.CNIConf.Vlan
-	d.log.Info("delHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
-	d.DeleteBridgePort(pf, vf, vlan, mac)
+	if vfReleased {
+		pf := 0
+		vf := req.CNIConf.VFID
+		mac := req.CNIConf.OrigVfState.EffectiveMAC
+		// TODO: fix setting Vlan based on network definition in CR
+		vlan := 2 // *req.CNIConf.Vlan
+		d.log.Info("cniCmdDelHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
+		d.DeleteBridgePort(pf, vf, vlan, mac)
+	}
 	return nil, nil
 }
 
@@ -262,7 +264,7 @@ func (d *HostSideManager) Ping() bool {
 	// Record successful ping
 	d.setPing(time.Now())
 
-	d.log.V(1).Info("Ping successful")
+	d.log.V(2).Info("Ping successful")
 	return true
 }
 

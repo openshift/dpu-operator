@@ -8,6 +8,7 @@ import (
 
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriovutils"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -16,7 +17,7 @@ var (
 )
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
-func LoadConf(n *cnitypes.NetConf) (*cnitypes.NetConf, error) {
+func LoadConf(n *cnitypes.NetConf, allocator *sriovutils.PCIAllocator) (*cnitypes.NetConf, error) {
 	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
 	if n.DeviceID != "" {
 		// Get rest of the VF information
@@ -34,12 +35,8 @@ func LoadConf(n *cnitypes.NetConf) (*cnitypes.NetConf, error) {
 	// This is to prevent issues where kubelet request to delete a pod and in the same time a new pod using the same
 	// vf is started. we can have an issue where the cmdDel of the old pod is called AFTER the cmdAdd of the new one
 	// This will block the new pod creation until the cmdDel is done.
-	// FIXME: Fix Logging
-	//logging.Debug("Check if the device is already allocated",
-	//	"func", "LoadConf",
-	//	"DefaultCNIDir", DefaultCNIDir,
-	//	"n.DeviceID", n.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(DefaultCNIDir)
+	klog.Infof("LoadConf():Check if the device is already allocated for DeviceID %s in directory %s", n.DeviceID, DefaultCNIDir)
+
 	isAllocated, err := allocator.IsAllocated(n.DeviceID)
 	if err != nil {
 		return n, err

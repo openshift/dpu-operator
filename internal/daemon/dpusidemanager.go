@@ -75,7 +75,7 @@ func (s *DpuSideManager) getPing() time.Time {
 }
 
 func (s *DpuSideManager) Ping(ctx context.Context, req *pb2.PingRequest) (*pb2.PingResponse, error) {
-	s.log.V(1).Info("Received heartbeat ping", "from", req.SenderId, "timestamp", req.Timestamp)
+	s.log.V(2).Info("Received heartbeat ping", "from", req.SenderId, "timestamp", req.Timestamp)
 
 	// Record the time we received this ping
 	s.setPing(time.Now())

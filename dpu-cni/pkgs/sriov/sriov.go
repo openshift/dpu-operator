@@ -55,19 +55,22 @@ type Manager interface {
 	ApplyVFConfig(conf *cnitypes.NetConf) error
 	FillOriginalVfInfo(conf *cnitypes.NetConf) error
 	CmdAdd(req *cnitypes.PodRequest) (*current.Result, error)
-	CmdDel(req *cnitypes.PodRequest) error
+	CmdDel(req *cnitypes.PodRequest) (bool, error)
 }
 
 type sriovManager struct {
-	nLink sriovutils.NetlinkManager
-	utils pciUtils
+	nLink     sriovutils.NetlinkManager
+	utils     pciUtils
+	allocator *sriovutils.PCIAllocator
 }
 
 // NewSriovManager returns an instance of SriovManager
 func NewSriovManager() *sriovManager {
+	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
 	return &sriovManager{
-		nLink: &sriovutils.MyNetlink{},
-		utils: &pciUtilsImpl{},
+		nLink:     &sriovutils.MyNetlink{},
+		utils:     &pciUtilsImpl{},
+		allocator: allocator,
 	}
 }
 
@@ -359,7 +362,7 @@ func (s *sriovManager) ResetVFConfig(conf *cnitypes.NetConf) error {
 func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error) {
 	klog.Info("CmdAdd called")
 
-	netConf, err := sriovconfig.LoadConf(req.CNIConf)
+	netConf, err := sriovconfig.LoadConf(req.CNIConf, sm.allocator)
 	if err != nil {
 		return nil, fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
 	}
@@ -494,15 +497,17 @@ func (sm *sriovManager) CmdAdd(req *cnitypes.PodRequest) (*current.Result, error
 
 	// Mark the pci address as in use.
 	klog.Infof("Mark the PCI address as in use %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
-	if err = allocator.SaveAllocatedPCI(netConf.DeviceID, req.Netns); err != nil {
+	if err = sm.allocator.SaveAllocatedPCI(netConf.DeviceID, req.Netns); err != nil {
 		return nil, fmt.Errorf("error saving the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
 
 	return result, nil
 }
 
-func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
+// CmdDel removes the device from the host. Plumbing of the DPU is done outside this function..
+// Returns true if the VF is released, meaning that plumbing must be done on the DPU side
+// Returns false if the VF is not released, meaning that plumbing should be avoided on the DPU side.
+func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) (bool, error) {
 	klog.Info("CmdDel called")
 
 	netConf, cRefPath, err := sriovconfig.LoadConfFromCache(req.ContainerId, req.IfName)
@@ -514,8 +519,10 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 		// Return nil when LoadConfFromCache fails since the rest
 		// of cmdDel() code relies on netconf as input argument
 		// and there is no meaning to continue.
+		// This can happen if the cmdAdd failed, but was before the netconfg was cached.
+		// Meaning that the VF was not setup in the container and reverted.
 		klog.Errorf("Cannot load config file from cache %v", err)
-		return nil
+		return false, nil
 	}
 
 	defer func() {
@@ -525,28 +532,30 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 	}()
 
 	if netConf.IPAM.Type != "" {
+		klog.Infof("CmdDel(): Executing IPAM plugin. IPAM type: %s", netConf.IPAM.Type)
 		err = ipam.ExecDel(netConf.IPAM.Type, req.CNIReq.Config)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// https://github.com/kubernetes/kubernetes/pull/35240
 	if req.Netns == "" {
-		return nil
+		return false, nil
 	}
 
 	// Verify VF ID existence.
 	if _, err := sriovutils.GetVfid(netConf.DeviceID, netConf.Master); err != nil {
-		return fmt.Errorf("cmdDel() error obtaining VF ID: %q", err)
+		return false, fmt.Errorf("cmdDel() error obtaining VF ID: %q", err)
 	}
 
+	klog.Infof("CmdDel(): Reset VF configuration %s", netConf.DeviceID)
 	/* ResetVFConfig resets a VF administratively. We must run ResetVFConfig
 	   before ReleaseVF because some drivers will error out if we try to
 	   reset netdev VF with trust off. So, reset VF MAC address via PF first.
 	*/
 	if err := sm.ResetVFConfig(netConf); err != nil {
-		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
+		return false, fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 
 	if !netConf.DPDKMode {
@@ -559,25 +568,26 @@ func (sm *sriovManager) CmdDel(req *cnitypes.PodRequest) error {
 			// IPAM resources
 			_, ok := err.(ns.NSPathNotExistErr)
 			if ok {
-				return nil
+				klog.Infof("cmdDel(): Exiting as the network namespace does not exists anymore %s", netConf.DeviceID)
+				return false, nil
 			}
 
-			return fmt.Errorf("failed to open netns %s: %q", netns, err)
+			return false, fmt.Errorf("failed to open netns %s: %q", netns, err)
 		}
 		defer netns.Close()
 
+		klog.Infof("cmdDel(): Release the VF Device ID %s, NetNS %s IfName %s", netConf.DeviceID, req.Netns, req.IfName)
 		if err = sm.ReleaseVF(netConf, req.IfName, netns); err != nil {
-			return err
+			return false, err
 		}
 	}
 	req.CNIConf.VFID = netConf.VFID
 
 	// Mark the pci address as released
 	klog.Infof("Mark the PCI address as released %s %s", sriovconfig.DefaultCNIDir, netConf.DeviceID)
-	allocator := sriovutils.NewPCIAllocator(sriovconfig.DefaultCNIDir)
-	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
-		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
+	if err = sm.allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
+		return false, fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
 
-	return nil
+	return true, nil
 }

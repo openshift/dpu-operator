@@ -99,8 +99,8 @@ func (m SriovManagerStub) CmdAdd(req *cnitypes.PodRequest) (*current.Result, err
 	return result, nil
 }
 
-func (m SriovManagerStub) CmdDel(req *cnitypes.PodRequest) error {
-	return nil
+func (m SriovManagerStub) CmdDel(req *cnitypes.PodRequest) (bool, error) {
+	return false, nil
 }
 
 type DummyDpuDaemon struct {
