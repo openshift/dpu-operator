@@ -491,7 +491,7 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 
 	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, vfIfName)
 	if err != nil {
-		vsp.log.Error(err, "Error adding VF to OvS Bridge", "BridgePortName", in.Name, "vfIfName", vfIfName)
+		vsp.log.Error(err, "Error deleting VF to OvS Bridge", "BridgePortName", in.Name, "vfIfName", vfIfName)
 		return nil, err
 	}
 
@@ -602,19 +602,19 @@ func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *
 	}
 	vsp.log.Info("DeleteNetworkFunction(): Outport Veth", "OutportVeth", outportVeth)
 
-	err := vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, inportVeth.IfName)
+	err := vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, inportVeth.PeerName)
 	if err != nil {
-		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "InportVeth", inportVeth.IfName)
+		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "InportVeth", inportVeth.PeerName)
 		return nil, err
 	}
-	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "InportVeth", inportVeth.IfName)
+	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "InportVeth", inportVeth.PeerName)
 
-	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, outportVeth.IfName)
+	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, outportVeth.PeerName)
 	if err != nil {
-		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "OutportVeth", outportVeth.IfName)
+		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "OutportVeth", outportVeth.PeerName)
 		return nil, err
 	}
-	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "OutportVeth", outportVeth.IfName)
+	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "OutportVeth", outportVeth.PeerName)
 
 	return nil, nil
 }
