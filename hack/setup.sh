@@ -53,6 +53,42 @@ wait_for_dpu() {
   echo "Total wait time: ${duration} seconds."
 }
 
+# Function to create config with retry logic to handle webhook certificate race condition.
+# Occationally, the webhook certificate is not ready yet when the config is created.
+# An error similar to: Error from server (InternalError): error when creating "examples/config.yaml": Internal error occurred:
+#     failed calling webhook "vdpuoperatorconfig.kb.io": failed to call webhook: Post "https://dpu-operator-webhook-service.openshift
+#     -dpu-operator.svc:443/validate-config-openshift-io-v1-dpuoperatorconfig?timeout=10s": tls: failed to verify certificate: x509:
+#     certificate signed by unknown authority
+# Would occur. This function retries creating the config, checking every 1 second for 30 seconds max.
+create_config_with_retry() {
+  local k8scli_func=$1
+  local config_file=$2
+  local max_attempts=30
+  local attempt=1
+  local error_output
+
+  echo "Creating config from $config_file..."
+
+  while [[ $attempt -le $max_attempts ]]; do
+    error_output=$($k8scli_func create -f "$config_file" 2>&1)
+    if [[ $? -eq 0 ]]; then
+      echo "$error_output"
+      echo "Config created successfully!"
+      return 0
+    else
+      if [[ $attempt -eq $max_attempts ]]; then
+        echo "Error: Failed to create config after $max_attempts attempts" >&2
+        echo "Last error message:" >&2
+        echo "$error_output" >&2
+        return 1
+      fi
+      echo "Attempt $attempt failed (webhook certificate not ready yet). Retrying in ${wait_time}s..."
+      sleep 1
+      attempt=$((attempt + 1))
+    fi
+  done
+}
+
 # Function to check kubeconfig files and determine execution path
 check_kubeconfig_files() {
     if [[ -f "$KUBECONFIG_OCP" && -f "$KUBECONFIG_MICROSHIFT" ]]; then
@@ -82,8 +118,8 @@ setup_1_cluster() {
         k8scli_ocp label "$node" dpu=true --overwrite
     done
 
-    # Create config in OCP cluster only
-    k8scli_ocp create -f examples/config.yaml
+    # Create config in OCP cluster only with retry logic
+    create_config_with_retry k8scli_ocp examples/config.yaml || exit 1
 
     # Wait for DpuOperatorConfig to be Ready on OCP cluster only
     echo "Waiting for DpuOperatorConfig to be Ready on OCP cluster..."
@@ -109,9 +145,9 @@ setup_2_cluster() {
     done
     k8scli_microshift label nodes --all dpu=true
 
-    # Create config on both clusters
-    k8scli_microshift create -f examples/config.yaml
-    k8scli_ocp create -f examples/config.yaml
+    # Create config on both clusters with retry logic
+    create_config_with_retry k8scli_microshift examples/config.yaml || exit 1
+    create_config_with_retry k8scli_ocp examples/config.yaml || exit 1
 
     # Wait for DpuOperatorConfig to be Ready on both clusters
     echo "Waiting for DpuOperatorConfig to be Ready on microshift cluster..."
