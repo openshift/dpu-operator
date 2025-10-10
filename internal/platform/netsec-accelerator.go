@@ -83,6 +83,16 @@ func (d *NetsecAcceleratorDetector) GetVendorName() string {
 	return "intel"
 }
 
-func (d *NetsecAcceleratorDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+func (d *NetsecAcceleratorDetector) DpuPlatformName() string {
 	return "intel-netsec"
+}
+
+func (d *NetsecAcceleratorDetector) DpuPlatformIdentifier(platform Platform) (plugin.DpuIdentifier, error) {
+	// Get the network device MAC Address from the SFP port 0's PCIe address
+	macAddress, err := platform.GetNetDevMACAddressFromPCIeAddr(IntelNetSecDpuSFPf0PCIeAddress)
+	if err != nil {
+		return "", errors.Errorf("Error getting network device MAC address for %s: %v", IntelNetSecDpuSFPf0PCIeAddress, err)
+	}
+
+	return plugin.DpuIdentifier(SanitizePCIAddress(macAddress)), nil
 }

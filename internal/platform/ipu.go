@@ -96,6 +96,11 @@ func (d *IntelDetector) GetVendorName() string {
 	return "intel"
 }
 
-func (d *IntelDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+func (d *IntelDetector) DpuPlatformName() string {
 	return "intel-ipu"
+}
+
+// FIXME: Must be a unique value on the DPU that is non changing.
+func (d *IntelDetector) DpuPlatformIdentifier(platform Platform) (plugin.DpuIdentifier, error) {
+	return plugin.DpuIdentifier("intel-ipu"), nil
 }
