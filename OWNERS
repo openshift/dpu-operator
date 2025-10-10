@@ -1,18 +1,14 @@
 reviewers:
   - bn222
-  - wizhaoredhat
-  - SalDaniele
-  - vrindle
+  - danwinship
   - thom311
-  - m-naught
-  - samd2021
+  - vrindle
+  - wizhaoredhat
 approvers:
   - bn222
-  - wizhaoredhat
-  - SalDaniele
-  - vrindle
+  - danwinship
   - thom311
-  - m-naught
-  - samd2021
+  - vrindle
+  - wizhaoredhat
 component: "Networking"
 subcomponent: "DPU"
