@@ -47,13 +47,16 @@ type VendorDetector interface {
 
 	GetVendorName() string
 
+	// The name of the DPU platform.
+	DpuPlatformName() string
+
 	// A unique identifier for when detection happens on the DPU
-	DpuPlatformIdentifier() plugin.DpuIdentifier
+	DpuPlatformIdentifier(platform Platform) (plugin.DpuIdentifier, error)
 }
 
 // SanitizeForTemplate converts identifiers to be template-safe by replacing hyphens with underscores
-func SanitizeForTemplate(identifier plugin.DpuIdentifier) string {
-	return strings.ReplaceAll(string(identifier), "-", "_")
+func SanitizeForTemplate(name string) string {
+	return strings.ReplaceAll(name, "-", "_")
 }
 
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
@@ -71,7 +74,7 @@ func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
 func (d *DpuDetectorManager) GetVendorDirectory(dpuProductName string) (string, error) {
 	for _, detector := range d.detectors {
 		if detector.Name() == dpuProductName {
-			return string(detector.DpuPlatformIdentifier()), nil
+			return detector.DpuPlatformName(), nil
 		}
 	}
 	return "", fmt.Errorf("unknown DPU product name: %s", dpuProductName)
@@ -130,7 +133,10 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 		}
 
 		if dpuPlatform {
-			identifier := detector.DpuPlatformIdentifier()
+			identifier, err := detector.DpuPlatformIdentifier(d.platform)
+			if err != nil {
+				return nil, err
+			}
 			vsp, err := detector.VspPlugin(true, imageManager, client, pm, identifier)
 			if err != nil {
 				return nil, err

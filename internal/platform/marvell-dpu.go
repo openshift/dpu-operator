@@ -71,6 +71,11 @@ func (d *MarvellDetector) GetVendorName() string {
 	return "marvell"
 }
 
-func (d *MarvellDetector) DpuPlatformIdentifier() plugin.DpuIdentifier {
+func (d *MarvellDetector) DpuPlatformName() string {
 	return "marvell-dpu"
+}
+
+// FIXME: Must be a unique value on the DPU that is non changing.
+func (d *MarvellDetector) DpuPlatformIdentifier(platform Platform) (plugin.DpuIdentifier, error) {
+	return plugin.DpuIdentifier("marvell-dpu"), nil
 }

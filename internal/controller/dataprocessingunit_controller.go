@@ -202,7 +202,7 @@ func (r *DataProcessingUnitReconciler) getVSPImageForDPU(dpu *configv1.DataProce
 	// Find the detector for this DPU product name and get its platform identifier
 	for _, detector := range detectorManager.GetDetectors() {
 		if detector.Name() == dpu.Spec.DpuProductName {
-			identifier := detector.DpuPlatformIdentifier()
+			identifier := detector.DpuPlatformName()
 			templateKey := platform.SanitizeForTemplate(identifier)
 			return r.imageManager.GetImage(templateKey)
 		}

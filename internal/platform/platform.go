@@ -19,6 +19,7 @@ type Platform interface {
 	ReadDeviceSerialNumber(pciDevice *ghw.PCIDevice) (string, error)
 	GetNetDevNamesFromPCIeAddr(pcieAddress string) ([]string, error)
 	GetNetDevNameFromPCIeAddr(pcieAddress string) (string, error)
+	GetNetDevMACAddressFromPCIeAddr(pcieAddress string) (string, error)
 }
 
 type HardwarePlatform struct{}
@@ -54,7 +55,7 @@ func (hp *HardwarePlatform) GetNetDevNamesFromPCIeAddr(pcieAddress string) ([]st
 	var ifaces []string
 	for _, nic := range nics {
 		if nic.PCIAddress != nil && *nic.PCIAddress == pcieAddress {
-			klog.V(2).Infof("GetNetDevNamesFromPCIeAddr(): found DPU network device %s %s", nic.Name, *nic.PCIAddress)
+			klog.V(2).Infof("GetNetDevNamesFromPCIeAddr(): found network device Name: %s PCIe: %s", nic.Name, *nic.PCIAddress)
 			ifaces = append(ifaces, nic.Name)
 		}
 	}
@@ -75,6 +76,22 @@ func (hp *HardwarePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) (strin
 	}
 
 	return ifNames[0], nil
+}
+
+func (hp *HardwarePlatform) GetNetDevMACAddressFromPCIeAddr(pcieAddress string) (string, error) {
+	nics, err := hp.NetDevs()
+	if err != nil {
+		return "", fmt.Errorf("failed to get network devices: %w", err)
+	}
+
+	for _, nic := range nics {
+		if nic.PCIAddress != nil && *nic.PCIAddress == pcieAddress {
+			klog.V(2).Infof("GetNetDevMACAddressFromPCIeAddr(): found network device Name: %s PCIe: %s MAC: %s", nic.Name, *nic.PCIAddress, nic.MacAddress)
+			return nic.MacAddress, nil
+		}
+	}
+
+	return "", fmt.Errorf("no network device found at address %s", pcieAddress)
 }
 
 func (hp *HardwarePlatform) Product() (*ghw.ProductInfo, error) {
@@ -178,6 +195,10 @@ func (p *FakePlatform) GetNetDevNamesFromPCIeAddr(pcieAddress string) ([]string,
 }
 
 func (p *FakePlatform) GetNetDevNameFromPCIeAddr(pcieAddress string) (string, error) {
+	return "", fmt.Errorf("Not implemented")
+}
+
+func (p *FakePlatform) GetNetDevMACAddressFromPCIeAddr(pcieAddress string) (string, error) {
 	return "", fmt.Errorf("Not implemented")
 }
 
