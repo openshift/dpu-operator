@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw"
@@ -42,6 +43,26 @@ const (
 	NoOfVethPairs                        int    = 2 // Only support 1 Network Function with 2 pairs (TODO: Need CRD)
 	MaxChains                            int    = 1 // Only support 1 Chain of Network Functions
 	OvSBridgeName                        string = "br-secondary"
+	// The reason why IntelWaitForVfSetupTimeout is high is because some net drivers take a long time to create VF interfaces
+	// For instance the E810 can take up to 30 seconds to fully register the VF interfaces with the kernel.
+	// The following is a sample kernel log for VF enabling on Intel e810. THe delta time is 528283 - 528256 = 27 seconds. For the first VF to be fully up.
+	// [528256.873706] ice 0000:ca:00.0: Enabling 8 VFs
+	// [528256.983461] iavf 0000:ca:01.0: enabling device (0000 -> 0002)
+	// ...
+	// [528256.988326] ice 0000:ca:00.0: Enabling 8 VFs with 17 vectors and 16 queues per VF
+	// [528257.062322] ice 0000:ca:00.0: Setting VLAN 2, QoS 0, TPID 0x8100 on VF 0
+	// ...
+	// [528257.100068] ice 0000:ca:00.0: VF 0 is now trusted
+	// ...
+	// [528277.561601] iavf 0000:ca:01.0: Failed to communicate with PF; waiting before retry
+	// [528282.869551] iavf 0000:ca:01.0: Hardware came out of reset. Attempting reinit.
+	// [528282.952530] iavf 0000:ca:01.0: Invalid MAC address 00:00:00:00:00:00, using random
+	// [528282.952956] iavf 0000:ca:01.0: Multiqueue Enabled: Queue pair count = 16
+	// [528282.952980] iavf 0000:ca:01.0: MAC address: 1e:ee:1a:79:25:cb
+	// [528282.952981] iavf 0000:ca:01.0: GRO is enabled
+	// [528282.957114] iavf 0000:ca:01.0 ens7f0v0: renamed from eth0
+	// [528283.062603] iavf 0000:ca:01.0 ens7f0v0: NIC Link is Up Speed is 25 Gbps Full Duplex
+	IntelWaitForVfSetupTimeout time.Duration = 40 * time.Second
 )
 
 type intelNetSecVspServer struct {
@@ -210,13 +231,13 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 	// The following code takes the second SFP port's first VF and adds this VF to the OvS bridge.
 	// The reason why a VF is chosen is to support VLAN use cases and multiple independent chains.
 	// TODO: When more chains are supported we need to put the following in a loop
-	vfPcieAddr, err := vspnetutils.WaitForVfPciAddressReady(vsp.fs, sfpPortIfName, 0)
+	vfPcieAddr, err := vspnetutils.WaitForVfPciAddressReady(vsp.fs, sfpPortIfName, 0, IntelWaitForVfSetupTimeout)
 	if err != nil {
 		vsp.log.Error(err, "Error getting VF PCI address", "VFID", 0, "sfpPortIfName", sfpPortIfName)
 		return err
 	}
 
-	vfIfName, err := vspnetutils.WaitForVfNetDevReady(vsp.platform, vfPcieAddr)
+	vfIfName, err := vspnetutils.WaitForNetDevReady(vsp.platform, vfPcieAddr, IntelWaitForVfSetupTimeout)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in getting SFP Port Interface Name", "vfPcieAddr", vfPcieAddr)
 		return err
@@ -251,7 +272,7 @@ func (vsp *intelNetSecVspServer) initOvSDataPlane(bridgeName string) error {
 		vfRepDevs: make(map[vspnetutils.VfDeviceKey]*intelNetSecVfRepDev),
 	}
 
-	err = vspnetutils.AddInterfaceToOvSBridge(bridgeName, vfIfName)
+	err = vsp.ifUpAndAddToBridge(vfIfName)
 	if err != nil {
 		vsp.log.Error(err, "Error occurred in adding SFP Port Interface to Bridge", "BridgeName", bridgeName, "sfpPortIfName", sfpPortIfName)
 		return err
@@ -442,15 +463,15 @@ func (vsp *intelNetSecVspServer) CreateBridgePort(ctx context.Context, in *opi.C
 		return nil, err
 	}
 
-	vfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
+	vfIfName, err := vspnetutils.WaitForNetDevReady(vsp.platform, vfDevice.PciAddress, IntelWaitForVfSetupTimeout)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
 	}
 
-	err = vspnetutils.AddInterfaceToOvSBridge(OvSBridgeName, vfIfName)
+	err = vsp.ifUpAndAddToBridge(vfIfName)
 	if err != nil {
-		vsp.log.Error(err, "Error adding VF to OvS Bridge", "BridgePortName", in.BridgePort.Name, "vfIfName", vfIfName)
+		vsp.log.Error(err, "Error setting up VF up and adding to OvS Bridge", "vfIfName", vfIfName)
 		return nil, err
 	}
 
@@ -483,15 +504,15 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 		return nil, err
 	}
 
-	vfIfName, err := vsp.platform.GetNetDevNameFromPCIeAddr(vfDevice.PciAddress)
+	vfIfName, err := vspnetutils.WaitForNetDevReady(vsp.platform, vfDevice.PciAddress, IntelWaitForVfSetupTimeout)
 	if err != nil {
 		vsp.log.Error(err, "Error getting netdev name from PCIe address", "PCIeAddress", vfDevice.PciAddress)
 		return nil, err
 	}
 
-	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, vfIfName)
+	err = vsp.ifDownAndDelFromBridge(vfIfName)
 	if err != nil {
-		vsp.log.Error(err, "Error deleting VF to OvS Bridge", "BridgePortName", in.Name, "vfIfName", vfIfName)
+		vsp.log.Error(err, "Error setting down VF and deleting from OvS Bridge", "vfIfName", vfIfName)
 		return nil, err
 	}
 
@@ -516,31 +537,59 @@ func (vsp *intelNetSecVspServer) DeleteBridgePort(ctx context.Context, in *opi.D
 	return nil, nil
 }
 
-func (vsp *intelNetSecVspServer) vethUpAndAddToBridge(veth *vspnetutils.VEthPairDeviceInfo) error {
-	// The peer interface is the dataplane interface that needs to be up and added to the bridge.
-	vethLink, err := netlink.LinkByName(veth.PeerName)
+// ifUpAndAddToBridge function to bring up the given interface and add it to the OvS Bridge.
+// This is a common function that should be used for adding interfaces to the OvS Bridge.
+// We want to make sure the interface is up before adding it to the OvS Bridge.
+func (vsp *intelNetSecVspServer) ifUpAndAddToBridge(ifName string) error {
+	link, err := netlink.LinkByName(ifName)
 	if err != nil {
-		vsp.log.Error(err, "Error getting inport Veth", "InportVeth", veth.IfName, "PeerName", veth.PeerName)
+		vsp.log.Error(err, "Error getting link by name", "ifName", ifName)
 		return err
 	}
 
-	vsp.log.Info("vethUpAndAddToBridge(): Setting up dataplane interface", "PeerName", veth.PeerName)
-	if err := netlink.LinkSetUp(vethLink); err != nil {
-		vsp.log.Error(err, "Error setting up inport Veth", "InportVeth", veth.IfName, "PeerName", veth.PeerName)
+	vsp.log.Info("ifUpAndAddToBridge(): Link up interface", "ifName", ifName)
+	if err := netlink.LinkSetUp(link); err != nil {
+		vsp.log.Error(err, "Error setting link up for interface", "ifName", ifName)
 		return err
 	}
 
-	vsp.log.Info("vethUpAndAddToBridge(): Adding dataplane interface to OvS Bridge", "PeerName", veth.PeerName)
-	err = vspnetutils.AddInterfaceToOvSBridge(OvSBridgeName, veth.PeerName)
+	vsp.log.Info("ifUpAndAddToBridge(): Adding interface to OvS Bridge", "ifName", ifName)
+	err = vspnetutils.AddInterfaceToOvSBridge(OvSBridgeName, ifName)
 	if err != nil {
-		vsp.log.Error(err, "Error adding inport Veth to OvS Bridge", "InportVeth", veth.IfName, "PeerName", veth.PeerName)
+		vsp.log.Error(err, "Error adding interface to OvS Bridge", "ifName", ifName)
 		return err
 	}
 
 	return nil
 }
 
-// TODO: Implement this
+// ifDownAndDelFromBridge function to bring down the given interface and delete it from the OvS Bridge.
+// This is a common function that should be used for deleting interfaces from the OvS Bridge.
+// We want to make sure the interface is down before deleting it from the OvS Bridge. This is prevent
+// packets coming from externally to reach the system via the VF.
+func (vsp *intelNetSecVspServer) ifDownAndDelFromBridge(ifName string) error {
+	link, err := netlink.LinkByName(ifName)
+	if err != nil {
+		vsp.log.Error(err, "Error getting link by name", "ifName", ifName)
+		return err
+	}
+
+	vsp.log.Info("ifDownAndDelFromBridge(): Link down interface", "ifName", ifName)
+	if err := netlink.LinkSetDown(link); err != nil {
+		vsp.log.Error(err, "Error setting link down for interface", "ifName", ifName)
+		return err
+	}
+
+	vsp.log.Info("ifDownAndDelFromBridge(): Deleting interface from OvS Bridge", "ifName", ifName)
+	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, ifName)
+	if err != nil {
+		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "ifName", ifName)
+		return err
+	}
+
+	return nil
+}
+
 func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
 	vsp.log.Info("Received CreateNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 
@@ -562,15 +611,15 @@ func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *
 	}
 	vsp.log.Info("CreateNetworkFunction(): Outport Veth", "OutportVeth", outportVeth)
 
-	err := vsp.vethUpAndAddToBridge(inportVeth)
+	err := vsp.ifUpAndAddToBridge(inportVeth.PeerName)
 	if err != nil {
-		vsp.log.Error(err, "Error setting up inport Veth", "InportVeth", inportVeth.IfName)
+		vsp.log.Error(err, "Error setting up inport Veth peer", "InportVeth", inportVeth.PeerName)
 		return nil, err
 	}
 
-	err = vsp.vethUpAndAddToBridge(outportVeth)
+	err = vsp.ifUpAndAddToBridge(outportVeth.PeerName)
 	if err != nil {
-		vsp.log.Error(err, "Error setting up outport Veth", "OutportVeth", outportVeth.IfName)
+		vsp.log.Error(err, "Error setting up outport Veth peer", "OutportVeth", outportVeth.PeerName)
 		return nil, err
 	}
 
@@ -580,7 +629,6 @@ func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *
 	return out, nil
 }
 
-// TODO: Implement this
 func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
 	vsp.log.Info("Received DeleteNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 
@@ -602,21 +650,50 @@ func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *
 	}
 	vsp.log.Info("DeleteNetworkFunction(): Outport Veth", "OutportVeth", outportVeth)
 
-	err := vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, inportVeth.PeerName)
+	err := vsp.ifDownAndDelFromBridge(inportVeth.PeerName)
 	if err != nil {
-		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "InportVeth", inportVeth.PeerName)
+		vsp.log.Error(err, "Error tearing down inport Veth peer", "InportVeth", inportVeth.PeerName)
 		return nil, err
 	}
+
 	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "InportVeth", inportVeth.PeerName)
 
-	err = vspnetutils.DeleteInterfaceFromOvSBridge(OvSBridgeName, outportVeth.PeerName)
+	err = vsp.ifDownAndDelFromBridge(outportVeth.PeerName)
 	if err != nil {
-		vsp.log.Error(err, "Error deleting interface from OvS Bridge", "OutportVeth", outportVeth.PeerName)
+		vsp.log.Error(err, "Error tearing down outport Veth peer", "OutportVeth", outportVeth.PeerName)
 		return nil, err
 	}
+
 	vsp.log.Info("DeleteNetworkFunction(): Deleted Interface from OvS Bridge", "OutportVeth", outportVeth.PeerName)
 
 	return nil, nil
+}
+
+// finishVfSetup function to finish the VF setup for the given interface name and VF ID.
+// It waits for the VF PCI address to be available, the VF netdev to be available, and the VF link to be available.
+// It then sets the VF link down and returns the VF PCI address, VF netdev name, and error if any.
+// The reason waits are used here is because setting the sriov numvfs can return early before any of the VF netdevs are
+// actually ready and available. Some drivers such as the Intel ICE can take up to 30 seconds to fully register the VF
+// netdevs with the kernel.
+func (vsp *intelNetSecVspServer) finishVfSetup(ifName string, vfID int) (string, string, error) {
+	pcieAddr, err := vspnetutils.WaitForVfPciAddressReady(vsp.fs, ifName, vfID, IntelWaitForVfSetupTimeout)
+	if err != nil {
+		vsp.log.Error(err, "Error getting VF PCI address", "VFID", vfID, "InterfaceName", ifName)
+		return "", "", err
+	}
+
+	vfIfName, vfLink, err := vspnetutils.WaitForLinkReady(vsp.platform, pcieAddr, IntelWaitForVfSetupTimeout)
+	if err != nil {
+		vsp.log.Error(err, "Error getting link by name", "ifName", vfIfName)
+		return "", "", err
+	}
+
+	if err := netlink.LinkSetDown(vfLink); err != nil {
+		vsp.log.Error(err, "Error setting link down for interface", "vfIfName", vfIfName)
+		return "", "", err
+	}
+
+	return pcieAddr, vfIfName, nil
 }
 
 // setVlanIdsSpoofChk function to set the VLAN IDs for host facing interfaces such that each container
@@ -683,9 +760,9 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pfPcieAddr stri
 			return err
 		}
 
-		pcieAddr, err := vspnetutils.WaitForVfPciAddressReady(vsp.fs, ifName, vfID)
+		pcieAddr, vfIfName, err := vsp.finishVfSetup(ifName, vfID)
 		if err != nil {
-			vsp.log.Error(err, "Error getting VF PCI address", "VFID", vfID, "InterfaceName", ifName)
+			vsp.log.Error(err, "Error finishing VF setup", "InterfaceName", ifName, "VfID", vfID)
 			return err
 		}
 
@@ -701,7 +778,7 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pfPcieAddr stri
 			Allocated:  false,
 		}
 
-		vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): Set VLAN ID for VF", "VFID", vfID, "VlanID", vlan, "InterfaceName", ifName, "PCIeAddress", pcieAddr)
+		vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): Set VLAN ID for VF", "InterfaceName", ifName, "VFID", vfID, "VlanID", vlan, "PCIeAddress", pcieAddr, "vfIfName", vfIfName)
 		vsp.log.Info("setVlanIdsSpoofChkInternalPorts(): VF Device Info", "VFKey", key, "VfDeviceInfo", vsp.vfDevs[key])
 	}
 
@@ -736,7 +813,13 @@ func (vsp *intelNetSecVspServer) setSpoofChkExternalPorts(pfPcieAddr string, num
 			return err
 		}
 
-		vsp.log.Info("setSpoofChkExternalPorts(): Set spoof check off for VF", "InterfaceName", ifName, "VfID", vfID)
+		pcieAddr, vfIfName, err := vsp.finishVfSetup(ifName, vfID)
+		if err != nil {
+			vsp.log.Error(err, "Error finishing VF setup", "InterfaceName", ifName, "VfID", vfID)
+			return err
+		}
+
+		vsp.log.Info("setSpoofChkExternalPorts(): Set spoof check off for VF", "InterfaceName", ifName, "VfID", vfID, "PCIeAddress", pcieAddr, "VfIfName", vfIfName)
 	}
 
 	return nil
