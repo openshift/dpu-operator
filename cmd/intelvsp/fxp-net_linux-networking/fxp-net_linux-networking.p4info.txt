@@ -547,7 +547,10 @@ tables {
     annotations: "@defaultonly"
     scope: DEFAULT_ONLY
   }
-  const_default_action_id: 21790705
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
   size: 1024
 }
 tables {
@@ -921,7 +924,7 @@ tables {
   action_refs {
     id: 29238102
   }
-  const_default_action_id: 32890467
+  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -948,7 +951,6 @@ tables {
   action_refs {
     id: 29238102
   }
-  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -1002,7 +1004,7 @@ tables {
   action_refs {
     id: 29238102
   }
-  const_default_action_id: 31939992
+  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -1056,7 +1058,7 @@ tables {
   action_refs {
     id: 29238102
   }
-  const_default_action_id: 31624713
+  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -1130,24 +1132,6 @@ tables {
 }
 tables {
   preamble {
-    id: 40941464
-    name: "linux_networking_control.mir_prof"
-    alias: "mir_prof"
-    annotations: "@intel_lut_type(\"mirror_profile\")"
-  }
-  match_fields {
-    id: 1
-    name: "mirror_prof_key"
-    bitwidth: 8
-    match_type: EXACT
-  }
-  action_refs {
-    id: 19137704
-  }
-  size: 256
-}
-tables {
-  preamble {
     id: 38721082
     name: "linux_networking_control.rx_phy_port_to_pr_map"
     alias: "rx_phy_port_to_pr_map"
@@ -1165,15 +1149,12 @@ tables {
     match_type: EXACT
   }
   action_refs {
-    id: 20004960
-  }
-  action_refs {
     id: 26092385
   }
   action_refs {
     id: 29238102
   }
-  const_default_action_id: 26092385
+  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -1200,7 +1181,7 @@ tables {
   action_refs {
     id: 29238102
   }
-  const_default_action_id: 26092385
+  const_default_action_id: 29238102
   size: 1024
 }
 tables {
@@ -1228,6 +1209,97 @@ tables {
     id: 29238102
   }
   const_default_action_id: 29238102
+  size: 1024
+}
+tables {
+  preamble {
+    id: 44641644
+    name: "linux_networking_control.hash_ipv4_tcp"
+    alias: "hash_ipv4_tcp"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 46678878
+    name: "linux_networking_control.hash_ipv4_udp"
+    alias: "hash_ipv4_udp"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 45972289
+    name: "linux_networking_control.hash_ipv4"
+    alias: "hash_ipv4"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 33896331
+    name: "linux_networking_control.hash_l2"
+    alias: "hash_l2"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 46852435
+    name: "linux_networking_control.hash_ipv6_tcp"
+    alias: "hash_ipv6_tcp"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 46359163
+    name: "linux_networking_control.hash_ipv6_udp"
+    alias: "hash_ipv6_udp"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 34506208
+    name: "linux_networking_control.hash_ipv6"
+    alias: "hash_ipv6"
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
   size: 1024
 }
 tables {
@@ -2472,29 +2544,6 @@ actions {
 }
 actions {
   preamble {
-    id: 20004960
-    name: "linux_networking_control.mirror_and_send"
-    alias: "mirror_and_send"
-  }
-  params {
-    id: 1
-    name: "port"
-    bitwidth: 32
-    type_name {
-      name: "PortId_t"
-    }
-  }
-  params {
-    id: 2
-    name: "mirror_session_id"
-    bitwidth: 16
-    type_name {
-      name: "MirrorSessionId_t"
-    }
-  }
-}
-actions {
-  preamble {
     id: 26423957
     name: "linux_networking_control.set_ipsec_tunnel"
     alias: "set_ipsec_tunnel"
@@ -2668,18 +2717,6 @@ actions {
 }
 actions {
   preamble {
-    id: 22609087
-    name: "linux_networking_control.send_rss_queue"
-    alias: "send_rss_queue"
-  }
-  params {
-    id: 1
-    name: "q_id"
-    bitwidth: 16
-  }
-}
-actions {
-  preamble {
     id: 17061464
     name: "linux_networking_control.ipv4_lpm_root_lut_action"
     alias: "ipv4_lpm_root_lut_action"
@@ -2700,243 +2737,6 @@ actions {
     id: 1
     name: "ipv6_table_lpm_root"
     bitwidth: 32
-  }
-}
-actions {
-  preamble {
-    id: 19137704
-    name: "linux_networking_control.mir_prof_action"
-    alias: "mir_prof_action"
-  }
-  params {
-    id: 1
-    name: "hash_val"
-    bitwidth: 64
-  }
-  params {
-    id: 2
-    name: "hash_mask"
-    bitwidth: 64
-  }
-  params {
-    id: 3
-    name: "port_dest_type"
-    bitwidth: 32
-  }
-  params {
-    id: 4
-    name: "vport_id"
-    bitwidth: 32
-  }
-  params {
-    id: 5
-    name: "mode"
-    bitwidth: 1
-  }
-  params {
-    id: 6
-    name: "op"
-    bitwidth: 32
-  }
-  params {
-    id: 7
-    name: "exp"
-    bitwidth: 32
-  }
-  params {
-    id: 8
-    name: "mod_addr"
-    bitwidth: 32
-  }
-  params {
-    id: 9
-    name: "mod_profile"
-    bitwidth: 24
-  }
-  params {
-    id: 10
-    name: "dest_id"
-    bitwidth: 16
-  }
-  params {
-    id: 11
-    name: "trunc_size"
-    bitwidth: 16
-  }
-  params {
-    id: 12
-    name: "mod_content_size"
-    bitwidth: 16
-  }
-  params {
-    id: 13
-    name: "dst_q"
-    bitwidth: 16
-  }
-  params {
-    id: 14
-    name: "defer_drop_en"
-    bitwidth: 1
-  }
-  params {
-    id: 15
-    name: "trunc_mode_en"
-    bitwidth: 1
-  }
-  params {
-    id: 16
-    name: "recirculate"
-    bitwidth: 1
-  }
-  params {
-    id: 17
-    name: "store_port"
-    bitwidth: 1
-  }
-  params {
-    id: 18
-    name: "func_valid"
-    bitwidth: 1
-  }
-  params {
-    id: 19
-    name: "store_vsi"
-    bitwidth: 1
-  }
-  params {
-    id: 20
-    name: "drop_en"
-    bitwidth: 1
-  }
-  params {
-    id: 21
-    name: "trunc"
-    bitwidth: 1
-  }
-  params {
-    id: 22
-    name: "mod_profile_valid"
-    bitwidth: 1
-  }
-  params {
-    id: 23
-    name: "mod_content_size_en"
-    bitwidth: 1
-  }
-  params {
-    id: 24
-    name: "mod_ptype_tras_index"
-    bitwidth: 8
-  }
-  params {
-    id: 25
-    name: "mod_common_en"
-    bitwidth: 1
-  }
-  params {
-    id: 26
-    name: "mod_append_action_bus_en"
-    bitwidth: 1
-  }
-  params {
-    id: 27
-    name: "is_md_gen0"
-    bitwidth: 1
-  }
-  params {
-    id: 28
-    name: "is_md_gen1"
-    bitwidth: 1
-  }
-  params {
-    id: 29
-    name: "is_md_local"
-    bitwidth: 1
-  }
-  params {
-    id: 30
-    name: "is_md_remote"
-    bitwidth: 1
-  }
-  params {
-    id: 31
-    name: "md_gen0_type"
-    bitwidth: 8
-  }
-  params {
-    id: 32
-    name: "md_gen0_off"
-    bitwidth: 8
-  }
-  params {
-    id: 33
-    name: "md_gen0_val"
-    bitwidth: 16
-  }
-  params {
-    id: 34
-    name: "md_gen0_mask"
-    bitwidth: 16
-  }
-  params {
-    id: 35
-    name: "md_gen1_type"
-    bitwidth: 8
-  }
-  params {
-    id: 36
-    name: "md_gen1_off"
-    bitwidth: 8
-  }
-  params {
-    id: 37
-    name: "md_gen1_val"
-    bitwidth: 16
-  }
-  params {
-    id: 38
-    name: "md_gen1_mask"
-    bitwidth: 16
-  }
-  params {
-    id: 39
-    name: "md_local_type"
-    bitwidth: 8
-  }
-  params {
-    id: 40
-    name: "md_local_off"
-    bitwidth: 8
-  }
-  params {
-    id: 41
-    name: "md_local_val"
-    bitwidth: 8
-  }
-  params {
-    id: 42
-    name: "md_local_mask"
-    bitwidth: 8
-  }
-  params {
-    id: 43
-    name: "md_remote_type"
-    bitwidth: 8
-  }
-  params {
-    id: 44
-    name: "md_remote_off"
-    bitwidth: 8
-  }
-  params {
-    id: 45
-    name: "md_remote_val"
-    bitwidth: 8
-  }
-  params {
-    id: 46
-    name: "md_remote_mask"
-    bitwidth: 8
   }
 }
 direct_counters {
@@ -2980,15 +2780,6 @@ direct_counters {
   }
 }
 type_info {
-  new_types {
-    key: "MirrorSessionId_t"
-    value {
-      translated_type {
-        uri: "p4.org/pna/v1/MirrorSessionId_t"
-        sdn_bitwidth: 16
-      }
-    }
-  }
   new_types {
     key: "PortId_t"
     value {
