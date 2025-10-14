@@ -49,6 +49,10 @@ spec:
           mountPropagation: Bidirectional
         - name: cni-dir
           mountPath: /var/lib/cni
+        - name: k8s-cni-dir
+          mountPath: /etc/kubernetes/cni
+        - name: etc-cni-dir
+          mountPath: /etc/cni
         - name: host-run
           mountPath: /var/run/netns
           mountPropagation: Bidirectional
@@ -66,6 +70,12 @@ spec:
         - name: cni-dir
           hostPath:
             path: {{.CniDir}} # /var/lib/cni
+        - name: k8s-cni-dir
+          hostPath:
+            path: /etc/kubernetes/cni
+        - name: etc-cni-dir
+          hostPath:
+            path: /etc/cni
         - name: host-run
           hostPath:
             path: /var/run/netns
