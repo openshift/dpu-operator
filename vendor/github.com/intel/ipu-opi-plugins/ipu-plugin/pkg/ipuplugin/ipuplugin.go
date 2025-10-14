@@ -17,8 +17,13 @@ package ipuplugin
 import (
 	"context"
 	"fmt"
-	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/firewall"
-	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/infrapod"
+	"net"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
+
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
@@ -28,16 +33,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"net"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
-	"time"
-)
-
-const (
-	dpuNamespace = "openshift-dpu-operator"
 )
 
 type server struct {
@@ -54,16 +49,14 @@ type server struct {
 	Ports           map[string]*types.BridgePortInfo
 	bridgeCtlr      types.BridgeController
 	p4rtClient      types.P4RTClient
-	p4Image         string
 	mode            string
 	daemonHostIp    string
 	daemonIpuIp     string
 	daemonPort      int
-	infrapodMgr     types.InfrapodMgr
 }
 
 func NewIpuPlugin(port int, brCtlr types.BridgeController,
-	p4Client types.P4RTClient, p4Image string, servingAddr, servingProto, bridge, intf, p4cpInstall, mode, daemonHostIp, daemonIpuIp string, daemonPort int) types.Runnable {
+	p4Client types.P4RTClient, servingAddr, servingProto, bridge, intf, p4cpInstall, mode, daemonHostIp, daemonIpuIp string, daemonPort int) types.Runnable {
 	return &server{
 		servingAddr:     servingAddr,
 		servingPort:     port,
@@ -76,37 +69,24 @@ func NewIpuPlugin(port int, brCtlr types.BridgeController,
 		Ports:           make(map[string]*types.BridgePortInfo),
 		bridgeCtlr:      brCtlr,
 		p4rtClient:      p4Client,
-		p4Image:         p4Image,
 		mode:            mode,
 		daemonHostIp:    daemonHostIp,
 		daemonIpuIp:     daemonIpuIp,
 		daemonPort:      daemonPort,
-		infrapodMgr:     nil, // Created in Run()
 	}
 }
 
-func waitForInfraP4d(p4rtClient types.P4RTClient, inCluster bool) (string, error) {
+func waitForInfraP4d(p4rtClient types.P4RTClient) (string, error) {
 	ctx := context.Background()
-	// Higher retries because ipu-plugin itself starts infrapod
-	// and if it doesn't wait the minimum, then there is a chance that it
-	// will keep restarting and hence restarting infrapod too
-	maxRetries := 50
+	maxRetries := 10
 	retryInterval := 2 * time.Second
 
 	var err error
 	var count int
 	var conn *grpc.ClientConn
 
-	log.Infof("waitForInfraP4d: inCluster: %v", inCluster)
 	for count = 0; count < maxRetries; count++ {
 		time.Sleep(retryInterval)
-		// Infrapod was created successfully. Since the service must have been
-		// restarted, the IP would be new. Resolve again and reassign
-		err = p4rtClient.ResolveServiceIp(inCluster)
-		if err != nil {
-			log.Warnf("Error %v while trying to resolve IP", err)
-			continue
-		}
 		conn, err = grpc.Dial(p4rtClient.GetIpPort(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		log.Infof("Connecting to server %s retry count:%d", p4rtClient.GetIpPort(), count)
 		if err != nil {
@@ -145,7 +125,6 @@ func (s *server) Run() error {
 	var err error
 	signalChannel := make(chan os.Signal, 2)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
-	inCluster := true
 
 	listen, err := s.getListener()
 	if err != nil {
@@ -153,60 +132,12 @@ func (s *server) Run() error {
 	}
 
 	if s.mode == types.IpuMode {
-		// Configure ACC firewall settings to allow microshift, dpu-operator, ACC-IMC internal traffics.
-		log.Info("Configure firewalld on ACC")
-		if err := firewall.Configure(); err != nil {
-			log.Error(err, "firewall setup failed: %v", err)
-		}
-
-		log.Info("Starting infrapod")
-		if s.p4Image != "" {
-			log.Infof("Using P4 image as : %s\n", s.p4Image)
-			s.infrapodMgr, err = infrapod.NewInfrapodMgr(s.p4Image, dpuNamespace)
-			if err != nil {
-				log.Error(err, "unable to create InfrapodMgr : %v", err)
-				return err
-			}
-			go func() {
-				if err = s.infrapodMgr.StartMgr(); err != nil {
-					log.Error(err, "unable to Start mgr : %v", err)
-					time.Sleep(2 * time.Second)
-					// Sending Sigterm to the main thread to start cleanup
-					syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
-				}
-			}()
-			if err = s.infrapodMgr.DeleteCrs(); err != nil {
-				log.Error(err, "unable to Delete Crs : %v", err)
-				return err
-			}
-			if err = s.infrapodMgr.WaitForPodDelete(60 * time.Second); err != nil {
-				log.Error(err, "unable to Wait for pod deletion : %v", err)
-				return err
-			}
-			if err = s.infrapodMgr.CreatePvCrs(); err != nil {
-				log.Error(err, "unable to Create PV Crs : %v", err)
-				return err
-			}
-			if err = s.infrapodMgr.CreateCrs(); err != nil {
-				log.Error(err, "unable to Create Crs : %v", err)
-				return err
-			}
-			if err = s.infrapodMgr.WaitForPodReady(60 * time.Second); err != nil {
-				log.Error(err, "unable to Wait for pod creation : %v", err)
-				return err
-			}
-		} else {
-			inCluster = false
-			log.Infof("Waiting for P4 pod to be started manually\n")
-		}
 		// Wait for the infrap4d connection to come up
-		if _, err := waitForInfraP4d(s.p4rtClient, inCluster); err != nil {
-			log.Error(err, "unable to connect to infrap4d, %v; Exiting", err)
+		if _, err := waitForInfraP4d(s.p4rtClient); err != nil {
 			return err
 		}
 		// Create bridge if it doesn't exist
 		if err := s.bridgeCtlr.EnsureBridgeExists(); err != nil {
-			log.Infof("error while checking host bridge existence: %v", err)
 			log.Fatalf("error while checking host bridge existence: %v", err)
 			return fmt.Errorf("host bridge error")
 		}
@@ -233,59 +164,35 @@ func (s *server) Run() error {
 	return nil
 }
 
-func cleanUpRulesOnExit(p4rtClient types.P4RTClient) error {
-	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", p4rtClient.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
-	p4rtclient.DeletePhyPortRules(p4rtClient, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
-
-	vfMacList, err := utils.GetVfMacList()
-	if err != nil {
-		log.Errorf("Stop: Error->%v", err)
-		return fmt.Errorf("Stop: Error->%v", err)
-	}
-	if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
-		log.Errorf("No VFs initialized on the host")
-	} else {
-		log.Infof("DeletePeerToPeerP4Rules, path->%s, vfMacList->%v", p4rtClient.GetBin(), vfMacList)
-		p4rtclient.DeletePeerToPeerP4Rules(p4rtClient, vfMacList)
-	}
-
-	log.Infof("DeleteLAGP4Rules, path->%s", p4rtClient.GetBin())
-	p4rtclient.DeleteLAGP4Rules(p4rtClient)
-
-	log.Infof("DeleteRHPrimaryNetworkVportP4Rules, path->%s, 1->%v", p4rtClient, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
-	p4rtclient.DeleteRHPrimaryNetworkVportP4Rules(p4rtClient, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
-	return nil
-}
-
 func (s *server) Stop() {
 	s.log.Info("Stopping IPU plugin")
 	if s.mode == types.IpuMode {
 		//Note: Deletes bridge created in EnsureBridgeExists in  Run api.
 		s.bridgeCtlr.DeleteBridges()
-		// Delete P4 rules on exit
-		cleanUpRulesOnExit(s.p4rtClient)
-		if err := s.infrapodMgr.DeleteCrs(); err != nil {
-			log.Error(err, "unable to Delete Crs : %v", err)
-			// Do not return since we continue on error
-		}
-		//Restore Red Hat primary network path via opcodes - This is required after the primiary network P4 rules are deleted.
-		utils.RestoreRHPrimaryNetwork()
 	}
-	// Stopping the gRPC server for the DPU daemon
+
+	log.Infof("DeletePhyPortRules, path->%s, 1->%v, 2->%v", s.p4rtClient.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.DeletePhyPortRules(s.p4rtClient, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+
+	vfMacList, err := utils.GetVfMacList()
+	if err != nil {
+		log.Errorf("Stop: Error->%v", err)
+	}
+	if len(vfMacList) == 0 || (len(vfMacList) == 1 && vfMacList[0] == "") {
+		log.Errorf("No VFs initialized on the host")
+	} else {
+		log.Infof("DeletePeerToPeerP4Rules, path->%s, vfMacList->%v", s.p4rtClient.GetBin(), vfMacList)
+		p4rtclient.DeletePeerToPeerP4Rules(s.p4rtClient, vfMacList)
+	}
+
+	log.Infof("DeleteLAGP4Rules, path->%s", s.p4rtClient.GetBin())
+	p4rtclient.DeleteLAGP4Rules(s.p4rtClient)
+
 	s.grpcSrvr.GracefulStop()
 	if s.listener != nil {
 		s.listener.Close()
 		_ = s.cleanUp()
 	}
-
-	if s.mode == types.IpuMode {
-		//Reset firewall to its default settings.
-		log.Info("Stop firewalld on ACC")
-		if err := firewall.CleanUp(); err != nil {
-			log.Error(err, "firewall cleanup failed: %v", err)
-		}
-	}
-
 	s.log.Info("IPU plugin has stopped")
 }
 

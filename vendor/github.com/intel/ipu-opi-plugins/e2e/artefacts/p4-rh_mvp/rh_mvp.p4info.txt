@@ -1,0 +1,826 @@
+pkg_info {
+  arch: "pna"
+}
+tables {
+  preamble {
+    id: 46866105
+    name: "rh_mvp_control.vlan_push_ctag_stag_mod_table"
+    alias: "vlan_push_ctag_stag_mod_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.mod_blob_ptr"
+    bitwidth: 24
+    match_type: EXACT
+  }
+  action_refs {
+    id: 29010669
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 38499371
+    name: "rh_mvp_control.vlan_push_stag_mod_table"
+    alias: "vlan_push_stag_mod_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.mod_blob_ptr"
+    bitwidth: 24
+    match_type: EXACT
+  }
+  action_refs {
+    id: 26916781
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 35843282
+    name: "rh_mvp_control.vlan_push_ctag_mod_table"
+    alias: "vlan_push_ctag_mod_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.mod_blob_ptr"
+    bitwidth: 24
+    match_type: EXACT
+  }
+  action_refs {
+    id: 19476925
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 44791827
+    name: "rh_mvp_control.vlan_pop_ctag_stag_mod_table"
+    alias: "vlan_pop_ctag_stag_mod_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.mod_blob_ptr"
+    bitwidth: 24
+    match_type: EXACT
+  }
+  action_refs {
+    id: 18029753
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 35281074
+    name: "rh_mvp_control.vlan_pop_stag_mod_table"
+    alias: "vlan_pop_stag_mod_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.mod_blob_ptr"
+    bitwidth: 24
+    match_type: EXACT
+  }
+  action_refs {
+    id: 24507408
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 37786634
+    name: "rh_mvp_control.vlan_pop_ctag_mod_table"
+    alias: "vlan_pop_ctag_mod_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.mod_blob_ptr"
+    bitwidth: 24
+    match_type: EXACT
+  }
+  action_refs {
+    id: 21476074
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 49008230
+    name: "rh_mvp_control.phy_ingress_vlan_dmac_table"
+    alias: "phy_ingress_vlan_dmac_table"
+  }
+  match_fields {
+    id: 1
+    name: "port_id"
+    bitwidth: 2
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "vid"
+    bitwidth: 12
+    match_type: EXACT
+  }
+  match_fields {
+    id: 3
+    name: "dmac"
+    annotations: "@format(MAC_ADDRESS)"
+    bitwidth: 48
+    match_type: EXACT
+  }
+  action_refs {
+    id: 18255697
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 38534218
+    name: "rh_mvp_control.phy_ingress_arp_table"
+    alias: "phy_ingress_arp_table"
+  }
+  match_fields {
+    id: 1
+    name: "port_id"
+    bitwidth: 2
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "vid"
+    bitwidth: 12
+    match_type: EXACT
+  }
+  action_refs {
+    id: 24572067
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 44032042
+    name: "rh_mvp_control.portmux_egress_resp_vsi_table"
+    alias: "portmux_egress_resp_vsi_table"
+  }
+  match_fields {
+    id: 1
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "bit32_zeros"
+    bitwidth: 32
+    match_type: EXACT
+  }
+  action_refs {
+    id: 29626876
+  }
+  action_refs {
+    id: 22775904
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 43467074
+    name: "rh_mvp_control.portmux_egress_resp_dmac_vsi_table"
+    alias: "portmux_egress_resp_dmac_vsi_table"
+  }
+  match_fields {
+    id: 1
+    name: "dmac"
+    annotations: "@format(MAC_ADDRESS)"
+    bitwidth: 48
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  action_refs {
+    id: 29626876
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 45781513
+    name: "rh_mvp_control.portmux_egress_req_table"
+    alias: "portmux_egress_req_table"
+  }
+  match_fields {
+    id: 1
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "vid"
+    bitwidth: 12
+    match_type: EXACT
+  }
+  action_refs {
+    id: 29626876
+  }
+  action_refs {
+    id: 22775904
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 45920889
+    name: "rh_mvp_control.portmux_ingress_loopback_table"
+    alias: "portmux_ingress_loopback_table"
+  }
+  match_fields {
+    id: 2
+    name: "bit32_zeros"
+    bitwidth: 32
+    match_type: EXACT
+  }
+  action_refs {
+    id: 22841159
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  action_refs {
+    id: 21257015
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 43816880
+    name: "rh_mvp_control.vport_arp_egress_table"
+    alias: "vport_arp_egress_table"
+  }
+  match_fields {
+    id: 1
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "bit32_zeros"
+    bitwidth: 32
+    match_type: EXACT
+  }
+  action_refs {
+    id: 24824497
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 41286760
+    name: "rh_mvp_control.ingress_loopback_table"
+    alias: "ingress_loopback_table"
+  }
+  match_fields {
+    id: 1
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "target_vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  action_refs {
+    id: 22841159
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 43924165
+    name: "rh_mvp_control.ingress_loopback_dmac_table"
+    alias: "ingress_loopback_dmac_table"
+  }
+  match_fields {
+    id: 1
+    name: "dmac"
+    annotations: "@format(MAC_ADDRESS)"
+    bitwidth: 48
+    match_type: EXACT
+  }
+  action_refs {
+    id: 22841159
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 41857485
+    name: "rh_mvp_control.vport_egress_vsi_table"
+    alias: "vport_egress_vsi_table"
+  }
+  match_fields {
+    id: 1
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "bit32_zeros"
+    bitwidth: 32
+    match_type: EXACT
+  }
+  action_refs {
+    id: 22841159
+  }
+  action_refs {
+    id: 32637686
+  }
+  action_refs {
+    id: 21257015
+  }
+  action_refs {
+    id: 30287134
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 16384
+}
+tables {
+  preamble {
+    id: 50313088
+    name: "rh_mvp_control.vport_egress_dmac_vsi_table"
+    alias: "vport_egress_dmac_vsi_table"
+  }
+  match_fields {
+    id: 1
+    name: "dmac"
+    annotations: "@format(MAC_ADDRESS)"
+    bitwidth: 48
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  action_refs {
+    id: 22841159
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 45925960
+    name: "rh_mvp_control.vport_egress_dmac_table"
+    alias: "vport_egress_dmac_table"
+  }
+  match_fields {
+    id: 1
+    name: "dmac"
+    annotations: "@format(MAC_ADDRESS)"
+    bitwidth: 48
+    match_type: EXACT
+  }
+  action_refs {
+    id: 22841159
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 21257015
+  size: 1024
+}
+tables {
+  preamble {
+    id: 39241585
+    name: "rh_mvp_control.comms_channel_table"
+    alias: "comms_channel_table"
+  }
+  match_fields {
+    id: 1
+    name: "meta.common.vsi"
+    bitwidth: 11
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
+    name: "user_meta.cmeta.bit32_zeros[15:0]"
+    bitwidth: 16
+    match_type: EXACT
+  }
+  action_refs {
+    id: 20250414
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+actions {
+  preamble {
+    id: 21257015
+    name: "NoAction"
+    alias: "NoAction"
+  }
+}
+actions {
+  preamble {
+    id: 19683603
+    name: "rh_mvp_control.no_modify"
+    alias: "no_modify"
+  }
+}
+actions {
+  preamble {
+    id: 20250414
+    name: "rh_mvp_control.l2_fwd"
+    alias: "l2_fwd"
+  }
+  params {
+    id: 1
+    name: "port"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 30287134
+    name: "rh_mvp_control.l2_fwd_miss_action"
+    alias: "l2_fwd_miss_action"
+  }
+  params {
+    id: 1
+    name: "port"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 22841159
+    name: "rh_mvp_control.fwd_to_port"
+    alias: "fwd_to_port"
+  }
+  params {
+    id: 1
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 19476925
+    name: "rh_mvp_control.mod_vlan_push_ctag"
+    alias: "mod_vlan_push_ctag"
+  }
+  params {
+    id: 1
+    name: "pcp"
+    bitwidth: 3
+  }
+  params {
+    id: 2
+    name: "dei"
+    bitwidth: 1
+  }
+  params {
+    id: 3
+    name: "vlan_id"
+    bitwidth: 12
+  }
+}
+actions {
+  preamble {
+    id: 18029753
+    name: "rh_mvp_control.mod_vlan_pop_ctag_stag"
+    alias: "mod_vlan_pop_ctag_stag"
+  }
+}
+actions {
+  preamble {
+    id: 24507408
+    name: "rh_mvp_control.mod_vlan_pop_stag"
+    alias: "mod_vlan_pop_stag"
+  }
+}
+actions {
+  preamble {
+    id: 21476074
+    name: "rh_mvp_control.mod_vlan_pop_ctag"
+    alias: "mod_vlan_pop_ctag"
+  }
+}
+actions {
+  preamble {
+    id: 29010669
+    name: "rh_mvp_control.mod_vlan_push_ctag_stag"
+    alias: "mod_vlan_push_ctag_stag"
+  }
+  params {
+    id: 1
+    name: "pcp"
+    bitwidth: 3
+  }
+  params {
+    id: 2
+    name: "dei"
+    bitwidth: 1
+  }
+  params {
+    id: 3
+    name: "ctag_id"
+    bitwidth: 12
+  }
+  params {
+    id: 4
+    name: "pcp_s"
+    bitwidth: 3
+  }
+  params {
+    id: 5
+    name: "dei_s"
+    bitwidth: 1
+  }
+  params {
+    id: 6
+    name: "stag_id"
+    bitwidth: 12
+  }
+}
+actions {
+  preamble {
+    id: 26916781
+    name: "rh_mvp_control.mod_vlan_push_stag"
+    alias: "mod_vlan_push_stag"
+  }
+  params {
+    id: 1
+    name: "pcp"
+    bitwidth: 3
+  }
+  params {
+    id: 2
+    name: "dei"
+    bitwidth: 1
+  }
+  params {
+    id: 3
+    name: "stag_id"
+    bitwidth: 12
+  }
+}
+actions {
+  preamble {
+    id: 29626876
+    name: "rh_mvp_control.vlan_pop_ctag_stag"
+    alias: "vlan_pop_ctag_stag"
+  }
+  params {
+    id: 1
+    name: "mod_ptr"
+    bitwidth: 24
+  }
+  params {
+    id: 2
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 22775904
+    name: "rh_mvp_control.vlan_pop_stag"
+    alias: "vlan_pop_stag"
+  }
+  params {
+    id: 1
+    name: "mod_ptr"
+    bitwidth: 24
+  }
+  params {
+    id: 2
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 18255697
+    name: "rh_mvp_control.vlan_pop_ctag"
+    alias: "vlan_pop_ctag"
+  }
+  params {
+    id: 1
+    name: "mod_ptr"
+    bitwidth: 24
+  }
+  params {
+    id: 2
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 32637686
+    name: "rh_mvp_control.vlan_push_ctag"
+    alias: "vlan_push_ctag"
+  }
+  params {
+    id: 1
+    name: "mod_ptr"
+    bitwidth: 24
+  }
+  params {
+    id: 2
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 24824497
+    name: "rh_mvp_control.send_to_port_mux"
+    alias: "send_to_port_mux"
+  }
+  params {
+    id: 1
+    name: "mod_ptr"
+    bitwidth: 24
+  }
+  params {
+    id: 2
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+actions {
+  preamble {
+    id: 24572067
+    name: "rh_mvp_control.send_to_port_mux_stag"
+    alias: "send_to_port_mux_stag"
+  }
+  params {
+    id: 1
+    name: "mod_ptr"
+    bitwidth: 24
+  }
+  params {
+    id: 2
+    name: "vport"
+    bitwidth: 32
+    type_name {
+      name: "PortId_t"
+    }
+  }
+}
+type_info {
+  new_types {
+    key: "PortId_t"
+    value {
+      translated_type {
+        uri: "p4.org/pna/v1/PortId_t"
+        sdn_bitwidth: 32
+      }
+    }
+  }
+}

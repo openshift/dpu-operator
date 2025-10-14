@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vsp-daemonset
+spec:
+  selector:
+    matchLabels:
+      name: vsp
+  template:
+    metadata:
+      labels:
+        name: vsp
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist
+              - key: node-role.kubernetes.io/master
+                operator: DoesNotExist
+      hostNetwork: true
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 180
+      containers:
+      - name: appcntr1
+        image: silpixa00400458:5000/intel-ipuplugin:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        command: [ "/usr/bin/ipuplugin" ]
+        args: [ "-v=debug"]
+        volumeMounts:
+        - mountPath: /var/run/
+          name: vendor-plugin-sock
+        - mountPath: /opt/p4/p4-cp-nws/var
+          mountPropagation: Bidirectional
+          name: host-opt
+        - mountPath: /proc
+          mountPropagation: Bidirectional
+          name: host-proc
+      volumes:
+      - hostPath:
+          path: /proc
+          type: ""
+        name: host-proc
+      - hostPath:
+          path: /opt/p4/p4-cp-nws/var
+          type: ""
+        name: host-opt
+      - hostPath:
+          path: /var/run/
+          type: ""
+        name: vendor-plugin-sock

@@ -15,16 +15,14 @@
 package types
 
 import (
-	"time"
-
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 )
 
 type BridgeType int
 
 type BridgePortInfo struct {
-	PbBrPort *pb.BridgePort
-	PortId   uint //For example, if ACC interface name is enp0s1f0d4, PortId(vportId) will be 4.
+	PbBrPort      *pb.BridgePort
+	PortInterface string
 }
 
 const (
@@ -32,8 +30,6 @@ const (
 	LinuxBridge
 	HostMode = "host"
 	IpuMode  = "ipu"
-	HostVfPr = "HostVfPr" // PR(port representator on ACC) for Host VF
-	NfPr     = "NfPr"     // PR(port representator on ACC) for Network Function
 )
 
 func (b BridgeType) String() string {
@@ -77,14 +73,4 @@ type P4RTClient interface {
 	ProgramFXPP4Rules(ruleSets []FxpRuleBuilder) error
 	GetBin() string
 	GetIpPort() string
-	ResolveServiceIp(inCluster bool) error
-}
-
-type InfrapodMgr interface {
-	StartMgr() error
-	CreateCrs() error
-	CreatePvCrs() error
-	DeleteCrs() error
-	WaitForPodDelete(timeout time.Duration) error
-	WaitForPodReady(timeout time.Duration) error
 }

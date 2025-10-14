@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: p4sdk-daemonset
+spec:
+  selector:
+    matchLabels:
+      name: p4sdk
+  template:
+    metadata:
+      labels:
+        name: p4sdk
+    spec:
+      hostNetwork: true
+      automountServiceAccountToken: false
+      containers:
+      - name: p4sdk
+        image: localhost:5000/intel-ipu-p4-sdk:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        command: [ "/entrypoint.sh" ]
+        resources:
+          limits:
+            hugepages-2Mi: 1Gi
+            cpu: "2"
+        volumeMounts:
+        - name: host-libmodules
+          mountPath: /lib/modules
+          mountPropagation: HostToContainer
+        - mountPath: /dev/hugepages
+          name: hugepage
+      volumes:
+      - name: host-libmodules
+        hostPath:
+          path: /lib/modules
+          type: Directory
+      - name: hugepage
+        emptyDir:
+          medium: HugePages-2Mi
+
+
