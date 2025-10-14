@@ -112,7 +112,8 @@ var _ = g.Describe("Full Daemon", func() {
 			// First, wait for the DPU CR to be created
 			Eventually(func() error {
 				dpuCR := &v1.DataProcessingUnit{}
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "intel-ipu"}, dpuCR)
+				// FIXME: This hardcode to intel ipu is terrible.
+				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "intel-ipu-dpu"}, dpuCR)
 				if err != nil {
 					return err
 				}

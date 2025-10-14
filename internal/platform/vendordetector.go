@@ -89,6 +89,16 @@ func (pi *DpuDetectorManager) IsDpu() (bool, error) {
 	return detector != nil, err
 }
 
+func (pi *DpuDetectorManager) postFixDpuSideToIdentifier(identifier plugin.DpuIdentifier, dpuSide bool) plugin.DpuIdentifier {
+	var postfix string
+	if dpuSide {
+		postfix = "-dpu"
+	} else {
+		postfix = "-host"
+	}
+	return plugin.DpuIdentifier(string(identifier) + postfix)
+}
+
 func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, error) {
 	var activeDetectors []VendorDetector
 	var errResult error
@@ -133,6 +143,7 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 		}
 
 		if dpuPlatform {
+			isDpuSide := true
 			identifier, err := detector.DpuPlatformIdentifier(d.platform)
 			if err != nil {
 				return nil, err
@@ -144,11 +155,11 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 
 			dpuCR := &v1.DataProcessingUnit{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: string(identifier),
+					Name: string(d.postFixDpuSideToIdentifier(identifier, isDpuSide)),
 				},
 				Spec: v1.DataProcessingUnitSpec{
 					DpuProductName: detector.Name(),
-					IsDpuSide:      true,
+					IsDpuSide:      isDpuSide,
 					NodeName:       nodeName,
 				},
 				Status: v1.DataProcessingUnitStatus{
@@ -182,10 +193,13 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 				return nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
 			}
 			if isDpu {
+				isDpuSide := false
 				identifier, err := detector.GetDpuIdentifier(d.platform, pci)
 				if err != nil {
 					return nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
 				}
+				// WARN: The identifier used in the dpuDevices slice & VSP plugin MUST NOT have the DPU side postfix, since it is used to compare multiple host
+				// PCI interfaces. The same DPU has the same Serial Number, but different PCI addresses in order for the code to ignore the other ports.
 				dpuDevices = append(dpuDevices, identifier)
 				vsp, err := detector.VspPlugin(false, imageManager, client, pm, identifier)
 				if err != nil {
@@ -194,11 +208,11 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 
 				dpuCR := &v1.DataProcessingUnit{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: string(identifier),
+						Name: string(d.postFixDpuSideToIdentifier(identifier, isDpuSide)),
 					},
 					Spec: v1.DataProcessingUnitSpec{
 						DpuProductName: detector.Name(),
-						IsDpuSide:      false,
+						IsDpuSide:      isDpuSide,
 						NodeName:       nodeName,
 					},
 					Status: v1.DataProcessingUnitStatus{
