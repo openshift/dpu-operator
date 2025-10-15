@@ -47,13 +47,16 @@ type VendorDetector interface {
 
 	GetVendorName() string
 
+	// The name of the DPU platform.
+	DpuPlatformName() string
+
 	// A unique identifier for when detection happens on the DPU
-	DpuPlatformIdentifier() plugin.DpuIdentifier
+	DpuPlatformIdentifier(platform Platform) (plugin.DpuIdentifier, error)
 }
 
 // SanitizeForTemplate converts identifiers to be template-safe by replacing hyphens with underscores
-func SanitizeForTemplate(identifier plugin.DpuIdentifier) string {
-	return strings.ReplaceAll(string(identifier), "-", "_")
+func SanitizeForTemplate(name string) string {
+	return strings.ReplaceAll(name, "-", "_")
 }
 
 func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
@@ -71,7 +74,7 @@ func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
 func (d *DpuDetectorManager) GetVendorDirectory(dpuProductName string) (string, error) {
 	for _, detector := range d.detectors {
 		if detector.Name() == dpuProductName {
-			return string(detector.DpuPlatformIdentifier()), nil
+			return detector.DpuPlatformName(), nil
 		}
 	}
 	return "", fmt.Errorf("unknown DPU product name: %s", dpuProductName)
@@ -84,6 +87,16 @@ func (d *DpuDetectorManager) GetDetectors() []VendorDetector {
 func (pi *DpuDetectorManager) IsDpu() (bool, error) {
 	detector, err := pi.detectDpuPlatform(false)
 	return detector != nil, err
+}
+
+func (pi *DpuDetectorManager) postFixDpuSideToIdentifier(identifier plugin.DpuIdentifier, dpuSide bool) plugin.DpuIdentifier {
+	var postfix string
+	if dpuSide {
+		postfix = "-dpu"
+	} else {
+		postfix = "-host"
+	}
+	return plugin.DpuIdentifier(string(identifier) + postfix)
 }
 
 func (pi *DpuDetectorManager) detectDpuPlatform(required bool) (VendorDetector, error) {
@@ -130,7 +143,11 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 		}
 
 		if dpuPlatform {
-			identifier := detector.DpuPlatformIdentifier()
+			isDpuSide := true
+			identifier, err := detector.DpuPlatformIdentifier(d.platform)
+			if err != nil {
+				return nil, err
+			}
 			vsp, err := detector.VspPlugin(true, imageManager, client, pm, identifier)
 			if err != nil {
 				return nil, err
@@ -138,11 +155,11 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 
 			dpuCR := &v1.DataProcessingUnit{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: string(identifier),
+					Name: string(d.postFixDpuSideToIdentifier(identifier, isDpuSide)),
 				},
 				Spec: v1.DataProcessingUnitSpec{
 					DpuProductName: detector.Name(),
-					IsDpuSide:      true,
+					IsDpuSide:      isDpuSide,
 					NodeName:       nodeName,
 				},
 				Status: v1.DataProcessingUnitStatus{
@@ -176,10 +193,13 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 				return nil, errors.Errorf("Error detecting if device is DPU with detector %v: %v", detector.Name(), err)
 			}
 			if isDpu {
+				isDpuSide := false
 				identifier, err := detector.GetDpuIdentifier(d.platform, pci)
 				if err != nil {
 					return nil, errors.Errorf("Error getting DPU identifier with detector %v: %v", detector.Name(), err)
 				}
+				// WARN: The identifier used in the dpuDevices slice & VSP plugin MUST NOT have the DPU side postfix, since it is used to compare multiple host
+				// PCI interfaces. The same DPU has the same Serial Number, but different PCI addresses in order for the code to ignore the other ports.
 				dpuDevices = append(dpuDevices, identifier)
 				vsp, err := detector.VspPlugin(false, imageManager, client, pm, identifier)
 				if err != nil {
@@ -188,11 +208,11 @@ func (d *DpuDetectorManager) DetectAll(imageManager images.ImageManager, client 
 
 				dpuCR := &v1.DataProcessingUnit{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: string(identifier),
+						Name: string(d.postFixDpuSideToIdentifier(identifier, isDpuSide)),
 					},
 					Spec: v1.DataProcessingUnitSpec{
 						DpuProductName: detector.Name(),
-						IsDpuSide:      false,
+						IsDpuSide:      isDpuSide,
 						NodeName:       nodeName,
 					},
 					Status: v1.DataProcessingUnitStatus{

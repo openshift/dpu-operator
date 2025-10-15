@@ -105,6 +105,9 @@ func cniRequestSetEnv(req *cnitypes.PodRequest) {
 	os.Setenv("CNI_NETNS", req.Netns)
 	os.Setenv("CNI_IFNAME", req.IfName)
 	os.Setenv("CNI_PATH", req.Path)
+	// IgnoreUnknown is set to true to allow for unknown CNI args to be passed to IPAM.
+	// For example the whereabouts CNI does not know what to do with K8S_POD_UID and errors out.
+	os.Setenv("CNI_ARGS", fmt.Sprintf("IgnoreUnknown=true;K8S_POD_NAMESPACE=%s;K8S_POD_NAME=%s;K8S_POD_UID=%s", req.PodNamespace, req.PodName, req.PodUID))
 }
 
 // cniRequestEnvCleanup cleans up the CNI environment variables once delegating IPAM plugins is done.
@@ -114,6 +117,7 @@ func cniRequestEnvCleanup() {
 	os.Unsetenv("CNI_NETNS")
 	os.Unsetenv("CNI_IFNAME")
 	os.Unsetenv("CNI_PATH")
+	os.Unsetenv("CNI_ARGS")
 }
 
 // cniRequestToPodRequest

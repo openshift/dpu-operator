@@ -12,7 +12,9 @@ spec:
     "cniVersion": "0.4.0",
     "name": "dpu-cni",
     "ipam": {
-      "type": "host-local",
-      "subnet": "10.56.217.0/24"
+      "type": "whereabouts",
+      "range": "10.56.217.0/24",
+      "range_start": "10.56.217.50",
+      "range_end": "10.56.217.150"
     }
     }'
