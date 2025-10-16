@@ -15,9 +15,13 @@
 package ipuplugin
 
 import (
+	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"io"
 	math_rand "math/rand"
 	"net"
 	"os"
@@ -54,42 +58,25 @@ const (
 	deviceId            = "0x1452"
 	vendorId            = "0x8086"
 	imcAddress          = "192.168.0.1:22"
-	ApfNumber           = 48
+	ApfNumber           = 16
 	last_byte_mac_range = 239
 )
 
-type AccApfInfoType struct {
-	Mac  string
-	Name string
-}
-
-var AccApfInfo []AccApfInfoType
-var AccApfsAvailForCNI []string
-
 var InitAccApfMacs = false
+var AccApfMacList []string
 var PeerToPeerP4RulesAdded = false
 
-// Reserved ACC interfaces(using vport_id or last digit of interface name, for example, index 4 represents-> enp0s1f0d4)
-/* With 1 NF config
-NF_PR_START_ID->6 to NF_PR_END_ID->7
-NF_AVAIL_START_ID->8 to NF_AVAIL_END_ID->9
-HOST_VF_START_ID->10 to HOST_VF_END_ID->25
-*/
+// Reserved ACC interfaces(using vport_id or last digit of interface name, like 4 represents-> enp0s1f0d4)
 const (
-	PHY_PORT0_PRIMARY_INTF_INDEX   = 1
-	RSVD_INIT_LEN                  = 4
-	PHY_PORT0_SECONDARY_INTF_INDEX = (PHY_PORT0_PRIMARY_INTF_INDEX + RSVD_INIT_LEN)
-
-	MAX_NF_CNT        = 1
-	NF_PR_START_ID    = (PHY_PORT0_SECONDARY_INTF_INDEX + 1)
-	NF_PR_LEN         = (MAX_NF_CNT * 2)
-	NF_PR_END_ID      = (NF_PR_START_ID + NF_PR_LEN - 1)
-	NF_AVAIL_START_ID = NF_PR_END_ID + 1
-	NF_AVAIL_END_ID   = (NF_AVAIL_START_ID + NF_PR_LEN - 1)
-	HOST_VF_START_ID  = (NF_AVAIL_END_ID + 1)
-	MAX_HOST_VF_CNT   = (16)
-	HOST_VF_END_ID    = (HOST_VF_START_ID + MAX_HOST_VF_CNT - 1)
+	PHY_PORT0_INTF_INDEX = 4
+	PHY_PORT1_INTF_INDEX = 5
+	NF_IN_PR_INTF_INDEX  = 9
+	NF_OUT_PR_INTF_INDEX = 10
 )
+
+// TODO: GetFilteredPFs can be used to fill the array.
+var AccIntfNames = [ApfNumber]string{"enp0s1f0", "enp0s1f0d1", "enp0s1f0d2", "enp0s1f0d3", "enp0s1f0d4", "enp0s1f0d5", "enp0s1f0d6",
+	"enp0s1f0d7", "enp0s1f0d8", "enp0s1f0d9", "enp0s1f0d10", "enp0s1f0d11", "enp0s1f0d12", "enp0s1f0d13", "enp0s1f0d14", "enp0s1f0d15"}
 
 func NewLifeCycleService(daemonHostIp, daemonIpuIp string, daemonPort int, mode string, p4rtClient types.P4RTClient, brCtlr types.BridgeController) *LifeCycleServiceServer {
 	return &LifeCycleServiceServer{
@@ -138,7 +125,6 @@ type ExecutableHandler interface {
 	validate() bool
 	nmcliSetupIpAddress(link netlink.Link, ipStr string, ipAddr *netlink.Addr) error
 	SetupAccApfs() error
-	AddAccApfsToGroupOne() error
 }
 
 type ExecutableHandlerImpl struct{}
@@ -177,46 +163,6 @@ func InitHandlers() {
 	if fxpHandler == nil {
 		fxpHandler = &FXPHandlerImpl{}
 	}
-}
-
-func removeFXPDefaultOpcode() error {
-	config := &ssh.ClientConfig{
-		User: "root",
-		Auth: []ssh.AuthMethod{
-			ssh.Password(""),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-	// Connect to the remote server.
-	client, err := ssh.Dial("tcp", imcAddress, config)
-	if err != nil {
-		log.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-		return fmt.Errorf("failed to dial remote server(%s): %s", imcAddress, err)
-	}
-	defer client.Close()
-
-	// Create an SFTP client.
-	sftpClient, err := sftp.NewClient(client)
-	if err != nil {
-		log.Info("AddRHPrimaryNetworkVportP4Rules: Warning!. Unable to create sftpClient")
-	}
-	defer sftpClient.Close()
-
-	opcodeStr := "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00"
-	remoteFilePath := "/tmp/del_opcode.txt"
-
-	err = utils.CopyFile(opcodeStr, remoteFilePath, sftpClient)
-	if err != nil {
-		log.Info("CopyFile: Warning!. Copy opcode file to IMC failed. Unable to delete default FXP opcode")
-	}
-
-	remoteCliCmd := "set -o pipefail && cli_client -x -f /tmp/del_opcode.txt"
-	_, err = utils.RunCliCmdOnImc(remoteCliCmd, "")
-	if err != nil {
-		log.Info("RunCliCmdOnImc: Warning!. Unable to delete default FXP opcode")
-	}
-
-	return nil
 }
 
 func isPF(iface string) (bool, error) {
@@ -581,14 +527,47 @@ func (s *SSHHandlerImpl) sshFunc() error {
 	}
 	defer sftpClient.Close()
 
-	//copy P4 package file.
+	// Open the source file.
 	p4PkgName := os.Getenv("P4_NAME") + ".pkg"
-	imcPath := "/work/scripts/" + p4PkgName
-	vspPath := "/" + p4PkgName
-	err = utils.CopyBinary(imcPath, vspPath, sftpClient)
-
+	localFilePath := "/" + p4PkgName
+	srcFile, err := os.Open(localFilePath)
 	if err != nil {
-		return fmt.Errorf("sshFunc:copyBinary-error: %v", err)
+		return fmt.Errorf("failed to open local file: %s", err)
+	}
+	defer srcFile.Close()
+
+	// Create the destination file on the remote server.
+	remoteFilePath := "/work/scripts/" + p4PkgName
+	dstFile, err := sftpClient.Create(remoteFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create remote file: %s", err)
+	}
+	defer dstFile.Close()
+
+	// Copy the file contents to the destination file.
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %s", err)
+	}
+
+	// Ensure that the file is written to the remote filesystem.
+	err = dstFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync file: %s", err)
+	}
+
+	// Start a session.
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create session: %s", err)
+	}
+	defer session.Close()
+
+	// Append python script to configure the ACC
+	commands := `echo "python /usr/bin/scripts/cfg_acc_apf_x2.py" >> /work/scripts/pre_init_app.sh`
+	err = session.Run(commands)
+	if err != nil {
+		return fmt.Errorf("failed to run commands: %s", err)
 	}
 
 	macAddress, err := setBaseMacAddr()
@@ -596,35 +575,91 @@ func (s *SSHHandlerImpl) sshFunc() error {
 		return fmt.Errorf("error from setBaseMacAddr()->%v", err)
 	}
 
-	inputFile := genLoadCustomPkgFile(macAddress)
-	remoteFilePath := "/work/scripts/load_custom_pkg.sh"
+	shellScript := genLoadCustomPkgFile(macAddress)
 
-	err = utils.CopyFile(inputFile, remoteFilePath, sftpClient)
-
+	loadCustomPkgFilePath := "/work/scripts/load_custom_pkg.sh"
+	loadCustomPkgFile, err := sftpClient.Create(loadCustomPkgFilePath)
 	if err != nil {
-		return fmt.Errorf("sshFunc:CopyFile-error: %v", err)
+		return fmt.Errorf("failed to create remote load_custom_pkg.sh: %s", err)
+	}
+	defer loadCustomPkgFile.Close()
+
+	_, err = loadCustomPkgFile.Write([]byte(shellScript))
+	if err != nil {
+		return fmt.Errorf("failed to write to load_custom_pkg.sh: %s", err)
 	}
 
-	//post_init_app.sh
-	inputFile = postInitAppScript()
-	remoteFilePath = "/work/scripts/post_init_app.sh"
-
-	err = utils.CopyFile(inputFile, remoteFilePath, sftpClient)
-
+	err = loadCustomPkgFile.Sync()
 	if err != nil {
-		return fmt.Errorf("sshFunc:CopyFile-error: %v", err)
+		return fmt.Errorf("failed to sync load_custom_pkg.sh: %s", err)
 	}
 
-	inputFile = macAddress + "\n"
-	remoteFilePath = "/work/uuid"
-
-	err = utils.CopyFile(inputFile, remoteFilePath, sftpClient)
-
+	err = sftpClient.Chmod(loadCustomPkgFilePath, 0755)
 	if err != nil {
-		return fmt.Errorf("sshFunc:CopyFile-error: %v", err)
+		log.Errorf("failed to chmod load_custom_pkg.sh file: %s", err)
+		return fmt.Errorf("failed to chmod load_custom_pkg.sh file: %s", err)
 	}
 
-	session, err := client.NewSession()
+	//Create post_init_app.sh
+	postInitAppFileStr := postInitAppScript()
+	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
+	postInitFile, err := sftpClient.Create(postInitRemoteFilePath)
+	if err != nil {
+		log.Errorf("failed to create post_init_app.sh file: %s", err)
+		return fmt.Errorf("failed to create post_init_app.sh file: %s", err)
+	}
+	defer postInitFile.Close()
+
+	_, err = postInitFile.Write([]byte(postInitAppFileStr))
+	if err != nil {
+		return fmt.Errorf("failed to write to post_init_app.sh file: %s", err)
+	}
+
+	err = postInitFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync post_init_app.sh file: %s", err)
+	}
+
+	err = sftpClient.Chmod(postInitRemoteFilePath, 0755)
+	if err != nil {
+		log.Errorf("failed to chmod post_init_app.sh file: %s", err)
+		return fmt.Errorf("failed to chmod post_init_app.sh file: %s", err)
+	}
+
+	uuidFilePath := "/work/uuid"
+	uuidFile, err := sftpClient.Create(uuidFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create remote uuid file: %s", err)
+	}
+	defer uuidFile.Close()
+
+	// Write the new MAC address to the uuid file.
+	_, err = uuidFile.Write([]byte(macAddress + "\n"))
+	if err != nil {
+		return fmt.Errorf("failed to write to uuid file: %s", err)
+	}
+
+	// Ensure that the uuid file is written to the remote filesystem.
+	err = uuidFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync uuid file: %s", err)
+	}
+
+	session, err = client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create session: %s", err)
+	}
+	defer session.Close()
+
+	// Run a command on the remote server and capture the output.
+	var stdoutBuf bytes.Buffer
+	session.Stdout = &stdoutBuf
+	err = session.Run(commands)
+	if err != nil {
+		return fmt.Errorf("failed to run commands: %s", err)
+	}
+
+	session, err = client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %s", err)
 	}
@@ -651,8 +686,8 @@ func countAPFDevices() int {
 /*
 Updates post_init_app.sh script, which installs
 port-setup.sh script. port-setup.sh script,
-will run devmem command for D1 interface, as soon as
-D1 comes up on ACC, to enable connectivity.
+will run devmem command for D5 interface, as soon as
+D5 comes up on ACC, to enable connectivity.
 There is an intermittent race condition, when port-setup.log file, is
 accessed(for file removal or any other case) by post_init_app.sh,
 then later when nohup tries to stdout to that log file(port-setup.log),
@@ -678,18 +713,11 @@ set -x
 trap 'echo "Line $LINENO: $BASH_COMMAND"' DEBUG
 
 PORT_SETUP_SCRIPT=/work/scripts/port-setup.sh
-POST_INIT_LOG=/work/scripts/post-init.log
-PORT_SETUP_LOG=/work/scripts/port-setup.log
-PORT_SETUP_LOG2=/work/scripts/port-setup2.log
-OPCODE_CFG_FILE=$(mktemp -p /tmp --suffix=.txt)
+PORT_SETUP_LOG=/work/port-setup.log
+POST_INIT_LOG=/work/post-init.log
+PORT_SETUP_LOG2=/work/port-setup2.log
 
 /usr/bin/rm -f ${PORT_SETUP_SCRIPT} ${POST_INIT_LOG}
-/usr/bin/rm -f ${PORT_SETUP_LOG} ${POST_SETUP_LOG2}
-sleep 1
-sync
-
-# For the redfish service to remain active after reboot, it must be started in the post_init.
-[ -e /work/scripts/start-redfish.sh ] && /work/scripts/start-redfish.sh
 
 exec 2>&1 1>${POST_INIT_LOG}
 
@@ -697,8 +725,8 @@ pkill -9 $(basename ${PORT_SETUP_SCRIPT})
 
 cat<<PORT_CONFIG_EOF > ${PORT_SETUP_SCRIPT}
 #!/bin/bash
-IDPF_VPORT_NAME="enp0s1f0d1"
-ACC_VPORT_ID=0x1
+IDPF_VPORT_NAME="enp0s1f0d5"
+ACC_VPORT_ID=0x5
 retry=0
 ran_cmds=0
 ran_cmds_cnt=0
@@ -727,9 +755,8 @@ trap release_lock EXIT
 run_devmem_cmds() {
 retry=0
 while [[ \${ran_cmds} -eq 0 ]] ; do
-sync
-sleep 4
-cli_entry=(\$(cli_client -qc | grep -w "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
+sleep 2
+cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
 if [ \${#cli_entry[@]} -gt 1 ] ; then
 
         for (( id=0 ; id<\${#cli_entry[@]} ; id+=2 )) ;  do
@@ -748,13 +775,6 @@ if [ \${#cli_entry[@]} -gt 1 ] ; then
                   echo "RunDevMemCmds_Start: LogFile->"
                   # Critical section - only one script can be here at a time
                   set -x
-		  # OPCODE update to program the rx_phy_port_to_pr_map table default action with the correct vsi_id of D1 interface, which could potentially change
-		  # per reboot of IMC.
-		  # opcode 0x1305 is for DELETE an entry.
-                  echo "opcode=0x1305 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00 act=set_vsi{act_val=\${vsi_id} val_type=0 dst_pe=0 slot=0x0}" > $OPCODE_CFG_FILE
-                  # opcode 0x1303 is for ADD an entry.
-		  echo "opcode=0x1303 prof_id=0xb cookie=123 key=0x00,0x00,0x00,0x00 act=set_vsi{act_val=\${vsi_id} val_type=0 dst_pe=0 slot=0x0}" >> $OPCODE_CFG_FILE
-		  cli_client -x -f $OPCODE_CFG_FILE
                   devmem 0x20292002a0 64 \${VSI_GROUP_INIT}
                   devmem 0x2029200388 64 0x1
                   devmem 0x20292002a0 64 \${VSI_GROUP_WRITE}
@@ -783,16 +803,16 @@ fi
 done
 }
 
-# Function to check if D1 interface is up on ACC
-primary_interface_up() {
-  cli_entry=(\$(cli_client -qc | grep -w "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
+# Function to check if D5 interface is up on ACC
+d5_interface_up() {
+  cli_entry=(\$(cli_client -qc | grep "fn_id: 0x4 .* vport_id \${ACC_VPORT_ID}" | sed 's/: / /g' | sed 's/addr //g'))
   if [ \${#cli_entry[@]} -gt 1 ] ; then
    return 1  # Success
   fi
   return 0
 }
 
-# Invokes run_devmem_cmds, upon startup, and periodically checks if D1 is alive, if not re-run.
+# Invokes run_devmem_cmds, upon startup, and periodically checks if D5 is alive, if not re-run.
 while [[ \${ran_cmds} -eq 0 ]]; do
    echo "invoke run_devmem_cmds"
    run_devmem_cmds
@@ -810,12 +830,12 @@ while [[ \${ran_cmds} -eq 0 ]]; do
 
    #inner while
    while true ; do
-   primary_interface_up
+   d5_interface_up
    if [[ \$? -eq 1 ]]; then
-      #echo "Primary interface up, sleep"
-      sleep 7
+      #echo "D5 interface up, sleep"
+      sleep 5
    else
-      echo "Primary not found. ACC may have gone down, retry."
+      echo "D5 not found. ACC may have gone down, retry."
       ran_cmds=0
       break
    fi
@@ -826,18 +846,10 @@ PORT_CONFIG_EOF
 /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
 /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"' '"${PORT_SETUP_LOG}"'' 0>&- &> ${PORT_SETUP_LOG} &
 
-PS_SCRIPT_NAME=$(basename ${PORT_SETUP_SCRIPT})
-
 log_retry=0
 while true ; do
    sync
 if [[ $log_retry -gt 10 ]]; then
-   echo "waited for log more than 10 secs, log not detected"
-   if pgrep -x "${PS_SCRIPT_NAME}" > /dev/null 2>&1; then
-      echo "Process '${PS_SCRIPT_NAME}' is running."
-   else
-      echo "Process '${PS_SCRIPT_NAME}' is not running."
-   fi
    echo "waited for log more than 10 secs, 2nd attempt for port_setup.sh below"
    /usr/bin/chmod a+x ${PORT_SETUP_SCRIPT}
    /usr/bin/nohup bash -c ''"${PORT_SETUP_SCRIPT}"' '"${PORT_SETUP_LOG2}"'' 0>&- &> ${PORT_SETUP_LOG2} &
@@ -847,17 +859,18 @@ if [[ $log_retry -gt 10 ]]; then
    break
 fi
 if [[ -s ${PORT_SETUP_LOG}  ]]; then
-   echo "non-empty log file exists"
-   sleep 1
-   break
-else
    log_retry=$((log_retry+1))
-   if [ -f ${PORT_SETUP_LOG} ]; then
-      echo "log file exists. but empty"
-   else
-      echo "log file doesnt exist"
-   fi
+   echo "log file empty. sleep and check"
    sleep 1
+elif [ ! -f ${PORT_SETUP_LOG} ]; then
+   log_retry=$((log_retry+1))
+   echo "log file doesnt exist. sleep and check"
+   sleep 1
+else
+   if [ -f ${PORT_SETUP_LOG} ]; then
+      echo "log file exists. break"
+      break
+   fi
 fi
 done`
 
@@ -883,9 +896,9 @@ if [ -e %s ]; then
     sed -i 's/pf_mac_address = "00:00:00:00:03:14";/pf_mac_address = "%s";/g' $CP_INIT_CFG
     sed -i 's/acc_apf = 4;/acc_apf = %s;/g' $CP_INIT_CFG
     sed -i 's/comm_vports = .*/comm_vports = (([5,0],[4,0]),([0,3],[5,3]),([0,2],[4,3]));/g' $CP_INIT_CFG
-    sed -i 's/uplink_vports = .*/uplink_vports = ([4,1,0],[5,1,0],[5,2,1]);/g' $CP_INIT_CFG
-    sed -i 's/rep_vports = .*/rep_vports = ([0,0,0],[0,1,1]);/g' $CP_INIT_CFG
-    sed -i 's/exception_vports = .*/exception_vports = ([4,1,0]); /g' $CP_INIT_CFG
+    sed -i 's/uplink_vports = .*/uplink_vports = ([0,0,0],[0,1,1],[4,1,0],[4,5,1],[5,1,0],[5,2,1]);/g' $CP_INIT_CFG
+    sed -i 's/rep_vports = .*/rep_vports = ([0,0,0],[4,5,1]);/g' $CP_INIT_CFG
+    sed -i 's/exception_vports = .*/exception_vports = ([0,0,0],[4,5,1]); /g' $CP_INIT_CFG
 else
     echo "No custom package found. Continuing with default package"
 fi
@@ -914,8 +927,6 @@ func skipIMCReboot() (bool, string) {
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	skipReboot := true
-	errMsg := ""
 
 	// Connect to the remote server.
 	client, err := ssh.Dial("tcp", imcAddress, config)
@@ -952,55 +963,131 @@ func skipIMCReboot() (bool, string) {
 		uuidFileExists = true
 	}
 	if !uuidFileExists {
-		skipReboot = false
-		errMsg = "UUID File does not exist"
-		// continue checking all other files
+		return false, "UUID File does not exist"
 	}
 
+	session, err = client.NewSession()
+	if err != nil {
+		log.Errorf("failed to create session: %v", err)
+		return false, fmt.Sprintf("failed to create session: %v", err)
+	}
+	defer session.Close()
+
+	//compute md5sum of pkg file on IMC
 	p4PkgName := os.Getenv("P4_NAME") + ".pkg"
-	imcPath := "/work/scripts/" + p4PkgName
-	vspPath := "/" + p4PkgName
-	p4pkgMatch, errStr := utils.CompareBinary(imcPath, vspPath, client)
+	commands = "cd /work/scripts; md5sum " + p4PkgName + " |  awk '{print $1}'"
+	imcOutput, err := session.CombinedOutput(commands)
+	if err != nil {
+		log.Errorf("Error->%v, running command->%s:", err, commands)
+		return false, fmt.Sprintf("Error->%v, running command->%s:", err, commands)
+	}
+
+	//compute md5sum of pkg file in ipu-plugin container
+	commands = "md5sum /" + p4PkgName + " |  awk '{print $1}'"
+	pluginOutput, err := utils.ExecuteScript(commands)
+	if err != nil {
+		log.Errorf("Error->%v, for md5sum command->%v", err, commands)
+		return false, fmt.Sprintf("Error->%v, for md5sum command->%v", err, commands)
+	}
+
+	if pluginOutput != string(imcOutput) {
+		log.Infof("md5sum mismatch, in ipu-plugin->%v, on IMC->%v", pluginOutput, string(imcOutput))
+	} else {
+		log.Infof("md5sum match, in ipu-plugin->%v, on IMC->%v", pluginOutput, string(imcOutput))
+		p4pkgMatch = true
+	}
 
 	if !p4pkgMatch {
-		skipReboot = false
-		errMsg = errStr
-		// continue checking all other files
+		return false, "md5sum mismatch"
 	}
 
 	genLcpkgFileStr := genLoadCustomPkgFile(outputStr)
 	log.Infof("loadCustomPkgFileStr->%v", genLcpkgFileStr)
+	genLcpkgFileHash := md5.Sum([]byte(genLcpkgFileStr))
+	genLcpkgFileHashStr := hex.EncodeToString(genLcpkgFileHash[:])
+
+	// Create an SFTP client.
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		log.Errorf("failed to create SFTP client: %s", err)
+		return false, fmt.Sprintf("failed to create SFTP client: %s", err)
+	}
+	defer sftpClient.Close()
+
 	// destination file on IMC.
 	remoteFilePath := "/work/scripts/load_custom_pkg.sh"
-	lcpkgFileMatch, errStr = utils.CompareFile(genLcpkgFileStr, remoteFilePath, client)
+	dstFile, err := sftpClient.Open(remoteFilePath)
+	if err != nil {
+		log.Errorf("failed to create remote file: %s", err)
+		return false, fmt.Sprintf("failed to create remote file: %s", err)
+	}
+	defer dstFile.Close()
+
+	imcLcpkgFileBytes, err := io.ReadAll(dstFile)
+	if err != nil {
+		log.Errorf("failed to read load_custom_pkg.sh: %s", err)
+		return false, fmt.Sprintf("failed to read load_custom_pkg.sh: %s", err)
+	}
+
+	imcLcpkgFileHash := md5.Sum(imcLcpkgFileBytes)
+	imcLcpkgFileHashStr := hex.EncodeToString(imcLcpkgFileHash[:])
+
+	if genLcpkgFileHashStr != imcLcpkgFileHashStr {
+		log.Infof("load_custom md5 mismatch, generated->%v, on IMC->%v", genLcpkgFileHashStr, imcLcpkgFileHashStr)
+	} else {
+		log.Infof("load_custom md5 match, generated->%v, on IMC->%v", genLcpkgFileHashStr, imcLcpkgFileHashStr)
+		lcpkgFileMatch = true
+	}
 
 	if !lcpkgFileMatch {
-		skipReboot = false
-		errMsg = errStr
-		// continue checking all other files
+		return false, "lcpkgFileMatch mismatch"
 	}
 
 	postInitAppFile := postInitAppScript()
-	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
-	piaFileMatch, errStr = utils.CompareFile(postInitAppFile, postInitRemoteFilePath, client)
+	postInitAppFileHash := md5.Sum([]byte(postInitAppFile))
+	postInitAppFileHashStr := hex.EncodeToString(postInitAppFileHash[:])
 
-	if !piaFileMatch {
-		skipReboot = false
-		errMsg = errStr
+	postInitRemoteFilePath := "/work/scripts/post_init_app.sh"
+	imcPostInitFile, err := sftpClient.Open(postInitRemoteFilePath)
+	if err != nil {
+		log.Errorf("failed to open post_init_app.sh file: %s", err)
+		return false, fmt.Sprintf("failed to open post_init_app.sh file: %s", err)
+	}
+	log.Infof("post_init_app.sh file exists")
+	defer imcPostInitFile.Close()
+
+	imcPostInitFileBytes, err := io.ReadAll(imcPostInitFile)
+	if err != nil {
+		log.Errorf("failed to read post_init_app.sh: %s", err)
+		return false, fmt.Sprintf("failed to read post_init_app.sh: %s", err)
 	}
 
-	if skipReboot == true {
-		errMsg = "checks pass, imc reboot not required"
+	imcPostInitFileHash := md5.Sum(imcPostInitFileBytes)
+	imcPostInitFileHashStr := hex.EncodeToString(imcPostInitFileHash[:])
+
+	if postInitAppFileHashStr != imcPostInitFileHashStr {
+		log.Infof("post_init_app.sh md5 mismatch, generated->%v, on IMC->%v", postInitAppFileHashStr, imcPostInitFileHashStr)
+	} else {
+		log.Infof("post_init_app.sh md5 match, generated->%v, on IMC->%v", postInitAppFileHashStr, imcPostInitFileHashStr)
+		piaFileMatch = true
+	}
+
+	if !piaFileMatch {
+		return false, "piaFileMatch mismatch"
 	}
 
 	log.Infof("uuidFileExists->%v, p4pkgMatch->%v, lcpkgFileMatch->%v, piaFileMatch->%v",
 		uuidFileExists, p4pkgMatch, lcpkgFileMatch, piaFileMatch)
-	return skipReboot, errMsg
+	return true, fmt.Sprintf("checks pass, imc reboot not required")
 
 }
 
 func (e *ExecutableHandlerImpl) validate() bool {
 
+	if numAPFs := countAPFDevices(); numAPFs < ApfNumber {
+		log.Errorf("Not enough APFs %v, expected->%v", numAPFs, ApfNumber)
+		return false
+	}
 	if noReboot, infoStr := skipIMCReboot(); !noReboot {
 		fmt.Printf("IMC reboot required : %v\n", infoStr)
 		return false
@@ -1009,95 +1096,27 @@ func (e *ExecutableHandlerImpl) validate() bool {
 	return true
 }
 
-func (e *ExecutableHandlerImpl) AddAccApfsToGroupOne() error {
-	vsiList, err := utils.GetAvailableAccVsiList()
-	if err != nil {
-		log.Errorf("AddAccApfsToGroupOne: unable to reach the IMC %v", err)
-		return fmt.Errorf("AddAccApfsToGroupOne: unable to reach the IMC %v", err)
-	}
-	if len(vsiList) == 0 {
-		log.Errorf("no APFs initialized on ACC")
-		return fmt.Errorf("no APFs initialized on ACC")
-	}
-	log.Infof("AddAccApfsToGroupOne, vsiList->%v", vsiList)
-	/*  Steps from script(for reference)
-	VSI_GROUP_INIT=$(printf  "0x%x" $((0x8000050000000000 + IDPF_VPORT_VSI_HEX)))
-		VSI_GROUP_WRITE=$(printf "0x%x" $((0xA000050000000000 + IDPF_VPORT_VSI_HEX)))
-			devmem 0x20292002a0 64 ${VSI_GROUP_INIT}
-				devmem 0x2029200388 64 0x1
-					devmem 0x20292002a0 64 ${VSI_GROUP_WRITE}
-	*/
-	for i := 0; i < len(vsiList); i++ {
-		log.Infof("Add to VSI Group 1, vsi->%v", vsiList[i])
-		hexStr := vsiList[i]
-		// skip "0x" prefix
-		hexStr = hexStr[2:]
-
-		// Convert to hex value
-		hexVal, err := strconv.ParseInt(hexStr, 16, 64)
-		if err != nil {
-			log.Errorf("error decoding hex: %v", err)
-			return fmt.Errorf("error decoding hex: %v", err)
-		}
-
-		// Check bounds before converting to uint64
-		if hexVal < 0 {
-			log.Errorf("hex value out of range: %v", hexVal)
-			return fmt.Errorf("hex value out of range: %v", hexVal)
-		}
-
-		var vsiGroupInit, vsiGroupWrite uint64
-
-		vsiGroupInit = 0x8000050000000000 + uint64(hexVal)
-		vsiGroupWrite = 0xA000050000000000 + uint64(hexVal)
-
-		vsiGroupInitString := fmt.Sprintf("0x%X", vsiGroupInit)
-		vsiGroupWriteString := fmt.Sprintf("0x%X", vsiGroupWrite)
-
-		devMemCmd1 := "devmem 0x20292002a0 64 " + vsiGroupInitString
-		devMemCmd2 := "devmem 0x2029200388 64 0x1"
-		devMemCmd3 := "devmem 0x20292002a0 64 " + vsiGroupWriteString
-
-		devMemCmd := devMemCmd1 + "; " + devMemCmd2 + "; " + devMemCmd3 + "; "
-		log.Infof("devMemCmd->%v", devMemCmd)
-
-		_, err = utils.ExecuteScript(fmt.Sprintf(`ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@192.168.0.1 "%s"`, devMemCmd))
-		if err != nil {
-			log.Errorf("err exec devMemCmd->%v", err)
-			return fmt.Errorf("err exec devMemCmd->%v", err)
-		}
-	}
-	return nil
-}
-
 func (e *ExecutableHandlerImpl) SetupAccApfs() error {
+	var err error
+
 	if !InitAccApfMacs {
-		var pfList []netlink.Link
-		InitHandlers()
-		if err := GetFilteredPFs(&pfList); err != nil {
-			log.Errorf("SetupAccApfs: err->%v from GetFilteredPFs", err)
-			return fmt.Errorf("SetupAccApfs: err->%v from GetFilteredPFs", err)
-		}
-		if len(pfList) != ApfNumber {
-			log.Errorf("not enough APFs initialized on ACC, total APFs->%d, APFs->%v", len(pfList), pfList)
-			return fmt.Errorf("not enough APFs initialized on ACC, total APFs->%d, APFs->%v", len(pfList), pfList)
+		AccApfMacList, err = utils.GetAccApfMacList()
+
+		if err != nil {
+			log.Errorf("SetupAccApfs: Error-> %v", err)
+			return fmt.Errorf("SetupAccApfs: Error-> %v", err)
 		}
 
-		for i := 0; i < len(pfList); i++ {
-			accApf := AccApfInfoType{
-				Mac:  pfList[i].Attrs().HardwareAddr.String(),
-				Name: pfList[i].Attrs().Name,
-			}
-			AccApfInfo = append(AccApfInfo, accApf)
+		if len(AccApfMacList) != ApfNumber {
+			log.Errorf("not enough APFs initialized on ACC, total APFs->%d, APFs->%v", len(AccApfMacList), AccApfMacList)
+			return fmt.Errorf("not enough APFs initialized on ACC, total APFs->%d", len(AccApfMacList))
 		}
+		log.Infof("On ACC, total APFs->%d", len(AccApfMacList))
+		for i := 0; i < len(AccApfMacList); i++ {
+			log.Infof("index->%d, mac->%s", i, AccApfMacList[i])
+		}
+		InitAccApfMacs = true
 	}
-	log.Infof("AccApfInfo->%v", AccApfInfo)
-	for i := NF_AVAIL_START_ID; i <= NF_AVAIL_END_ID; i = i + 1 {
-		AccApfsAvailForCNI = append(AccApfsAvailForCNI, AccApfInfo[i].Name)
-	}
-	log.Infof("AccApfsAvailForCNI->%v", AccApfsAvailForCNI)
-
-	InitAccApfMacs = true
 	return nil
 }
 
@@ -1128,30 +1147,18 @@ func (s *FXPHandlerImpl) configureFXP(p types.P4RTClient, brCtlr types.BridgeCon
 	}
 	//Add Phy Port0 to ovs bridge
 	//Note: Per current design, Phy Port1 is added to a different bridge(through P4 rules).
-	if err := brCtlr.AddPort(AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Name); err != nil {
-		log.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Name)
-		return fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Name)
+	if err := brCtlr.AddPort(AccIntfNames[PHY_PORT0_INTF_INDEX]); err != nil {
+		log.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_INTF_INDEX])
+		return fmt.Errorf("failed to add port to bridge: %v, for interface->%v", err, AccIntfNames[PHY_PORT0_INTF_INDEX])
 	}
 	//Add P4 rules for phy ports
-	log.Infof("AddPhyPortRules, path->%s, 1->%v, 2->%v", p.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
-	p4rtclient.AddPhyPortRules(p, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
+	log.Infof("AddPhyPortRules, path->%s, 1->%v, 2->%v", p.GetBin(), AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
+	p4rtclient.AddPhyPortRules(p, AccApfMacList[PHY_PORT0_INTF_INDEX], AccApfMacList[PHY_PORT1_INTF_INDEX])
 
 	CheckAndAddPeerToPeerP4Rules(p)
 
 	log.Infof("AddLAGP4Rules, path->%v", p.GetBin())
 	p4rtclient.AddLAGP4Rules(p)
-
-	//Before adding primiary network P4 rules, remove opcode programmed to handle default network reach for primiary network (as part of IMC's post_init_app.sh script)
-	err := removeFXPDefaultOpcode()
-	if err != nil {
-		log.Infof("WARNING: FXP's default opcode entry cleanup failed. This could potentially impact secondary network reach from external world")
-	}
-	//Wait for 2 seconds to ensure cli_client command execution to delete the default opcode is successful.
-	time.Sleep(2 * time.Second)
-
-	//Add P4 rules to handle Primary network traffic via phy port0
-	log.Infof("AddRHPrimaryNetworkVportP4Rules,  path->%s, 1->%v, 2->%v", p.GetBin(), AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
-	p4rtclient.AddRHPrimaryNetworkVportP4Rules(p, AccApfInfo[PHY_PORT0_SECONDARY_INTF_INDEX].Mac, AccApfInfo[PHY_PORT0_PRIMARY_INTF_INDEX].Mac)
 
 	return nil
 }
@@ -1176,10 +1183,6 @@ func (s *LifeCycleServiceServer) Init(ctx context.Context, in *pb.InitRequest) (
 			}
 		} else {
 			log.Info("not forcing state")
-		}
-		if err := ExecutableHandlerGlobal.AddAccApfsToGroupOne(); err != nil {
-			log.Fatalf("error from->AddAccApfsToGroupOne: %v", err)
-			return nil, fmt.Errorf("error from->AddAccApfsToGroupOne: %v", err)
 		}
 		if err := ExecutableHandlerGlobal.SetupAccApfs(); err != nil {
 			log.Errorf("error from  SetupAccApfs %v", err)

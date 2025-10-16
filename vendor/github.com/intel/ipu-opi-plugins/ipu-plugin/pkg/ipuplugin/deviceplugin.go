@@ -24,9 +24,8 @@ type DevicePluginService struct {
 
 var (
 	//TODO: Use (GetFilteredPfs), to find interface names to be excluded.
-	//excluding d3(host-acc), reserving D4,D1(QSPF ports) D6-D8(for max 3 host VFs), D9-D10(for single NF)
-	exclude = []string{"enp0s1f0", "enp0s1f0d1", "enp0s1f0d2", "enp0s1f0d3",
-		"enp0s1f0d4", "enp0s1f0d5", "enp0s1f0d6",
+	//excluding d3(host-acc), reserving D4-D5(QSPF ports) D6-D8(for max 3 host VFs), D9-D10(for single NF)
+	exclude = []string{"enp0s1f0", "enp0s1f0d1", "enp0s1f0d2", "enp0s1f0d3", "enp0s1f0d4", "enp0s1f0d5", "enp0s1f0d6",
 		"enp0s1f0d7", "enp0s1f0d8", "enp0s1f0d9", "enp0s1f0d10"}
 	sysClassNet      = "/sys/class/net"
 	sysBusPciDevices = "/sys/bus/pci/devices"
@@ -35,13 +34,6 @@ var (
 	intelVendor      = "0x8086"
 	maxVfsSupported  = 64
 )
-
-/*
-hostVfDevs uses a map(where key is pci-address(for example-> 0000:cb:00.6))
-accDevs uses a map(where key is ACC netdev interface name(for example-> enp0s1f0d14))
-*/
-var hostVfDevs map[string]*pb.Device
-var accDevs map[string]*pb.Device
 
 func NewDevicePluginService(mode string) *DevicePluginService {
 	return &DevicePluginService{mode: mode}
@@ -241,54 +233,9 @@ func (s *DevicePluginService) SetNumVfs(ctx context.Context, vfCountReq *pb.VfCo
 	return res, err
 }
 
-// GetPciFromNetDev takes in a network device name and returns its PCI address
-// Note: This function(GetPciFromNetDev) is based on similar api in dpu-operator/dpu-cni/pkgs/sriovutils
-func GetPciFromNetDev(ifName string) (string, error) {
-	netDevPath := filepath.Join(sysClassNet, ifName, "device")
-	pciAddr, err := filepath.EvalSymlinks(netDevPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to find PCI address for net device %s: %v", ifName, err)
-	}
-
-	return filepath.Base(pciAddr), nil
-}
-
-/*
-For the first call, we query the devices(on host or ACC) and cache it.
-For subsequent calls, we return cached list of devices. Caching helps in
-addressing the case, wherein, if host-VF is allocated for a pod, it is no
-longer available in host netnamespace, so doesnt show up under /sys/class/net,
-so we were returning 1 less device, but DPU's allocator still expects, the
-overall count of Host-VFs(even if one of them is in allocated state).
-DPU resource allocation, maintains its own list of total vs how-many VFs available.
-*/
 func discoverHostDevices(mode string) (map[string]*pb.Device, error) {
 
-	if mode != types.IpuMode && mode != types.HostMode {
-		return make(map[string]*pb.Device), fmt.Errorf("Invalid mode->%v", mode)
-	}
-	//Note: It is expected that VSP's-Init(on ACC) gets invoked prior to GetDevices,
-	//this check is meant to catch any anomalies.
-	if mode == types.IpuMode {
-		if len(AccApfsAvailForCNI) == 0 {
-			log.Errorf("discoverHostDevices: Error, AccApfsAvailForCNI not setup")
-			return make(map[string]*pb.Device), fmt.Errorf("discoverHostDevices: Error, AccApfsAvailForCNI not setup")
-		}
-	}
-
-	if mode == types.IpuMode {
-		if accDevs == nil {
-			accDevs = make(map[string]*pb.Device)
-		} else if len(accDevs) > 0 {
-			return accDevs, nil
-		}
-	} else { //mode == types.HostMode
-		if hostVfDevs == nil {
-			hostVfDevs = make(map[string]*pb.Device)
-		} else if len(hostVfDevs) > 0 {
-			return hostVfDevs, nil
-		}
-	}
+	devices := make(map[string]*pb.Device)
 
 	files, err := os.ReadDir(sysClassNet)
 	if err != nil {
@@ -306,25 +253,15 @@ func discoverHostDevices(mode string) (map[string]*pb.Device, error) {
 		device_code := strings.TrimSpace(string(deviceCodeByte))
 		if mode == types.IpuMode {
 			if device_code == deviceCode {
-				if slices.Contains(AccApfsAvailForCNI, file.Name()) {
-					accDevs[file.Name()] = &pb.Device{ID: file.Name(), Health: pluginapi.Healthy}
+				if !slices.Contains(exclude, file.Name()) {
+					devices[file.Name()] = &pb.Device{ID: file.Name(), Health: pluginapi.Healthy}
 				}
 			}
 		} else if mode == types.HostMode {
 			if device_code == deviceCodeVf {
-				pciAddr, err := GetPciFromNetDev(file.Name())
-				if err != nil {
-					log.Errorf("Error->%v finding pci addr from netinterface->%s", err, file.Name())
-					continue
-				}
-				hostVfDevs[pciAddr] = &pb.Device{ID: pciAddr, Health: pluginapi.Healthy}
+				devices[file.Name()] = &pb.Device{ID: file.Name(), Health: pluginapi.Healthy}
 			}
 		}
 	}
-
-	if mode == types.IpuMode {
-		return accDevs, nil
-	}
-
-	return hostVfDevs, nil
+	return devices, nil
 }

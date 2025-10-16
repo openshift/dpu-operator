@@ -1,0 +1,68 @@
+name: Go-static-analysis
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba022e95695ff85de572c04a18142 # v2.7.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.0
+      - name: Get module list
+        run: |
+          modules=$(find . -name 'go.mod' -exec dirname {} \;)
+      - name: Run golangci-lint
+        run: |
+          for module in $modules; do
+            echo "Running golangci-lint on module: $module"
+            golangci-lint run $module/...
+          done
+        env:
+          GO111MODULE: on
+
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    env:
+      SHELLCHECK_OPTS: -e SC3037 # disabled because of false issue in entrypoint.sh
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@63c24ba6bd7ba022e95695ff85de572c04a18142 # v2.7.0
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@cd81f4475ab741e097ec0fe73b692f3e49d66b8c # master
+
+  hadolint:
+    runs-on: ubuntu-latest
+    name: Hadolint
+    env:
+      HADOLINT_RECURSIVE: "true"
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@63c24ba6bd7ba022e95695ff85de572c04a18142 # v2.7.0
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
+    - uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+      name: Run Hadolint
+      with:
+       recursive: true
+       ignore: DL3008,DL3059,DL3015,DL3018,DL3029 

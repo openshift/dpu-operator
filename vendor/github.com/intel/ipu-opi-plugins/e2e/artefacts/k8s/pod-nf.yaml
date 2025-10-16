@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfpod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: nfnet, nfnet
+spec:
+  hostNetwork: true
+  containers:
+  - name: nf 
+    image: intel-networkfunction:latest
+    imagePullPolicy: IfNotPresent
+    securityContext:
+      privileged: true
+    command: [ "/app/nf"]
+    resources:
+      requests:
+        intel.com/ipu: '2'
+      limits:
+        intel.com/ipu: '2'

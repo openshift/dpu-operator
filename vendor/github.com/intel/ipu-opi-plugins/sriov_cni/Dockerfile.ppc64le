@@ -1,0 +1,21 @@
+FROM ppc64le/golang:alpine@sha256:a879e36d234fc7ce698dfab6de809e55a8f974fb07cbc9e4eb6d0ec0027c91de as builder
+
+COPY . /usr/src/sriov-cni
+
+ENV HTTP_PROXY $http_proxy
+ENV HTTPS_PROXY $https_proxy
+
+WORKDIR /usr/src/sriov-cni
+RUN apk add --no-cache --virtual build-dependencies build-base=~0.5 && \
+    make clean && \
+    make build
+
+FROM ppc64le/alpine@sha256:b12b826de1ec8c4237aa09a0287e7be8bd317586f32bf6cd9395ec5dba52a3a2
+COPY --from=builder /usr/src/sriov-cni/build/sriov /usr/bin/
+WORKDIR /
+
+LABEL io.k8s.display-name="SR-IOV CNI"
+
+COPY ./images/entrypoint.sh /
+
+ENTRYPOINT ["/entrypoint.sh"]
