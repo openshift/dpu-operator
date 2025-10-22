@@ -711,14 +711,10 @@ func (vsp *intelNetSecVspServer) setVlanIdsSpoofChkInternalPorts(pfPcieAddr stri
 	}
 
 	// WORKAROUND: Set the PF hardware mode to VEPA (Virtual Ethernet Port Aggregator)
-	// Only needed on the host because the NetSec Accelerator will switch packets, but the
-	// host will not switch packets.
-	if !vsp.isDPUMode {
-		err = vspnetutils.SetPfHwModeVepa(ifName)
-		if err != nil {
-			vsp.log.Error(err, "Error setting PF hardware mode to VEPA", "IfName", ifName)
-			return err
-		}
+	err = vspnetutils.SetPfHwModeVepa(ifName)
+	if err != nil {
+		vsp.log.Error(err, "Error setting PF hardware mode to VEPA", "IfName", ifName)
+		return err
 	}
 
 	// Map each VF ID to the corresponding VLAN ID.
