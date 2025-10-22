@@ -59,7 +59,15 @@ func (ovsdp *OvsDP) AddPortToDataPlane(bridgeName string, portName string, vfPCI
 func (ovsdp *OvsDP) DeletePortFromDataPlane(bridgeName string, portName string) error {
 	ovsdp.log.Info("Deleting Port from Bridge", "PortName", portName)
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, portName)
-	return cmd.Run()
+
+	err := cmd.Run()
+
+	// Also bring down the interface (best-effort, ignoring errors). See RHEL-108203, where
+	// the SDP interfaces are required to be down as long as there is no VF configured on the
+	// host side.
+	_ = vspnetutils.LinkSetUpDown(portName, false)
+
+	return err
 }
 
 // ovs-vsctl command to delete ovs bridge
