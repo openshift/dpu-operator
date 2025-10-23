@@ -224,7 +224,7 @@ tasks:
     cmds:
       - "{{.BINDIR}}/operator-sdk generate kustomize manifests -q"
       - cd config/manager && ../../{{.BINDIR}}/kustomize edit set image controller=${IMG:-controller:latest}
-      - "{{.BINDIR}}/kustomize build config/manifests | {{.BINDIR}}/operator-sdk generate bundle -q --overwrite --version ${VERSION:-4.20.0}"
+      - "{{.BINDIR}}/kustomize build config/manifests | {{.BINDIR}}/operator-sdk generate bundle -q --overwrite --version ${VERSION:-4.21.0}"
       - "{{.BINDIR}}/operator-sdk bundle validate ./bundle"
       - cp bundle/manifests/* manifests/stable
 
