@@ -5,6 +5,7 @@ import (
 	"os/exec"
 
 	"github.com/go-logr/logr"
+	vspnetutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/common"
 	mrvlutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/mrvl-utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -40,7 +41,7 @@ func createDbParam(ovsDbPath string) string {
 func (ovsdp *OvsDP) AddPortToDataPlane(bridgeName string, portName string, vfPCIAddres string, isDPDK bool) error {
 	var cmd *exec.Cmd
 
-	exec.Command("ip", "link", "set", portName, "up").Run()
+	_ = vspnetutils.LinkSetUpDown(portName, true)
 
 	if isDPDK {
 		ovsdp.log.Info("Adding DPDK Port to Bridge", "PortName", portName, "VFPCIAddress", vfPCIAddres)
