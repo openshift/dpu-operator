@@ -5,6 +5,7 @@ import (
 	"os/exec"
 
 	"github.com/go-logr/logr"
+	vspnetutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/common"
 	mrvlutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/mrvl-utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -40,7 +41,7 @@ func createDbParam(ovsDbPath string) string {
 func (ovsdp *OvsDP) AddPortToDataPlane(bridgeName string, portName string, vfPCIAddres string, isDPDK bool) error {
 	var cmd *exec.Cmd
 
-	exec.Command("ip", "link", "set", portName, "up").Run()
+	_ = vspnetutils.LinkSetUpDown(portName, true)
 
 	if isDPDK {
 		ovsdp.log.Info("Adding DPDK Port to Bridge", "PortName", portName, "VFPCIAddress", vfPCIAddres)
@@ -58,7 +59,15 @@ func (ovsdp *OvsDP) AddPortToDataPlane(bridgeName string, portName string, vfPCI
 func (ovsdp *OvsDP) DeletePortFromDataPlane(bridgeName string, portName string) error {
 	ovsdp.log.Info("Deleting Port from Bridge", "PortName", portName)
 	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, portName)
-	return cmd.Run()
+
+	err := cmd.Run()
+
+	// Also bring down the interface (best-effort, ignoring errors). See RHEL-108203, where
+	// the SDP interfaces are required to be down as long as there is no VF configured on the
+	// host side.
+	_ = vspnetutils.LinkSetUpDown(portName, false)
+
+	return err
 }
 
 // ovs-vsctl command to delete ovs bridge

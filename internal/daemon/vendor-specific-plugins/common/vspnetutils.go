@@ -135,6 +135,29 @@ func CreateNfVethPair(idx int) (*VEthPairDeviceInfo, error) {
 	return CreateVethPair(nfInterfaceName, dpInterfaceName)
 }
 
+func LinkSetUpDown(ifName string, up bool) error {
+	link, err := netlink.LinkByName(ifName)
+	if err != nil {
+		klog.Error(err, "LinkSetUpDown: Error getting link by name", "ifName", ifName)
+		return err
+	}
+
+	klog.Info("LinkSetUpDown: set interface", "ifName", ifName, "up", up)
+
+	if up {
+		err = netlink.LinkSetUp(link)
+	} else {
+		err = netlink.LinkSetDown(link)
+	}
+
+	if err != nil {
+		klog.Error(err, "LinkSetUpDown: Error setting link for interface", "ifName", ifName, "up", up)
+		return err
+	}
+
+	return nil
+}
+
 // CreateVethPair function to create a veth pair with the given index and InterfaceInfo
 func CreateVethPair(ifname string, peername string) (*VEthPairDeviceInfo, error) {
 	deviceInfo := VEthPairDeviceInfo{
