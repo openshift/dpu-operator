@@ -1,0 +1,12 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: nfnet
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/ipu
+spec:
+  config: '{
+  "type": "nf-cni",
+  "cniVersion": "0.3.1",
+  "name": "apf-network"
+}'

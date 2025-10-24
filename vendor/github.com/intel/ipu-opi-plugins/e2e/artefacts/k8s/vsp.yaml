@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vsp
+spec:
+  hostNetwork: true
+  automountServiceAccountToken: false
+  containers:
+  - name: appcntr1
+    image: <hostIP>:5000/intel-ipuplugin:latest
+    imagePullPolicy: Always
+    securityContext:
+      privileged: true
+    command: [ "/usr/bin/ipuplugin" ]
+    args: [ "--bridgeType=linux", "--interface=enp0s1f0d3", "--ovsCliDir=/opt/p4/p4-cp-nws", "-v=debug", "--mode=host" ]
+    volumeMounts:
+    - name: vendor-plugin-sock
+      mountPath: /var/run
+  volumes:
+  - name: vendor-plugin-sock
+    hostPath:
+      path: /var/run

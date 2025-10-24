@@ -1,0 +1,41 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: daily
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+
+  - package-ecosystem: gomod
+    directory: /ipu-plugin
+    schedule:
+      interval: daily
+
+  - package-ecosystem: docker
+    directory: /ipu-plugin/images
+    schedule:
+      interval: daily
+
+  - package-ecosystem: docker
+    directory: /sriov_cni
+    schedule:
+      interval: daily
+
+  - package-ecosystem: gomod
+    directory: /sriov_cni
+    schedule:
+      interval: daily
+
+  - package-ecosystem: docker
+    directory: /p4sdk/images
+    schedule:
+      interval: daily

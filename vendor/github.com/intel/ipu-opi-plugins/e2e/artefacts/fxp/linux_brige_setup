@@ -1,0 +1,48 @@
+#Rules to create Linux bridge and outer/inner vlan tags should be run on ACC.
+#This enables Linux bridge(running on ACC) to resolve ARP
+
+ip link add name br0 type bridge
+ip link set dev br0 up
+#Here we are using one of the available APF(network interface listed in ip -br l) in ACC->enp0s1f0d3
+ip link add link enp0s1f0d3 name d3.300 type vlan id 300 protocol 802.1ad
+
+#Note: 300 is the outer vlan used by the P4 script used in demo->p4-gen-arp-rules.sh
+#In 1.6.2, learning needs to be turned off for the outer vlan as the ARP responses will
+#otherwise get learnt on the outer vlan. This is a difference in behavior from 1.2.
+
+#And the P4 script assigns inner vlan numbers 301 to 308 that correspond to the 8 VFs(on the host).
+ip link set dev d3.300 up
+ip link set dev d3.300 master br0
+bridge link set dev d3.300 learning off
+
+ip link add link d3.300 name d3.300.301 type vlan id 301
+ip link set dev d3.300.301 up
+ip link set dev d3.300.301 master br0
+
+ip link add link d3.300 name d3.300.302 type vlan id 302
+ip link set dev d3.300.302 up
+ip link set dev d3.300.302 master br0
+
+ip link add link d3.300 name d3.300.303 type vlan id 303
+ip link set dev d3.300.303 up
+ip link set dev d3.300.303 master br0
+
+ip link add link d3.300 name d3.300.304 type vlan id 304
+ip link set dev d3.300.304 up
+ip link set dev d3.300.304 master br0
+
+ip link add link d3.300 name d3.300.305 type vlan id 305
+ip link set dev d3.300.305 up
+ip link set dev d3.300.305 master br0
+
+ip link add link d3.300 name d3.300.306 type vlan id 306
+ip link set dev d3.300.306 up
+ip link set dev d3.300.306 master br0
+
+ip link add link d3.300 name d3.300.307 type vlan id 307
+ip link set dev d3.300.307 up
+ip link set dev d3.300.307 master br0
+
+ip link add link d3.300 name d3.300.308 type vlan id 308
+ip link set dev d3.300.308 up
+ip link set dev d3.300.308 master br0
