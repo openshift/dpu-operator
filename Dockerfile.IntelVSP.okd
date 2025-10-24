@@ -1,0 +1,62 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+COPY . .
+
+# Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
+# As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
+RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
+
+FROM registry.ci.openshift.org/ocp/4.20:base-rhel9
+ARG TARGETARCH
+ENV PYTHONUNBUFFERED=1
+WORKDIR /
+
+# https://github.com/grpc/grpc/issues/24556
+# dependencies needed to compile python packages
+# python3-dev gcc gcc-c++
+RUN dnf install -y \
+	NetworkManager openvswitch3.4 iproute python3 python3-devel openssh-clients gcc gcc-c++ \
+    && python3 -m ensurepip --upgrade
+
+#By setting workdir, the directory is created automatically
+WORKDIR /opt/p4/p4-cp-nws/bin/
+
+RUN mkdir -p /opt/p4/p4-cp-nws/bin/p4
+
+COPY ./cmd/intelvsp/fxp-net_linux-networking/fxp-net_linux-networking.pkg /
+COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
+
+# Add steps for cachito
+ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
+ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
+COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+
+# Create a pip.conf file to globally set --ignore-installed.
+# Needed as the base centos image has setuptools installed by a package manager
+RUN mkdir -p /root/.config/pip && \
+    echo "[install]" > /root/.config/pip/pip.conf && \
+    echo "ignore-installed = true" >> /root/.config/pip/pip.conf
+
+COPY openshift/install-dpu.sh .
+RUN chmod +x install-dpu.sh \
+    && ./install-dpu.sh
+
+# Remove packages which are only needed for cachito
+RUN dnf remove -y gcc gcc-c++ \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+#TODO: Update to newer package, according to release.
+
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/p4 /opt/p4rt_proto
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4rt_proto
+RUN chmod a+x /opt/p4rt_proto/copy_p4rt_python_deps.sh
+RUN /opt/p4rt_proto/copy_p4rt_python_deps.sh
+
+COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /ipuplugin
+LABEL io.k8s.display-name="IPU OPI Plugin"
+
+ENTRYPOINT ["/ipuplugin"]
