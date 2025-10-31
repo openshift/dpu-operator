@@ -84,6 +84,8 @@ The DPU operator also integrates with CDA (https://github.com/bn222/cluster-depl
 task e2e-test
 ```
 
+See [README-ci.md](./README-ci.md) for details on how this is used to test dpu-operator PRs.
+
 ### End-to-end testing on any cluster
 It is possible to run the e2e test suite separately by using the 'e2e-test-suite' target. This will execute the tests on two clusters, which are referenced by the configuration files located at `/root/kubeconfig.ocpcluster` and `/root/kubeconfig.microshift`. This target will skip re-deploying the clusters. It's also used at the end of the e2e-test target.
 ```sh
