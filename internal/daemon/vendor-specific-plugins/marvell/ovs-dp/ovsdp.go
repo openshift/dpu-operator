@@ -83,7 +83,7 @@ func createBridge(bridgeName string) error {
 }
 
 // InitDataPlane initializes the data path in this case it creates an ovs bridge
-func (ovsdp *OvsDP) InitDataPlane(bridgeName string) error {
+func (ovsdp *OvsDP) InitDataPlane(bridgeName string, isMacLearning bool) error {
 	ovsdp.log.Info("Initializing OVS-DPDK Data Plane")
 	ovsdp.bridgeName = bridgeName
 	// "br0" For Testing Purpose
@@ -93,6 +93,24 @@ func (ovsdp *OvsDP) InitDataPlane(bridgeName string) error {
 
 	}
 	ovsdp.log.Info("OVS-DPDK Bridge Created Successfully", "BridgeName", bridgeName)
+
+	// Modify the default NORMAL flow to have highest priority
+	if isMacLearning {
+		ovsdp.log.Info("Modifying NORMAL flow to highest priority")
+		// First delete the existing NORMAL flow
+		cmd := exec.Command("chroot", "/host", "ovs-ofctl", "del-flows", bridgeName)
+		if err := cmd.Run(); err != nil {
+			ovsdp.log.Error(err, "Error occurred in deleting default NORMAL flow")
+			return err
+		}
+		// Add high priority NORMAL flow
+		cmd = exec.Command("chroot", "/host", "ovs-ofctl", "add-flow", bridgeName, "priority=65535,actions=NORMAL")
+		if err := cmd.Run(); err != nil {
+			ovsdp.log.Error(err, "Error occurred in adding high priority NORMAL flow")
+			return err
+		}
+		ovsdp.log.Info("NORMAL flow priority updated successfully", "Priority", 65535)
+	}
 	// Get the name of interface from device id with device id as "a063"
 	// a063 is the device id of RPM interface
 	portName, err := mrvlutils.GetNameByDeviceID(deviceId)

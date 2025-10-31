@@ -26,7 +26,7 @@ func (debugDP *DebugDP) DeletePortFromDataPlane(bridgeName string, portName stri
 
 }
 
-func (debugDP *DebugDP) InitDataPlane(bridgeName string) error {
+func (debugDP *DebugDP) InitDataPlane(bridgeName string, isMacLearning bool) error {
 	debugDP.log.Info("Init Data plane", "bridgeName", bridgeName)
 	return nil
 }
