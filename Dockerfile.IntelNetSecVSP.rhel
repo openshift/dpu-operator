@@ -23,6 +23,7 @@ COPY --from=builder /workspace/bin/vsp-intel-netsec.${TARGETARCH} /vsp-intel-net
 
 RUN yum update -y \
     && yum install -y \
+       ethtool \
        net-tools \
        kmod \
        pciutils \
