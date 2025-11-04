@@ -7,7 +7,7 @@ metadata:
     v1.multus-cni.io/default-network: {{ default_network }} {% else %}
     k8s.v1.cni.cncf.io/networks: {{ secondary_network_nad }} {% endif %}
   labels:
-    tft-tests: "{{ index }}"
+    tft-tests: {{ label_tft_tests }}
     tft-port: "{{ port }}"
 spec:
   nodeSelector:
@@ -18,3 +18,5 @@ spec:
     command: {{ command }}
     args: {{ args }}
     imagePullPolicy: {{ image_pull_policy }}
+    securityContext:
+      privileged: {{ privileged_pod }}
