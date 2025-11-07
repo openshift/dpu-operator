@@ -1,0 +1,3287 @@
+{
+    "program_name": "rh_mvp",
+    "build_date": "Thu Oct  3 18:32:36 2024",
+    "compile_command": "/opt/p4-tools/p4c/bin/p4c-pna-xxp -I /opt/p4-tools/p4c/share/p4c/p4c_src/../idpf-lib --Wdisable --no-pedantic --top4 LiveVariableAnalysis --context rh_mvp.context.json --tdi rh_mvp.tdi.json -I /opt/p4-tools/p4c/share/p4c/p4include -I /opt/p4-tools/p4c/bin/../lib -I /opt/p4-tools/p4c/bin/../share/p4c/p4include -I /opt/p4-tools/p4c/bin/../share/p4c/idpf-lib --p4v=16 --p4runtime-files rh_mvp.p4info.txt --pkg-name RH MVP P4 Program pkg --pkg-version 1.0.73.29 -v -o ./rh_mvp_95b22d5c86e94df082d07cf9c81c3475.s rh_mvp.p4",
+    "compiler_version": "3.0.70.124",
+    "schema_version": "1.0.0",
+    "run_id": "124103183217",
+    "target": "MEV",
+    "global_configs": {
+        "hardware_blocks": [
+            {
+                "name": "RC",
+                "rc_entry_space_cfg": {
+                    "rc_num_banks": 8,
+                    "rc_num_entries": 8192
+                }
+            },
+            {
+                "name": "MOD",
+                "hash_space_cfg": {
+                    "base_128_entries": 0,
+                    "base_256_entries": 2097152
+                }
+            },
+            {
+                "name": "SEM",
+                "obj_cache": [
+                    {
+                        "object_id": 0,
+                        "base_address": 0,
+                        "entry_size": 64
+                    },
+                    {
+                        "object_id": 1,
+                        "base_address": 17104896,
+                        "entry_size": 64
+                    },
+                    {
+                        "object_id": 2,
+                        "base_address": 34209792,
+                        "entry_size": 32
+                    }
+                ]
+            }
+        ]
+    },
+    "tables": [
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 46866105,
+            "name": "rh_mvp_control.vlan_push_ctag_stag_mod_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.mod_blob_ptr",
+                    "instance_name": "meta.common.mod_blob_ptr",
+                    "field_name": "meta.common.mod_blob_ptr",
+                    "match_type": "exact",
+                    "bit_width": 24,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "default_action_handle": 21257015,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.mod_vlan_push_ctag_stag",
+                    "handle": 29010669,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "pcp",
+                            "bit_width": 3
+                        },
+                        {
+                            "name": "dei",
+                            "bit_width": 1
+                        },
+                        {
+                            "name": "ctag_id",
+                            "bit_width": 12
+                        },
+                        {
+                            "name": "pcp_s",
+                            "bit_width": 3
+                        },
+                        {
+                            "name": "dei_s",
+                            "bit_width": 1
+                        },
+                        {
+                            "name": "stag_id",
+                            "bit_width": 12
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "MOD",
+                        "id": 7,
+                        "hw_interface": "ConfigQueue",
+                        "hw_resource": "MOD_CONTENT",
+                        "hw_resource_id": 0,
+                        "profile": [
+                            4
+                        ],
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.mod_vlan_push_ctag_stag",
+                                "action_handle": 29010669,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "pcp",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 3
+                                    },
+                                    {
+                                        "param_name": "dei",
+                                        "param_handle": 1,
+                                        "dest_start": 1,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 1
+                                    },
+                                    {
+                                        "param_name": "ctag_id",
+                                        "param_handle": 2,
+                                        "dest_start": 2,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 12
+                                    },
+                                    {
+                                        "param_name": "pcp_s",
+                                        "param_handle": 3,
+                                        "dest_start": 4,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 3
+                                    },
+                                    {
+                                        "param_name": "dei_s",
+                                        "param_handle": 4,
+                                        "dest_start": 5,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 1
+                                    },
+                                    {
+                                        "param_name": "stag_id",
+                                        "param_handle": 5,
+                                        "dest_start": 6,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 12
+                                    }
+                                ],
+                                "mod_content_format": {
+                                    "mod_profile": 4,
+                                    "mod_obj_size": 1,
+                                    "mod_fields": [
+                                        {
+                                            "name": "type",
+                                            "handle": 0,
+                                            "type": "constant",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 0,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 16,
+                                            "value": [
+                                                136,
+                                                168
+                                            ]
+                                        },
+                                        {
+                                            "name": "pcp_s",
+                                            "handle": 1,
+                                            "param_handle": 3,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 3,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "dei_s",
+                                            "handle": 2,
+                                            "param_handle": 4,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 3,
+                                            "bit_width": 1,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "stag_id",
+                                            "handle": 3,
+                                            "param_handle": 5,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 4,
+                                            "bit_width": 12,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "type",
+                                            "handle": 4,
+                                            "type": "constant",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 4,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 16,
+                                            "value": [
+                                                129,
+                                                0
+                                            ]
+                                        },
+                                        {
+                                            "name": "pcp",
+                                            "handle": 5,
+                                            "param_handle": 0,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 6,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 3,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "dei",
+                                            "handle": 6,
+                                            "param_handle": 1,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 6,
+                                            "start_bit_offset": 3,
+                                            "bit_width": 1,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "ctag_id",
+                                            "handle": 7,
+                                            "param_handle": 2,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 6,
+                                            "start_bit_offset": 4,
+                                            "bit_width": 12,
+                                            "value": []
+                                        }
+                                    ]
+                                },
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 38499371,
+            "name": "rh_mvp_control.vlan_push_stag_mod_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.mod_blob_ptr",
+                    "instance_name": "meta.common.mod_blob_ptr",
+                    "field_name": "meta.common.mod_blob_ptr",
+                    "match_type": "exact",
+                    "bit_width": 24,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "default_action_handle": 21257015,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.mod_vlan_push_stag",
+                    "handle": 26916781,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "pcp",
+                            "bit_width": 3
+                        },
+                        {
+                            "name": "dei",
+                            "bit_width": 1
+                        },
+                        {
+                            "name": "stag_id",
+                            "bit_width": 12
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "MOD",
+                        "id": 7,
+                        "hw_interface": "ConfigQueue",
+                        "hw_resource": "MOD_CONTENT",
+                        "hw_resource_id": 0,
+                        "profile": [
+                            6
+                        ],
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.mod_vlan_push_stag",
+                                "action_handle": 26916781,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "pcp",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 3
+                                    },
+                                    {
+                                        "param_name": "dei",
+                                        "param_handle": 1,
+                                        "dest_start": 1,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 1
+                                    },
+                                    {
+                                        "param_name": "stag_id",
+                                        "param_handle": 2,
+                                        "dest_start": 2,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 12
+                                    }
+                                ],
+                                "mod_content_format": {
+                                    "mod_profile": 6,
+                                    "mod_obj_size": 1,
+                                    "mod_fields": [
+                                        {
+                                            "name": "type",
+                                            "handle": 0,
+                                            "type": "constant",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 0,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 16,
+                                            "value": [
+                                                136,
+                                                168
+                                            ]
+                                        },
+                                        {
+                                            "name": "pcp",
+                                            "handle": 1,
+                                            "param_handle": 0,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 3,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "dei",
+                                            "handle": 2,
+                                            "param_handle": 1,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 3,
+                                            "bit_width": 1,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "stag_id",
+                                            "handle": 3,
+                                            "param_handle": 2,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 4,
+                                            "bit_width": 12,
+                                            "value": []
+                                        }
+                                    ]
+                                },
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 35843282,
+            "name": "rh_mvp_control.vlan_push_ctag_mod_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.mod_blob_ptr",
+                    "instance_name": "meta.common.mod_blob_ptr",
+                    "field_name": "meta.common.mod_blob_ptr",
+                    "match_type": "exact",
+                    "bit_width": 24,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "default_action_handle": 21257015,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.mod_vlan_push_ctag",
+                    "handle": 19476925,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "pcp",
+                            "bit_width": 3
+                        },
+                        {
+                            "name": "dei",
+                            "bit_width": 1
+                        },
+                        {
+                            "name": "vlan_id",
+                            "bit_width": 12
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "MOD",
+                        "id": 7,
+                        "hw_interface": "ConfigQueue",
+                        "hw_resource": "MOD_CONTENT",
+                        "hw_resource_id": 0,
+                        "profile": [
+                            5
+                        ],
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.mod_vlan_push_ctag",
+                                "action_handle": 19476925,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "pcp",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 3
+                                    },
+                                    {
+                                        "param_name": "dei",
+                                        "param_handle": 1,
+                                        "dest_start": 1,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 1
+                                    },
+                                    {
+                                        "param_name": "vlan_id",
+                                        "param_handle": 2,
+                                        "dest_start": 2,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 12
+                                    }
+                                ],
+                                "mod_content_format": {
+                                    "mod_profile": 5,
+                                    "mod_obj_size": 1,
+                                    "mod_fields": [
+                                        {
+                                            "name": "type",
+                                            "handle": 0,
+                                            "type": "constant",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 0,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 16,
+                                            "value": [
+                                                129,
+                                                0
+                                            ]
+                                        },
+                                        {
+                                            "name": "pcp",
+                                            "handle": 1,
+                                            "param_handle": 0,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 0,
+                                            "bit_width": 3,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "dei",
+                                            "handle": 2,
+                                            "param_handle": 1,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 3,
+                                            "bit_width": 1,
+                                            "value": []
+                                        },
+                                        {
+                                            "name": "vlan_id",
+                                            "handle": 3,
+                                            "param_handle": 2,
+                                            "type": "parameter",
+                                            "byte_order": "NETWORK",
+                                            "byte_array_index": 2,
+                                            "start_bit_offset": 4,
+                                            "bit_width": 12,
+                                            "value": []
+                                        }
+                                    ]
+                                },
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 44791827,
+            "name": "rh_mvp_control.vlan_pop_ctag_stag_mod_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.mod_blob_ptr",
+                    "instance_name": "meta.common.mod_blob_ptr",
+                    "field_name": "meta.common.mod_blob_ptr",
+                    "match_type": "exact",
+                    "bit_width": 24,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "default_action_handle": 21257015,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.mod_vlan_pop_ctag_stag",
+                    "handle": 18029753,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "MOD",
+                        "id": 7,
+                        "hw_interface": "ConfigQueue",
+                        "hw_resource": "MOD_CONTENT",
+                        "hw_resource_id": 0,
+                        "profile": [
+                            1
+                        ],
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.mod_vlan_pop_ctag_stag",
+                                "action_handle": 18029753,
+                                "immediate_fields": [],
+                                "mod_content_format": {
+                                    "mod_profile": 1,
+                                    "mod_obj_size": 1
+                                },
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 35281074,
+            "name": "rh_mvp_control.vlan_pop_stag_mod_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.mod_blob_ptr",
+                    "instance_name": "meta.common.mod_blob_ptr",
+                    "field_name": "meta.common.mod_blob_ptr",
+                    "match_type": "exact",
+                    "bit_width": 24,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "default_action_handle": 21257015,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.mod_vlan_pop_stag",
+                    "handle": 24507408,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "MOD",
+                        "id": 7,
+                        "hw_interface": "ConfigQueue",
+                        "hw_resource": "MOD_CONTENT",
+                        "hw_resource_id": 0,
+                        "profile": [
+                            3
+                        ],
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.mod_vlan_pop_stag",
+                                "action_handle": 24507408,
+                                "immediate_fields": [],
+                                "mod_content_format": {
+                                    "mod_profile": 3,
+                                    "mod_obj_size": 1
+                                },
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 37786634,
+            "name": "rh_mvp_control.vlan_pop_ctag_mod_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.mod_blob_ptr",
+                    "instance_name": "meta.common.mod_blob_ptr",
+                    "field_name": "meta.common.mod_blob_ptr",
+                    "match_type": "exact",
+                    "bit_width": 24,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "default_action_handle": 21257015,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.mod_vlan_pop_ctag",
+                    "handle": 21476074,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "MOD",
+                        "id": 7,
+                        "hw_interface": "ConfigQueue",
+                        "hw_resource": "MOD_CONTENT",
+                        "hw_resource_id": 0,
+                        "profile": [
+                            2
+                        ],
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.mod_vlan_pop_ctag",
+                                "action_handle": 21476074,
+                                "immediate_fields": [],
+                                "mod_content_format": {
+                                    "mod_profile": 2,
+                                    "mod_obj_size": 1
+                                },
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "RX",
+            "handle": 49008230,
+            "name": "rh_mvp_control.phy_ingress_vlan_dmac_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "port_id",
+                    "instance_name": "port_id",
+                    "field_name": "port_id",
+                    "match_type": "exact",
+                    "bit_width": 2,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "vid",
+                    "instance_name": "vid",
+                    "field_name": "vid",
+                    "match_type": "exact",
+                    "bit_width": 12,
+                    "index": 1,
+                    "position": 1
+                },
+                {
+                    "name": "dmac",
+                    "instance_name": "dmac",
+                    "field_name": "dmac",
+                    "match_type": "exact",
+                    "bit_width": 48,
+                    "index": 2,
+                    "position": 3
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 3,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 4,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 2,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 4,
+                    "start_bit_offset": 0,
+                    "bit_width": 48
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.vlan_pop_ctag",
+                    "handle": 18255697,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            6
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.vlan_pop_ctag",
+                                "action_handle": 18255697,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 2,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 21476074,
+                                        "p4_ref_table_handle": 37786634
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 1,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 2,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "RX",
+            "handle": 38534218,
+            "name": "rh_mvp_control.phy_ingress_arp_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "port_id",
+                    "instance_name": "port_id",
+                    "field_name": "port_id",
+                    "match_type": "exact",
+                    "bit_width": 2,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "vid",
+                    "instance_name": "vid",
+                    "field_name": "vid",
+                    "match_type": "exact",
+                    "bit_width": 12,
+                    "index": 1,
+                    "position": 1
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 3,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 4,
+                    "bit_width": 16
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 2,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.send_to_port_mux_stag",
+                    "handle": 24572067,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            2
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 2,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.send_to_port_mux_stag",
+                                "action_handle": 24572067,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 6,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 26916781,
+                                        "p4_ref_table_handle": 38499371
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 3,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 4,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 44032042,
+            "name": "rh_mvp_control.portmux_egress_resp_vsi_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "bit32_zeros",
+                    "instance_name": "bit32_zeros",
+                    "field_name": "bit32_zeros",
+                    "match_type": "exact",
+                    "bit_width": 32,
+                    "index": 1,
+                    "position": 2
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 0,
+                    "bit_width": 32
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.vlan_pop_ctag_stag",
+                    "handle": 29626876,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "rh_mvp_control.vlan_pop_stag",
+                    "handle": 22775904,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            11
+                        ],
+                        "sub_profile": 2,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.vlan_pop_ctag_stag",
+                                "action_handle": 29626876,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 1,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 18029753,
+                                        "p4_ref_table_handle": 44791827
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "rh_mvp_control.vlan_pop_stag",
+                                "action_handle": 22775904,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 3,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 24507408,
+                                        "p4_ref_table_handle": 35281074
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 43467074,
+            "name": "rh_mvp_control.portmux_egress_resp_dmac_vsi_table",
+            "size": 1024,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "dmac",
+                    "instance_name": "dmac",
+                    "field_name": "dmac",
+                    "match_type": "exact",
+                    "bit_width": 48,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 1,
+                    "position": 6
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 48
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 6,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.vlan_pop_ctag_stag",
+                    "handle": 29626876,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            11
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.vlan_pop_ctag_stag",
+                                "action_handle": 29626876,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 1,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 18029753,
+                                        "p4_ref_table_handle": 44791827
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 45781513,
+            "name": "rh_mvp_control.portmux_egress_req_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "vid",
+                    "instance_name": "vid",
+                    "field_name": "vid",
+                    "match_type": "exact",
+                    "bit_width": 12,
+                    "index": 1,
+                    "position": 2
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 4,
+                    "bit_width": 16
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.vlan_pop_ctag_stag",
+                    "handle": 29626876,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "rh_mvp_control.vlan_pop_stag",
+                    "handle": 22775904,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            10
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.vlan_pop_ctag_stag",
+                                "action_handle": 29626876,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 1,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 18029753,
+                                        "p4_ref_table_handle": 44791827
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "rh_mvp_control.vlan_pop_stag",
+                                "action_handle": 22775904,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 3,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 24507408,
+                                        "p4_ref_table_handle": 35281074
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "RX",
+            "handle": 45920889,
+            "name": "rh_mvp_control.portmux_ingress_loopback_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "bit32_zeros",
+                    "instance_name": "bit32_zeros",
+                    "field_name": "bit32_zeros",
+                    "match_type": "exact",
+                    "bit_width": 32,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 32
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.fwd_to_port",
+                    "handle": 22841159,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            9
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.fwd_to_port",
+                                "action_handle": 22841159,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 5,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 6,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 43816880,
+            "name": "rh_mvp_control.vport_arp_egress_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "bit32_zeros",
+                    "instance_name": "bit32_zeros",
+                    "field_name": "bit32_zeros",
+                    "match_type": "exact",
+                    "bit_width": 32,
+                    "index": 1,
+                    "position": 2
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 0,
+                    "bit_width": 32
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 2,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.send_to_port_mux",
+                    "handle": 24824497,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            7
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 2,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.send_to_port_mux",
+                                "action_handle": 24824497,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 4,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 29010669,
+                                        "p4_ref_table_handle": 46866105
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "RX",
+            "handle": 41286760,
+            "name": "rh_mvp_control.ingress_loopback_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "target_vsi",
+                    "instance_name": "target_vsi",
+                    "field_name": "target_vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 1,
+                    "position": 2
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 1,
+                    "bit_width": 16
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.fwd_to_port",
+                    "handle": 22841159,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            5
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.fwd_to_port",
+                                "action_handle": 22841159,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 7,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 8,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "RX",
+            "handle": 43924165,
+            "name": "rh_mvp_control.ingress_loopback_dmac_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "dmac",
+                    "instance_name": "dmac",
+                    "field_name": "dmac",
+                    "match_type": "exact",
+                    "bit_width": 48,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 48
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.fwd_to_port",
+                    "handle": 22841159,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            5
+                        ],
+                        "sub_profile": 2,
+                        "obj_id": 1,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.fwd_to_port",
+                                "action_handle": 22841159,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 9,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 10,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 41857485,
+            "name": "rh_mvp_control.vport_egress_vsi_table",
+            "size": 16384,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "bit32_zeros",
+                    "instance_name": "bit32_zeros",
+                    "field_name": "bit32_zeros",
+                    "match_type": "exact",
+                    "bit_width": 32,
+                    "index": 1,
+                    "position": 2
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 0,
+                    "bit_width": 32
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 2,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.fwd_to_port",
+                    "handle": 22841159,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "rh_mvp_control.vlan_push_ctag",
+                    "handle": 32637686,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "mod_ptr",
+                            "bit_width": 24
+                        },
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                },
+                {
+                    "name": "rh_mvp_control.l2_fwd_miss_action",
+                    "handle": 30287134,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            4
+                        ],
+                        "sub_profile": 1,
+                        "obj_id": 2,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.fwd_to_port",
+                                "action_handle": 22841159,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "rh_mvp_control.vlan_push_ctag",
+                                "action_handle": 32637686,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "mod_ptr",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 24
+                                    },
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 1,
+                                        "dest_start": 3,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 5,
+                                        "prefetch": 1
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 0,
+                                        "parameters": [
+                                            {
+                                                "param_name": "mod_ptr",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 24,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ],
+                                        "p4_ref_action_handle": 19476925,
+                                        "p4_ref_table_handle": 35843282
+                                    },
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 1,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            },
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd_miss_action",
+                                "action_handle": 30287134,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 50313088,
+            "name": "rh_mvp_control.vport_egress_dmac_vsi_table",
+            "size": 1024,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "dmac",
+                    "instance_name": "dmac",
+                    "field_name": "dmac",
+                    "match_type": "exact",
+                    "bit_width": 48,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "vsi",
+                    "instance_name": "vsi",
+                    "field_name": "vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 1,
+                    "position": 6
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 48
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 6,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 2,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.fwd_to_port",
+                    "handle": 22841159,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            4
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 2,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.fwd_to_port",
+                                "action_handle": 22841159,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "TX",
+            "handle": 45925960,
+            "name": "rh_mvp_control.vport_egress_dmac_table",
+            "size": 1024,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "dmac",
+                    "instance_name": "dmac",
+                    "field_name": "dmac",
+                    "match_type": "exact",
+                    "bit_width": 48,
+                    "index": 0,
+                    "position": 0
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "NETWORK",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 48
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 2,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.fwd_to_port",
+                    "handle": 22841159,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "vport",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": true,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            4
+                        ],
+                        "sub_profile": 2,
+                        "obj_id": 2,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.fwd_to_port",
+                                "action_handle": 22841159,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "vport",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "vport",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "table_type": "match",
+            "direction": "BIDIRECTIONAL",
+            "handle": 39241585,
+            "name": "rh_mvp_control.comms_channel_table",
+            "size": 1024,
+            "isDefaultSize": true,
+            "add_on_miss": false,
+            "idle_timeout_with_auto_delete": false,
+            "match_key_fields": [
+                {
+                    "name": "meta.common.vsi",
+                    "instance_name": "meta.common.vsi",
+                    "field_name": "meta.common.vsi",
+                    "match_type": "exact",
+                    "bit_width": 11,
+                    "index": 0,
+                    "position": 0
+                },
+                {
+                    "name": "user_meta.cmeta.bit32_zeros[15:0]",
+                    "instance_name": "user_meta.cmeta.bit32_zeros[15:0]",
+                    "field_name": "user_meta.cmeta.bit32_zeros[15:0]",
+                    "match_type": "exact",
+                    "bit_width": 16,
+                    "index": 1,
+                    "position": 2
+                }
+            ],
+            "match_key_format": [
+                {
+                    "match_key_handle": 0,
+                    "byte_order": "HOST",
+                    "byte_array_index": 0,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                },
+                {
+                    "match_key_handle": 1,
+                    "byte_order": "HOST",
+                    "byte_array_index": 2,
+                    "start_bit_offset": 0,
+                    "bit_width": 16
+                }
+            ],
+            "default_action_handle": 21257015,
+            "max_default_actions": 4,
+            "actions": [
+                {
+                    "name": "rh_mvp_control.l2_fwd",
+                    "handle": 20250414,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": true,
+                    "allowed_as_default_action": false,
+                    "p4_parameters": [
+                        {
+                            "name": "port",
+                            "bit_width": 32
+                        }
+                    ]
+                },
+                {
+                    "name": "NoAction",
+                    "handle": 21257015,
+                    "constant_default_action": false,
+                    "is_compiler_added_action": false,
+                    "allowed_as_hit_action": false,
+                    "allowed_as_default_action": true,
+                    "p4_parameters": []
+                }
+            ],
+            "match_attributes": {
+                "hardware_blocks": [
+                    {
+                        "name": "SEM",
+                        "id": 0,
+                        "hw_interface": "ConfigQueue",
+                        "profile": [
+                            1
+                        ],
+                        "sub_profile": 0,
+                        "obj_id": 0,
+                        "hash_size": 267264,
+                        "action_format": [
+                            {
+                                "action_name": "rh_mvp_control.l2_fwd",
+                                "action_handle": 20250414,
+                                "immediate_fields": [
+                                    {
+                                        "param_name": "port",
+                                        "param_handle": 0,
+                                        "dest_start": 0,
+                                        "start_bit_offset": 0,
+                                        "dest_width": 32
+                                    }
+                                ],
+                                "hw_actions_list": [
+                                    {
+                                        "prec": 7,
+                                        "action_code": "SET1_16b",
+                                        "encoding_grp": 11,
+                                        "encoding_port": "VSI",
+                                        "index": 2,
+                                        "parameters": [
+                                            {
+                                                "param_name": "port",
+                                                "param_handle": 0,
+                                                "param_start_bit": 0,
+                                                "param_value_length": 32,
+                                                "value_start_bit": 0,
+                                                "byte_order": "HOST"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "prec": 1,
+                                        "action_code": "SET1A_24b",
+                                        "index": 9,
+                                        "mod_profile": 0,
+                                        "prefetch": 0
+                                    }
+                                ]
+                            },
+                            {
+                                "action_name": "NoAction",
+                                "action_handle": 21257015,
+                                "immediate_fields": [],
+                                "hw_actions_list": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

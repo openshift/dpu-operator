@@ -1923,6 +1923,13 @@
             }
           ],
           "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
         }
       ],
       "data" : [],
@@ -3314,7 +3321,7 @@
       "size" : 1024,
       "annotations" : [],
       "depends_on" : [],
-      "has_const_default_action" : true,
+      "has_const_default_action" : false,
       "key" : [
         {
           "id" : 1,
@@ -3902,38 +3909,6 @@
       ],
       "action_specs" : [
         {
-          "id" : 20004960,
-          "name" : "linux_networking_control.mirror_and_send",
-          "action_scope" : "TableAndDefault",
-          "annotations" : [],
-          "data" : [
-            {
-              "id" : 1,
-              "name" : "port",
-              "repeated" : false,
-              "mandatory" : true,
-              "read_only" : false,
-              "annotations" : [],
-              "type" : {
-                "type" : "bytes",
-                "width" : 32
-              }
-            },
-            {
-              "id" : 2,
-              "name" : "mirror_session_id",
-              "repeated" : false,
-              "mandatory" : true,
-              "read_only" : false,
-              "annotations" : [],
-              "type" : {
-                "type" : "bytes",
-                "width" : 16
-              }
-            }
-          ]
-        },
-        {
           "id" : 26092385,
           "name" : "linux_networking_control.fwd_to_vsi",
           "action_scope" : "TableAndDefault",
@@ -4092,6 +4067,188 @@
           "name" : "linux_networking_control.drop",
           "action_scope" : "TableAndDefault",
           "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv4_tcp",
+      "id" : 44641644,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv4_udp",
+      "id" : 46678878,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv4",
+      "id" : 45972289,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_l2",
+      "id" : 33896331,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv6_tcp",
+      "id" : 46852435,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv6_udp",
+      "id" : 46359163,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.linux_networking_control.hash_ipv6",
+      "id" : 34506208,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [],
+      "action_specs" : [
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
           "data" : []
         }
       ],
@@ -4859,587 +5016,6 @@
           "type" : {
             "type" : "bytes",
             "width" : 32
-          },
-          "mandatory" : false,
-          "read_only" : false
-        }
-      ]
-    },
-    {
-      "name" : "main.linux_networking_control.mir_prof",
-      "id" : 40941464,
-      "table_type" : "MatchValueLookupTable",
-      "size" : 256,
-      "annotations" : [
-        {
-          "name" : "@intel_lut_type(\"mirror_profile\")"
-        }
-      ],
-      "depends_on" : [],
-      "has_const_default_action" : false,
-      "key" : [
-        {
-          "id" : 1,
-          "name" : "mirror_prof_key",
-          "repeated" : false,
-          "annotations" : [],
-          "mandatory" : false,
-          "match_type" : "Exact",
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          }
-        }
-      ],
-      "data" : [
-        {
-          "id" : 1,
-          "name" : "hash_val",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 64
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 2,
-          "name" : "hash_mask",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 64
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 3,
-          "name" : "port_dest_type",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 32
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 4,
-          "name" : "vport_id",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 32
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 5,
-          "name" : "mode",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 6,
-          "name" : "op",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 32
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 7,
-          "name" : "exp",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 32
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 8,
-          "name" : "mod_addr",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 32
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 9,
-          "name" : "mod_profile",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 24
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 10,
-          "name" : "dest_id",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 11,
-          "name" : "trunc_size",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 12,
-          "name" : "mod_content_size",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 13,
-          "name" : "dst_q",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 14,
-          "name" : "defer_drop_en",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 15,
-          "name" : "trunc_mode_en",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 16,
-          "name" : "recirculate",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 17,
-          "name" : "store_port",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 18,
-          "name" : "func_valid",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 19,
-          "name" : "store_vsi",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 20,
-          "name" : "drop_en",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 21,
-          "name" : "trunc",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 22,
-          "name" : "mod_profile_valid",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 23,
-          "name" : "mod_content_size_en",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 24,
-          "name" : "mod_ptype_tras_index",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 25,
-          "name" : "mod_common_en",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 26,
-          "name" : "mod_append_action_bus_en",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 27,
-          "name" : "is_md_gen0",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 28,
-          "name" : "is_md_gen1",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 29,
-          "name" : "is_md_local",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 30,
-          "name" : "is_md_remote",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 1
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 31,
-          "name" : "md_gen0_type",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 32,
-          "name" : "md_gen0_off",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 33,
-          "name" : "md_gen0_val",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 34,
-          "name" : "md_gen0_mask",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 35,
-          "name" : "md_gen1_type",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 36,
-          "name" : "md_gen1_off",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 37,
-          "name" : "md_gen1_val",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 38,
-          "name" : "md_gen1_mask",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 16
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 39,
-          "name" : "md_local_type",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 40,
-          "name" : "md_local_off",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 41,
-          "name" : "md_local_val",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 42,
-          "name" : "md_local_mask",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 43,
-          "name" : "md_remote_type",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 44,
-          "name" : "md_remote_off",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 45,
-          "name" : "md_remote_val",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
-          },
-          "mandatory" : false,
-          "read_only" : false
-        },
-        {
-          "id" : 46,
-          "name" : "md_remote_mask",
-          "repeated" : false,
-          "annotations" : [],
-          "type" : {
-            "type" : "bytes",
-            "width" : 8
           },
           "mandatory" : false,
           "read_only" : false

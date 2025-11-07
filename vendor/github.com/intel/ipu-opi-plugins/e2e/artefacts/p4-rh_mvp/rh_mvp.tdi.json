@@ -1,0 +1,1672 @@
+{
+  "schema_version" : "1.0.0",
+  "tables" : [
+    {
+      "name" : "main.rh_mvp_control.vlan_push_ctag_stag_mod_table",
+      "id" : 46866105,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 29010669,
+          "name" : "rh_mvp_control.mod_vlan_push_ctag_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "pcp",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dei",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "ctag_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            },
+            {
+              "id" : 4,
+              "name" : "pcp_s",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 5,
+              "name" : "dei_s",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 6,
+              "name" : "stag_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vlan_push_stag_mod_table",
+      "id" : 38499371,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 26916781,
+          "name" : "rh_mvp_control.mod_vlan_push_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "pcp",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dei",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "stag_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vlan_push_ctag_mod_table",
+      "id" : 35843282,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 19476925,
+          "name" : "rh_mvp_control.mod_vlan_push_ctag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "pcp",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 3
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "dei",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 1
+              }
+            },
+            {
+              "id" : 3,
+              "name" : "vlan_id",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 12
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vlan_pop_ctag_stag_mod_table",
+      "id" : 44791827,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 18029753,
+          "name" : "rh_mvp_control.mod_vlan_pop_ctag_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vlan_pop_stag_mod_table",
+      "id" : 35281074,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 24507408,
+          "name" : "rh_mvp_control.mod_vlan_pop_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vlan_pop_ctag_mod_table",
+      "id" : 37786634,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.mod_blob_ptr",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 24
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 21476074,
+          "name" : "rh_mvp_control.mod_vlan_pop_ctag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.phy_ingress_vlan_dmac_table",
+      "id" : 49008230,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "port_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 2
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vid",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 12
+          }
+        },
+        {
+          "id" : 3,
+          "name" : "dmac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 18255697,
+          "name" : "rh_mvp_control.vlan_pop_ctag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.phy_ingress_arp_table",
+      "id" : 38534218,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "port_id",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 2
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vid",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 12
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 24572067,
+          "name" : "rh_mvp_control.send_to_port_mux_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.portmux_egress_resp_vsi_table",
+      "id" : 44032042,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "bit32_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 29626876,
+          "name" : "rh_mvp_control.vlan_pop_ctag_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 22775904,
+          "name" : "rh_mvp_control.vlan_pop_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.portmux_egress_resp_dmac_vsi_table",
+      "id" : 43467074,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "dmac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 29626876,
+          "name" : "rh_mvp_control.vlan_pop_ctag_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.portmux_egress_req_table",
+      "id" : 45781513,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vid",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 12
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 29626876,
+          "name" : "rh_mvp_control.vlan_pop_ctag_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 22775904,
+          "name" : "rh_mvp_control.vlan_pop_stag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.portmux_ingress_loopback_table",
+      "id" : 45920889,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 2,
+          "name" : "bit32_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22841159,
+          "name" : "rh_mvp_control.fwd_to_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vport_arp_egress_table",
+      "id" : 43816880,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "bit32_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 24824497,
+          "name" : "rh_mvp_control.send_to_port_mux",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.ingress_loopback_table",
+      "id" : 41286760,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "target_vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22841159,
+          "name" : "rh_mvp_control.fwd_to_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.ingress_loopback_dmac_table",
+      "id" : 43924165,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "dmac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22841159,
+          "name" : "rh_mvp_control.fwd_to_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vport_egress_vsi_table",
+      "id" : 41857485,
+      "table_type" : "MatchAction_Direct",
+      "size" : 16384,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "bit32_zeros",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 32
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22841159,
+          "name" : "rh_mvp_control.fwd_to_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 32637686,
+          "name" : "rh_mvp_control.vlan_push_ctag",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "mod_ptr",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 24
+              }
+            },
+            {
+              "id" : 2,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : []
+        },
+        {
+          "id" : 30287134,
+          "name" : "rh_mvp_control.l2_fwd_miss_action",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vport_egress_dmac_vsi_table",
+      "id" : 50313088,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "dmac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22841159,
+          "name" : "rh_mvp_control.fwd_to_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.vport_egress_dmac_table",
+      "id" : 45925960,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : true,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "dmac",
+          "repeated" : false,
+          "annotations" : [
+            {
+              "name" : "@format(MAC_ADDRESS)"
+            }
+          ],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 48
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 22841159,
+          "name" : "rh_mvp_control.fwd_to_port",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "vport",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    },
+    {
+      "name" : "main.rh_mvp_control.comms_channel_table",
+      "id" : 39241585,
+      "table_type" : "MatchAction_Direct",
+      "size" : 1024,
+      "annotations" : [],
+      "depends_on" : [],
+      "has_const_default_action" : false,
+      "key" : [
+        {
+          "id" : 1,
+          "name" : "meta.common.vsi",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 11
+          }
+        },
+        {
+          "id" : 2,
+          "name" : "user_meta.cmeta.bit32_zeros[15:0]",
+          "repeated" : false,
+          "annotations" : [],
+          "mandatory" : false,
+          "match_type" : "Exact",
+          "type" : {
+            "type" : "bytes",
+            "width" : 16
+          }
+        }
+      ],
+      "action_specs" : [
+        {
+          "id" : 20250414,
+          "name" : "rh_mvp_control.l2_fwd",
+          "action_scope" : "TableAndDefault",
+          "annotations" : [],
+          "data" : [
+            {
+              "id" : 1,
+              "name" : "port",
+              "repeated" : false,
+              "mandatory" : true,
+              "read_only" : false,
+              "annotations" : [],
+              "type" : {
+                "type" : "bytes",
+                "width" : 32
+              }
+            }
+          ]
+        },
+        {
+          "id" : 21257015,
+          "name" : "NoAction",
+          "action_scope" : "DefaultOnly",
+          "annotations" : [
+            {
+              "name" : "@defaultonly"
+            }
+          ],
+          "data" : []
+        }
+      ],
+      "data" : [],
+      "supported_operations" : [],
+      "attributes" : []
+    }
+  ],
+  "learn_filters" : []
+}
