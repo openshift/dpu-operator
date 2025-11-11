@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -56,6 +58,9 @@ type Daemon struct {
 	dpuDetectorManger *platform.DpuDetectorManager
 	managedDpus       map[string]*ManagedDpu
 	nodeName          string
+	// Readiness state tracking
+	readyMutex sync.RWMutex
+	isReady    bool
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
@@ -79,6 +84,56 @@ func (d *Daemon) WithNodeName(nodeName string) *Daemon {
 	return d
 }
 
+// readinessHandler handles the /readyz endpoint
+func (d *Daemon) readinessHandler(w http.ResponseWriter, r *http.Request) {
+	d.readyMutex.RLock()
+	ready := d.isReady
+	d.readyMutex.RUnlock()
+
+	if ready {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("Not ready"))
+	}
+}
+
+// startReadinessServer starts the HTTP server for readiness probes
+func (d *Daemon) startReadinessServer(ctx context.Context) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/readyz", d.readinessHandler)
+
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(shutdownCtx)
+	}()
+
+	d.log.Info("Starting readiness server", "addr", ":8080")
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("readiness server failed: %v", err)
+	}
+	return nil
+}
+
+// markReady marks the daemon as ready after completing a detection cycle and DPU CR sync
+func (d *Daemon) markReady() {
+	d.readyMutex.Lock()
+	defer d.readyMutex.Unlock()
+
+	if !d.isReady {
+		d.log.Info("Daemon is now ready - detection cycle and DPU CR sync completed")
+		d.isReady = true
+	}
+}
+
 func (d *Daemon) PrepareAndServe(ctx context.Context) error {
 	err := d.Prepare()
 
@@ -87,6 +142,7 @@ func (d *Daemon) PrepareAndServe(ctx context.Context) error {
 		return err
 	}
 
+	// Start the readiness server - errors will be handled in Serve()
 	return d.Serve(ctx)
 }
 
@@ -117,6 +173,13 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	errChan := make(chan error)
 	managerCtx, cancelManagers := context.WithCancel(ctx)
 	defer cancelManagers()
+
+	// Start the readiness server and handle errors through errChan
+	go func() {
+		if err := d.startReadinessServer(ctx); err != nil {
+			errChan <- fmt.Errorf("readiness server failed: %v", err)
+		}
+	}()
 
 	d.log.Info("Entering main daemon loop")
 
@@ -161,10 +224,7 @@ func (d *Daemon) Serve(ctx context.Context) error {
 						defer close(doneChannel)
 						err := d.runSideManager(mgr, identifier, managerCtx)
 						if err != nil {
-							select {
-							case errChan <- err:
-							default:
-							}
+							errChan <- err
 						}
 					}(sideManager, identifier, done)
 				}
@@ -216,6 +276,9 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				d.log.Error(err, "Failed to update node labels")
 				return err
 			}
+
+			// Mark daemon as ready after completing detection cycle and DPU CR sync
+			d.markReady()
 		case err := <-errChan:
 			d.log.Error(err, "Side manager failed, stopping all managers")
 			d.shutdown(cancelManagers, managerDone)
