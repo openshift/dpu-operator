@@ -163,13 +163,13 @@ tasks:
   fast-e2e-test:
     cmds:
       - task: redeploy
-      - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} KUBECONFIG_DPU={{.KUBECONFIG_DPU}} sh hack/setup.sh
+      - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} KUBECONFIG_DPU={{.KUBECONFIG_DPU}} go run tools/basic_setup/basic_setup.go
       - task: run-e2e-test
 
   fast-e2e-test-1c:
     cmds:
       - task: redeploy-1c
-      - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} sh hack/setup.sh
+      - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} go run tools/basic_setup/basic_setup.go
       - task: run-e2e-test
 
   run-e2e-test:
