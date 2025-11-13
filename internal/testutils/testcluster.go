@@ -15,6 +15,8 @@ import (
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/scheme"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
+	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -76,7 +80,7 @@ func ExecInPod(clientset kubernetes.Interface, config *rest.Config, pod *corev1.
 		TTY:     false,
 	}
 
-	req := clientset.CoreV1().RESTClient().Post().Resource("pods").Name(pod.Name).Namespace(pod.Namespace).SubResource("exec").VersionedParams(&podExecOptions, scheme.ParameterCodec)
+	req := clientset.CoreV1().RESTClient().Post().Resource("pods").Name(pod.Name).Namespace(pod.Namespace).SubResource("exec").VersionedParams(&podExecOptions, kubescheme.ParameterCodec)
 
 	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
@@ -751,4 +755,400 @@ func EventuallyNoDpuOperatorConfig(c client.Client, timeout time.Duration, inter
 
 	cleanupTime := time.Now()
 	fmt.Printf("All DpuOperatorConfigs cleaned up after %v\n", cleanupTime.Sub(startTime))
+}
+
+func LabelNodesForDpu(c client.Client, dpuSide string) error {
+	nodeList := &corev1.NodeList{}
+	err := c.List(context.TODO(), nodeList)
+	if err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	const dpuSideLabelKey = "dpu.config.openshift.io/dpuside"
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		if node.Labels == nil {
+			node.Labels = make(map[string]string)
+		}
+		node.Labels[dpuSideLabelKey] = dpuSide
+
+		err := c.Update(context.TODO(), node)
+		if err != nil {
+			return fmt.Errorf("failed to label node %s: %w", node.Name, err)
+		}
+	}
+	return nil
+}
+
+func IsMasterNode(node corev1.Node) bool {
+	if labels := node.Labels; labels != nil {
+		if _, exists := labels["node-role.kubernetes.io/master"]; exists {
+			return true
+		}
+		if _, exists := labels["node-role.kubernetes.io/control-plane"]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+func LabelAllNodesWithDpu(c client.Client) error {
+	nodes := &corev1.NodeList{}
+	err := c.List(context.TODO(), nodes)
+	if err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if err := LabelSingleNodeWithDpu(c, node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func LabelWorkerNodesWithDpu(c client.Client) error {
+	nodes := &corev1.NodeList{}
+	err := c.List(context.TODO(), nodes)
+	if err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	var workerNodes []corev1.Node
+	for _, node := range nodes.Items {
+		if !IsMasterNode(node) {
+			workerNodes = append(workerNodes, node)
+		}
+	}
+
+	if len(workerNodes) == 0 {
+		return nil
+	}
+
+	for _, node := range workerNodes {
+		if err := LabelSingleNodeWithDpu(c, &node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func LabelSingleNodeWithDpu(c client.Client, node *corev1.Node) error {
+	if node.Labels == nil {
+		node.Labels = make(map[string]string)
+	}
+	node.Labels["dpu"] = "true"
+
+	err := c.Update(context.TODO(), node)
+	if err != nil {
+		return fmt.Errorf("failed to label node %s: %w", node.Name, err)
+	}
+	return nil
+}
+
+func LabelNodesWithDpu(c client.Client) error {
+	clusterEnv := utils.NewClusterEnvironment(c)
+	flavour, err := clusterEnv.Flavour(context.TODO())
+	if err != nil {
+		return fmt.Errorf("failed to detect cluster flavor: %w", err)
+	}
+
+	if flavour == utils.UnknownFlavour {
+		return fmt.Errorf("unknown cluster flavor - cannot determine node labeling strategy")
+	}
+
+	switch flavour {
+	case utils.MicroShiftFlavour, utils.KindFlavour:
+		return LabelAllNodesWithDpu(c)
+	case utils.OpenShiftFlavour:
+		return LabelWorkerNodesWithDpu(c)
+	default:
+		return fmt.Errorf("unsupported cluster flavor %s", flavour)
+	}
+}
+
+func WaitForDPUReady(c client.Client) error {
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, TestInitialSetupTimeout*5, true, func(ctx context.Context) (bool, error) {
+		dpuList := &configv1.DataProcessingUnitList{}
+		err := c.List(ctx, dpuList, client.InNamespace(vars.Namespace))
+		if err != nil {
+			return false, nil
+		}
+
+		cdaLog.Info("DPU CRs found", "count", len(dpuList.Items))
+
+		// Must have at least 1 DPU CR
+		if len(dpuList.Items) == 0 {
+			return false, nil
+		}
+
+		allReady := true
+		for i, dpu := range dpuList.Items {
+			var status string
+			var reason string
+			ready := false
+			for _, condition := range dpu.Status.Conditions {
+				if condition.Type == "Ready" {
+					status = string(condition.Status)
+					reason = condition.Reason
+					if condition.Status == metav1.ConditionTrue {
+						ready = true
+					}
+					break
+				}
+			}
+			if status == "" {
+				status = "Unknown"
+			}
+
+			cdaLog.Info("DPU CR details", "index", i, "name", dpu.Name, "status", status, "reason", reason, "ready", ready)
+
+			if !ready {
+				allReady = false
+			}
+		}
+
+		// All DPU CRs must be Ready=True
+		return allReady, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timeout waiting for all DPU CRs to be Ready: %w", err)
+	}
+
+	return nil
+}
+
+func WaitForDPU(c client.Client) error {
+
+	var dpuName string
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, TestInitialSetupTimeout*3, true, func(ctx context.Context) (bool, error) {
+		dpuList := &configv1.DataProcessingUnitList{}
+		err := c.List(ctx, dpuList, client.InNamespace(vars.Namespace))
+		if err != nil {
+			return false, nil
+		}
+
+		if len(dpuList.Items) > 0 {
+			dpuName = dpuList.Items[0].Name
+			return true, nil
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timeout waiting for DPU resource: %w", err)
+	}
+
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, TestInitialSetupTimeout*3, true, func(ctx context.Context) (bool, error) {
+		dpu := &configv1.DataProcessingUnit{}
+		key := client.ObjectKey{Name: dpuName, Namespace: vars.Namespace}
+
+		err := c.Get(ctx, key, dpu)
+		if err != nil {
+			return false, nil
+		}
+
+		if meta.IsStatusConditionTrue(dpu.Status.Conditions, "Ready") {
+			return true, nil
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timeout waiting for DPU %s to be Ready: %w", dpuName, err)
+	}
+
+	return nil
+}
+
+func WaitForAllPodsReady(c client.Client, namespace string) error {
+
+	err := wait.PollImmediate(time.Second, TestInitialSetupTimeout*3, func() (bool, error) {
+		podList := &corev1.PodList{}
+		err := c.List(context.TODO(), podList, client.InNamespace(namespace))
+		if err != nil {
+			return false, err
+		}
+
+		if len(podList.Items) == 0 {
+			return false, nil
+		}
+
+		for _, pod := range podList.Items {
+			ready := false
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+					ready = true
+					break
+				}
+			}
+			if !ready {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("pods not ready after timeout: %w", err)
+	}
+
+	return nil
+}
+
+func CreateClientsFromConfig(restConfig *rest.Config) (client.Client, kubernetes.Interface, error) {
+	crClient, err := client.New(restConfig, client.Options{Scheme: scheme.Scheme})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create controller-runtime client: %w", err)
+	}
+
+	k8sClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	return crClient, k8sClient, nil
+}
+
+func SetupDpuOperator(c client.Client, configFile string) error {
+	if err := LabelNodesWithDpu(c); err != nil {
+		return fmt.Errorf("failed to label nodes: %w", err)
+	}
+
+	if err := SetupDpuOperatorConfig(c, configFile); err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	if err := TryEventually(func() error {
+		return IsDpuOperatorConfigReady(c, "dpu-operator-config")
+	}, TestInitialSetupTimeout, time.Second); err != nil {
+		return fmt.Errorf("failed waiting for DpuOperatorConfig: %w", err)
+	}
+
+	if err := WaitForDPU(c); err != nil {
+		return fmt.Errorf("failed waiting for DPU: %w", err)
+	}
+
+	if err := WaitForAllPodsReady(c, vars.Namespace); err != nil {
+		return fmt.Errorf("failed waiting for pods: %w", err)
+	}
+
+	return nil
+}
+
+// Non-test versions of helper functions that return errors instead of using assertions
+
+func CreateNamespaceWithRetry(client client.Client, ns *corev1.Namespace) error {
+	// Try to create the namespace (ignore error if it already exists)
+	err := client.Create(context.Background(), ns)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	// Wait for the namespace to be available
+	return TryEventually(func() error {
+		found := &corev1.Namespace{}
+		return client.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, found)
+	}, TestAPITimeout*3, TestRetryInterval)
+}
+
+func CreateDpuOperatorCRWithRetry(client client.Client, cr *configv1.DpuOperatorConfig) error {
+	err := client.Create(context.Background(), cr)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create DpuOperatorConfig: %w", err)
+	}
+
+	// Wait for it to exist
+	return TryEventually(func() error {
+		found := &configv1.DpuOperatorConfig{}
+		return client.Get(context.Background(), types.NamespacedName{Name: cr.GetName()}, found)
+	}, TestAPITimeout*3, TestRetryInterval)
+}
+
+func SetupDpuOperatorConfig(c client.Client, configFile string) error {
+	ns := DpuOperatorNamespace()
+
+	// Create namespace without test assertions
+	if err := CreateNamespaceWithRetry(c, ns); err != nil {
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	var config *configv1.DpuOperatorConfig
+
+	if configFile != "" {
+		configData, err := os.ReadFile(configFile)
+		if err != nil {
+			return fmt.Errorf("failed to read config file %s: %w", configFile, err)
+		}
+
+		config = &configv1.DpuOperatorConfig{}
+		if yamlErr := yaml.UnmarshalStrict(configData, config); yamlErr != nil {
+			return fmt.Errorf("failed to parse config file %s: %w", configFile, yamlErr)
+		}
+
+		config.SetNamespace(ns.Name)
+		config.SetName("dpu-operator-config")
+	} else {
+		config = DpuOperatorCR("dpu-operator-config", ns)
+	}
+
+	// Create DpuOperatorConfig without test assertions
+	return CreateDpuOperatorCRWithRetry(c, config)
+}
+
+func ConfigureDpuOperator(c client.Client, configFile string) error {
+	// Label nodes with DPU
+	if err := LabelNodesWithDpu(c); err != nil {
+		return fmt.Errorf("failed to label nodes: %w", err)
+	}
+
+	// Setup DpuOperatorConfig using non-test version
+	if err := SetupDpuOperatorConfig(c, configFile); err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	// Wait for DpuOperatorConfig to be ready
+	if err := TryEventually(func() error {
+		return IsDpuOperatorConfigReady(c, "dpu-operator-config")
+	}, TestInitialSetupTimeout, time.Second); err != nil {
+		return fmt.Errorf("failed waiting for DpuOperatorConfig: %w", err)
+	}
+
+	// Wait for all pods
+	if err := WaitForAllPodsReady(c, vars.Namespace); err != nil {
+		return fmt.Errorf("failed waiting for pods: %w", err)
+	}
+
+	return nil
+}
+
+func SetupDpuOperatorWithRetry(c client.Client, configFile string) error {
+	if err := LabelNodesWithDpu(c); err != nil {
+		return fmt.Errorf("failed to label nodes: %w", err)
+	}
+
+	if err := SetupDpuOperatorConfig(c, configFile); err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	if err := TryEventually(func() error {
+		return IsDpuOperatorConfigReady(c, "dpu-operator-config")
+	}, TestInitialSetupTimeout, time.Second); err != nil {
+		return fmt.Errorf("failed waiting for DpuOperatorConfig: %w", err)
+	}
+
+	if err := WaitForAllPodsReady(c, vars.Namespace); err != nil {
+		return fmt.Errorf("failed waiting for pods: %w", err)
+	}
+
+	if err := WaitForDPUReady(c); err != nil {
+		return fmt.Errorf("failed waiting for all DPU CRs to be Ready: %w", err)
+	}
+
+	return nil
 }

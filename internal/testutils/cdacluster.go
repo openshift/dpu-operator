@@ -6,9 +6,16 @@ import (
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	ctrl "sigs.k8s.io/controller-runtime"
+)
+
+var (
+	cdaLog = ctrl.Log.WithName("cdacluster")
 )
 
 type CdaCluster struct {
+	Name           string
+	KubeconfigPath string
 }
 
 func (t *CdaCluster) EnsureExists(kubeconfigPath string) (*rest.Config, error) {
