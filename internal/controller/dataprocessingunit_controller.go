@@ -142,6 +142,7 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 		"VspName":                   r.getVSPName(dpu),
 		"DpuName":                   dpu.Name,
 		"NodeName":                  dpu.Spec.NodeName,
+		"HostName":                  dpu.Spec.NodeName,
 		"VendorSpecificPluginImage": vspImage,
 		"ImagePullPolicy":           r.imagePullPolicy,
 		"Command":                   "[]",
