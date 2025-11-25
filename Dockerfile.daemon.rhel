@@ -18,7 +18,7 @@ RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.21:base-rhel9-minimal-test
 ARG TARGETARCH
 WORKDIR /
 COPY --from=builder /workspace/bin/daemon.${TARGETARCH} daemon
