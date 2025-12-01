@@ -8,6 +8,15 @@ spec:
     spec:
       containers:
       - name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         ports:
         - containerPort: 9443
           name: webhook-server

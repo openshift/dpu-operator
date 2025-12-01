@@ -21,6 +21,12 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: DataProcessingUnitConfig is the Schema for the dataprocessingunitconfigs
+        API.
+      displayName: Data Processing Unit Config
+      kind: DataProcessingUnitConfig
+      name: dataprocessingunitconfigs.config.openshift.io
+      version: v1
     - description: DataProcessingUnit is the Schema for the dataprocessingunits API
       displayName: Data Processing Unit
       kind: DataProcessingUnit

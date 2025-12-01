@@ -17,7 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -41,6 +44,19 @@ import (
 var (
 	setupLog = ctrl.Log.WithName("setup")
 )
+
+func webhookReadinessCheck(mgr ctrl.Manager) healthz.Checker {
+	return func(req *http.Request) error {
+		// Check if webhook TLS server is ready by trying to connect
+		conn, err := tls.Dial("tcp", ":9443", &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return fmt.Errorf("webhook TLS server not ready: %w", err)
+		}
+		defer conn.Close()
+
+		return nil
+	}
+}
 
 func main() {
 	var metricsAddr string
@@ -136,7 +152,7 @@ func main() {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", webhookReadinessCheck(mgr)); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
