@@ -126,6 +126,7 @@ tasks:
       - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
       - KUBECONFIG="{{.KUBECONFIG_DPU}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
       - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+      - echo "DPU operator deployment complete - controller manager and webhook are ready"
 
   deploy-1c:
     deps:
