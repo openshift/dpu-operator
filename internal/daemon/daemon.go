@@ -268,7 +268,7 @@ func (d *Daemon) Serve(ctx context.Context) error {
 			}
 
 			// Sync DPU CRs with the current state
-			err = d.SyncDpuCRs()
+			changed, err := d.SyncDpuCRs()
 			if err != nil {
 				d.log.Error(err, "Failed to sync DPU CRs")
 				return err
@@ -281,8 +281,11 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				return err
 			}
 
-			// Mark daemon as ready after completing detection cycle and DPU CR sync
-			d.markReady()
+			// Mark daemon as ready only when DPU CRs are fully in sync
+			// This ensures CRs are queryable before signaling readiness
+			if !changed {
+				d.markReady()
+			}
 		case err := <-errChan:
 			d.log.Error(err, "Routine failed, stopping all routines")
 			d.shutdown(cancelRoutines, routineDone)
@@ -299,7 +302,7 @@ func (d *Daemon) shutdown(cancelRoutines context.CancelFunc, routineDone []chan 
 	// Clean up all DPU CRs by clearing managed DPUs and syncing
 	d.log.Info("Cleaning up DPU CRs before shutdown")
 	d.managedDpus = make(map[string]*ManagedDpu)
-	err := d.SyncDpuCRs()
+	_, err := d.SyncDpuCRs()
 	if err != nil {
 		d.log.Error(err, "Failed to clean up DPU CRs during shutdown")
 	}
@@ -329,12 +332,14 @@ func (d *Daemon) createSideManager(dpuCR *configv1.DataProcessingUnit, dpuPlugin
 	}
 }
 
-func (d *Daemon) SyncDpuCRs() error {
+// SyncDpuCRs synchronizes DPU CRs with Kubernetes.
+// Returns (true, nil) if any changes were made, (false, nil) if everything was in sync.
+func (d *Daemon) SyncDpuCRs() (bool, error) {
 	// Get all existing DPU CRs from K8s
 	existingCRs := &configv1.DataProcessingUnitList{}
 	err := d.client.List(context.TODO(), existingCRs)
 	if err != nil {
-		return fmt.Errorf("Failed to list existing DPU CRs: %v", err)
+		return false, fmt.Errorf("Failed to list existing DPU CRs: %v", err)
 	}
 
 	// Create a map of existing CRs by name for quick lookup, filtered by node name
@@ -347,11 +352,16 @@ func (d *Daemon) SyncDpuCRs() error {
 		}
 	}
 
+	changed := false
+
 	// Sync each managed DPU to K8s
 	for identifier, managedDpu := range d.managedDpus {
-		err := d.syncSingleDpuCR(managedDpu.DpuCR, existingCRMap)
+		updated, err := d.syncSingleDpuCR(managedDpu.DpuCR, existingCRMap)
 		if err != nil {
 			d.log.Error(err, "Failed to sync DPU CR", "identifier", identifier)
+		}
+		if updated {
+			changed = true
 		}
 	}
 
@@ -365,14 +375,17 @@ func (d *Daemon) SyncDpuCRs() error {
 				d.log.Error(err, "Failed to delete orphaned DPU CR", "crName", crName)
 			} else {
 				d.log.Info("Successfully deleted orphaned DPU CR", "crName", crName)
+				changed = true
 			}
 		}
 	}
 
-	return nil
+	return changed, nil
 }
 
-func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRMap map[string]*configv1.DataProcessingUnit) error {
+// syncSingleDpuCR syncs a single DPU CR to Kubernetes.
+// Returns (true, nil) if changes were made, (false, nil) if no changes needed.
+func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRMap map[string]*configv1.DataProcessingUnit) (bool, error) {
 	identifier := dpuCR.Name
 
 	// Check if CR exists in the cluster
@@ -391,24 +404,24 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 
 			// Set owner reference to DpuOperatorConfig
 			if err := d.setOwnerReference(dpuCRCopy); err != nil {
-				return fmt.Errorf("Failed to set owner reference for DPU CR %s: %v", identifier, err)
+				return false, fmt.Errorf("Failed to set owner reference for DPU CR %s: %v", identifier, err)
 			}
 
 			err := d.client.Create(context.TODO(), dpuCRCopy)
 			if err != nil {
-				return fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
+				return false, fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
 			}
 
 			// Update status after creation
 			err = d.client.Status().Update(context.TODO(), dpuCRCopy)
 			if err != nil {
-				return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
+				return false, fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 			}
 
 			d.log.Info("Created DPU CR", "name", identifier, "dpuProductName", dpuCRCopy.Spec.DpuProductName, "isDpuSide", dpuCRCopy.Spec.IsDpuSide)
-			return nil
+			return true, nil
 		}
-		return fmt.Errorf("Failed to get DPU CR %s: %v", identifier, err)
+		return false, fmt.Errorf("Failed to get DPU CR %s: %v", identifier, err)
 	}
 
 	// CR exists, update it to reflect all fields
@@ -421,7 +434,7 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 		currentDpuCR.Spec = dpuCR.Spec
 		err := d.client.Update(context.TODO(), currentDpuCR)
 		if err != nil {
-			return fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
+			return false, fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
 		}
 	}
 
@@ -429,15 +442,16 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 		currentDpuCR.Status = dpuCR.Status
 		err := d.client.Status().Update(context.TODO(), currentDpuCR)
 		if err != nil {
-			return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
+			return false, fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 		}
 	}
 
 	if needsSpecUpdate || needsStatusUpdate {
 		d.log.Info("Updated DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 // conditionsNeedUpdate compares the latest condition and returns true if it differs.
