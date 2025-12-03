@@ -105,7 +105,7 @@ func (d *Daemon) startReadinessServer(ctx context.Context) error {
 	mux.HandleFunc("/readyz", d.readinessHandler)
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":8082",
 		Handler: mux,
 	}
 
@@ -116,10 +116,11 @@ func (d *Daemon) startReadinessServer(ctx context.Context) error {
 		server.Shutdown(shutdownCtx)
 	}()
 
-	d.log.Info("Starting readiness server", "addr", ":8080")
+	d.log.Info("Starting readiness server", "addr", ":8082")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("readiness server failed: %v", err)
 	}
+	d.log.Info("Readiness server exited")
 	return nil
 }
 
@@ -168,16 +169,19 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	d.log.Info("Setting up manager channels")
-	var managerDone []chan struct{}
-	errChan := make(chan error)
-	managerCtx, cancelManagers := context.WithCancel(ctx)
-	defer cancelManagers()
+	d.log.Info("Setting up routine channels")
+	var routineDone []chan struct{}
+	errChan := make(chan error, 1)
+	routineCtx, cancelRoutines := context.WithCancel(ctx)
+	defer cancelRoutines()
 
-	// Start the readiness server and handle errors through errChan
+	// Start the readiness server like a side manager
+	readinessDone := make(chan struct{})
+	routineDone = append(routineDone, readinessDone)
 	go func() {
-		if err := d.startReadinessServer(ctx); err != nil {
-			errChan <- fmt.Errorf("readiness server failed: %v", err)
+		defer close(readinessDone)
+		if err := d.startReadinessServer(routineCtx); err != nil {
+			errChan <- err
 		}
 	}()
 
@@ -219,10 +223,10 @@ func (d *Daemon) Serve(ctx context.Context) error {
 					d.managers = append(d.managers, sideManager)
 
 					done := make(chan struct{})
-					managerDone = append(managerDone, done)
+					routineDone = append(routineDone, done)
 					go func(mgr SideManager, identifier string, doneChannel chan struct{}) {
 						defer close(doneChannel)
-						err := d.runSideManager(mgr, identifier, managerCtx)
+						err := d.runSideManager(mgr, identifier, routineCtx)
 						if err != nil {
 							errChan <- err
 						}
@@ -280,18 +284,18 @@ func (d *Daemon) Serve(ctx context.Context) error {
 			// Mark daemon as ready after completing detection cycle and DPU CR sync
 			d.markReady()
 		case err := <-errChan:
-			d.log.Error(err, "Side manager failed, stopping all managers")
-			d.shutdown(cancelManagers, managerDone)
+			d.log.Error(err, "Routine failed, stopping all routines")
+			d.shutdown(cancelRoutines, routineDone)
 			return err
 		case <-ctx.Done():
-			d.log.Info("Context cancelled, waiting for all side managers to stop")
-			d.shutdown(cancelManagers, managerDone)
+			d.log.Info("Context cancelled, waiting for all routines to stop")
+			d.shutdown(cancelRoutines, routineDone)
 			return ctx.Err()
 		}
 	}
 }
 
-func (d *Daemon) shutdown(cancelManagers context.CancelFunc, managerDone []chan struct{}) {
+func (d *Daemon) shutdown(cancelRoutines context.CancelFunc, routineDone []chan struct{}) {
 	// Clean up all DPU CRs by clearing managed DPUs and syncing
 	d.log.Info("Cleaning up DPU CRs before shutdown")
 	d.managedDpus = make(map[string]*ManagedDpu)
@@ -300,13 +304,13 @@ func (d *Daemon) shutdown(cancelManagers context.CancelFunc, managerDone []chan 
 		d.log.Error(err, "Failed to clean up DPU CRs during shutdown")
 	}
 
-	// Stop all side managers
-	cancelManagers()
-	d.log.Info("Waiting for all side managers to stop")
-	for _, done := range managerDone {
+	// Stop all routines
+	cancelRoutines()
+	d.log.Info("Waiting for all routines to stop")
+	for _, done := range routineDone {
 		<-done
 	}
-	d.log.Info("All side managers stopped")
+	d.log.Info("All routines stopped")
 }
 
 func (d *Daemon) createSideManager(dpuCR *configv1.DataProcessingUnit, dpuPlugin *plugin.GrpcPlugin) (SideManager, error) {
