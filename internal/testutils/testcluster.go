@@ -869,17 +869,31 @@ func LabelNodesWithDpu(c client.Client) error {
 }
 
 func WaitForDPUReady(c client.Client) error {
-	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, TestInitialSetupTimeout*5, true, func(ctx context.Context) (bool, error) {
+	// Get initial DPU list and fail fast if empty
+	// Since daemon readiness guarantees detection completed, we should have DPUs
+	initialDpuList := &configv1.DataProcessingUnitList{}
+	err := c.List(context.TODO(), initialDpuList, client.InNamespace(vars.Namespace))
+	if err != nil {
+		return fmt.Errorf("failed to list DPU CRs: %w", err)
+	}
+
+	if len(initialDpuList.Items) == 0 {
+		return fmt.Errorf("no DPU CRs found after daemon completed detection cycle")
+	}
+
+	expectedDpuNames := make(map[string]bool)
+	for _, dpu := range initialDpuList.Items {
+		expectedDpuNames[dpu.Name] = true
+	}
+	expectedCount := len(initialDpuList.Items)
+
+	cdaLog.Info("Found DPU CRs to wait for", "count", expectedCount, "names", expectedDpuNames)
+
+	// Wait for all detected DPUs to be Ready
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, TestInitialSetupTimeout*5, true, func(ctx context.Context) (bool, error) {
 		dpuList := &configv1.DataProcessingUnitList{}
 		err := c.List(ctx, dpuList, client.InNamespace(vars.Namespace))
 		if err != nil {
-			return false, nil
-		}
-
-		cdaLog.Info("DPU CRs found", "count", len(dpuList.Items))
-
-		// Must have at least 1 DPU CR
-		if len(dpuList.Items) == 0 {
 			return false, nil
 		}
 
@@ -909,7 +923,6 @@ func WaitForDPUReady(c client.Client) error {
 			}
 		}
 
-		// All DPU CRs must be Ready=True
 		return allReady, nil
 	})
 
@@ -917,6 +930,26 @@ func WaitForDPUReady(c client.Client) error {
 		return fmt.Errorf("timeout waiting for all DPU CRs to be Ready: %w", err)
 	}
 
+	// Verify no new DPUs appeared during waiting
+	// Detection should be stable after daemon readiness
+	finalDpuList := &configv1.DataProcessingUnitList{}
+	err = c.List(context.TODO(), finalDpuList, client.InNamespace(vars.Namespace))
+	if err != nil {
+		return fmt.Errorf("failed to verify final DPU list: %w", err)
+	}
+
+	if len(finalDpuList.Items) != expectedCount {
+		return fmt.Errorf("DPU count changed during waiting: expected %d, found %d (detection may still be ongoing)", expectedCount, len(finalDpuList.Items))
+	}
+
+	// Verify same DPUs are present
+	for _, dpu := range finalDpuList.Items {
+		if !expectedDpuNames[dpu.Name] {
+			return fmt.Errorf("unexpected new DPU %s appeared during waiting (detection may still be ongoing)", dpu.Name)
+		}
+	}
+
+	cdaLog.Info("All DPUs ready and detection stable", "count", expectedCount)
 	return nil
 }
 

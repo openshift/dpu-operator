@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -56,6 +58,9 @@ type Daemon struct {
 	dpuDetectorManger *platform.DpuDetectorManager
 	managedDpus       map[string]*ManagedDpu
 	nodeName          string
+	// Readiness state tracking
+	readyMutex sync.RWMutex
+	isReady    bool
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
@@ -79,6 +84,57 @@ func (d *Daemon) WithNodeName(nodeName string) *Daemon {
 	return d
 }
 
+// readinessHandler handles the /readyz endpoint
+func (d *Daemon) readinessHandler(w http.ResponseWriter, r *http.Request) {
+	d.readyMutex.RLock()
+	ready := d.isReady
+	d.readyMutex.RUnlock()
+
+	if ready {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("Not ready"))
+	}
+}
+
+// startReadinessServer starts the HTTP server for readiness probes
+func (d *Daemon) startReadinessServer(ctx context.Context) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/readyz", d.readinessHandler)
+
+	server := &http.Server{
+		Addr:    ":8082",
+		Handler: mux,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(shutdownCtx)
+	}()
+
+	d.log.Info("Starting readiness server", "addr", ":8082")
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("readiness server failed: %v", err)
+	}
+	d.log.Info("Readiness server exited")
+	return nil
+}
+
+// markReady marks the daemon as ready after completing a detection cycle and DPU CR sync
+func (d *Daemon) markReady() {
+	d.readyMutex.Lock()
+	defer d.readyMutex.Unlock()
+
+	if !d.isReady {
+		d.log.Info("Daemon is now ready - detection cycle and DPU CR sync completed")
+		d.isReady = true
+	}
+}
+
 func (d *Daemon) PrepareAndServe(ctx context.Context) error {
 	err := d.Prepare()
 
@@ -87,6 +143,7 @@ func (d *Daemon) PrepareAndServe(ctx context.Context) error {
 		return err
 	}
 
+	// Start the readiness server - errors will be handled in Serve()
 	return d.Serve(ctx)
 }
 
@@ -112,11 +169,21 @@ func (d *Daemon) Serve(ctx context.Context) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	d.log.Info("Setting up manager channels")
-	var managerDone []chan struct{}
-	errChan := make(chan error)
-	managerCtx, cancelManagers := context.WithCancel(ctx)
-	defer cancelManagers()
+	d.log.Info("Setting up routine channels")
+	var routineDone []chan struct{}
+	errChan := make(chan error, 1)
+	routineCtx, cancelRoutines := context.WithCancel(ctx)
+	defer cancelRoutines()
+
+	// Start the readiness server like a side manager
+	readinessDone := make(chan struct{})
+	routineDone = append(routineDone, readinessDone)
+	go func() {
+		defer close(readinessDone)
+		if err := d.startReadinessServer(routineCtx); err != nil {
+			errChan <- err
+		}
+	}()
 
 	d.log.Info("Entering main daemon loop")
 
@@ -156,15 +223,12 @@ func (d *Daemon) Serve(ctx context.Context) error {
 					d.managers = append(d.managers, sideManager)
 
 					done := make(chan struct{})
-					managerDone = append(managerDone, done)
+					routineDone = append(routineDone, done)
 					go func(mgr SideManager, identifier string, doneChannel chan struct{}) {
 						defer close(doneChannel)
-						err := d.runSideManager(mgr, identifier, managerCtx)
+						err := d.runSideManager(mgr, identifier, routineCtx)
 						if err != nil {
-							select {
-							case errChan <- err:
-							default:
-							}
+							errChan <- err
 						}
 					}(sideManager, identifier, done)
 				}
@@ -204,7 +268,7 @@ func (d *Daemon) Serve(ctx context.Context) error {
 			}
 
 			// Sync DPU CRs with the current state
-			err = d.SyncDpuCRs()
+			changed, err := d.SyncDpuCRs()
 			if err != nil {
 				d.log.Error(err, "Failed to sync DPU CRs")
 				return err
@@ -216,34 +280,40 @@ func (d *Daemon) Serve(ctx context.Context) error {
 				d.log.Error(err, "Failed to update node labels")
 				return err
 			}
+
+			// Mark daemon as ready only when DPU CRs are fully in sync
+			// This ensures CRs are queryable before signaling readiness
+			if !changed {
+				d.markReady()
+			}
 		case err := <-errChan:
-			d.log.Error(err, "Side manager failed, stopping all managers")
-			d.shutdown(cancelManagers, managerDone)
+			d.log.Error(err, "Routine failed, stopping all routines")
+			d.shutdown(cancelRoutines, routineDone)
 			return err
 		case <-ctx.Done():
-			d.log.Info("Context cancelled, waiting for all side managers to stop")
-			d.shutdown(cancelManagers, managerDone)
+			d.log.Info("Context cancelled, waiting for all routines to stop")
+			d.shutdown(cancelRoutines, routineDone)
 			return ctx.Err()
 		}
 	}
 }
 
-func (d *Daemon) shutdown(cancelManagers context.CancelFunc, managerDone []chan struct{}) {
+func (d *Daemon) shutdown(cancelRoutines context.CancelFunc, routineDone []chan struct{}) {
 	// Clean up all DPU CRs by clearing managed DPUs and syncing
 	d.log.Info("Cleaning up DPU CRs before shutdown")
 	d.managedDpus = make(map[string]*ManagedDpu)
-	err := d.SyncDpuCRs()
+	_, err := d.SyncDpuCRs()
 	if err != nil {
 		d.log.Error(err, "Failed to clean up DPU CRs during shutdown")
 	}
 
-	// Stop all side managers
-	cancelManagers()
-	d.log.Info("Waiting for all side managers to stop")
-	for _, done := range managerDone {
+	// Stop all routines
+	cancelRoutines()
+	d.log.Info("Waiting for all routines to stop")
+	for _, done := range routineDone {
 		<-done
 	}
-	d.log.Info("All side managers stopped")
+	d.log.Info("All routines stopped")
 }
 
 func (d *Daemon) createSideManager(dpuCR *configv1.DataProcessingUnit, dpuPlugin *plugin.GrpcPlugin) (SideManager, error) {
@@ -262,12 +332,14 @@ func (d *Daemon) createSideManager(dpuCR *configv1.DataProcessingUnit, dpuPlugin
 	}
 }
 
-func (d *Daemon) SyncDpuCRs() error {
+// SyncDpuCRs synchronizes DPU CRs with Kubernetes.
+// Returns (true, nil) if any changes were made, (false, nil) if everything was in sync.
+func (d *Daemon) SyncDpuCRs() (bool, error) {
 	// Get all existing DPU CRs from K8s
 	existingCRs := &configv1.DataProcessingUnitList{}
 	err := d.client.List(context.TODO(), existingCRs)
 	if err != nil {
-		return fmt.Errorf("Failed to list existing DPU CRs: %v", err)
+		return false, fmt.Errorf("Failed to list existing DPU CRs: %v", err)
 	}
 
 	// Create a map of existing CRs by name for quick lookup, filtered by node name
@@ -280,11 +352,16 @@ func (d *Daemon) SyncDpuCRs() error {
 		}
 	}
 
+	changed := false
+
 	// Sync each managed DPU to K8s
 	for identifier, managedDpu := range d.managedDpus {
-		err := d.syncSingleDpuCR(managedDpu.DpuCR, existingCRMap)
+		updated, err := d.syncSingleDpuCR(managedDpu.DpuCR, existingCRMap)
 		if err != nil {
 			d.log.Error(err, "Failed to sync DPU CR", "identifier", identifier)
+		}
+		if updated {
+			changed = true
 		}
 	}
 
@@ -298,14 +375,17 @@ func (d *Daemon) SyncDpuCRs() error {
 				d.log.Error(err, "Failed to delete orphaned DPU CR", "crName", crName)
 			} else {
 				d.log.Info("Successfully deleted orphaned DPU CR", "crName", crName)
+				changed = true
 			}
 		}
 	}
 
-	return nil
+	return changed, nil
 }
 
-func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRMap map[string]*configv1.DataProcessingUnit) error {
+// syncSingleDpuCR syncs a single DPU CR to Kubernetes.
+// Returns (true, nil) if changes were made, (false, nil) if no changes needed.
+func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRMap map[string]*configv1.DataProcessingUnit) (bool, error) {
 	identifier := dpuCR.Name
 
 	// Check if CR exists in the cluster
@@ -324,24 +404,24 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 
 			// Set owner reference to DpuOperatorConfig
 			if err := d.setOwnerReference(dpuCRCopy); err != nil {
-				return fmt.Errorf("Failed to set owner reference for DPU CR %s: %v", identifier, err)
+				return false, fmt.Errorf("Failed to set owner reference for DPU CR %s: %v", identifier, err)
 			}
 
 			err := d.client.Create(context.TODO(), dpuCRCopy)
 			if err != nil {
-				return fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
+				return false, fmt.Errorf("Failed to create DPU CR %s: %v", identifier, err)
 			}
 
 			// Update status after creation
 			err = d.client.Status().Update(context.TODO(), dpuCRCopy)
 			if err != nil {
-				return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
+				return false, fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 			}
 
 			d.log.Info("Created DPU CR", "name", identifier, "dpuProductName", dpuCRCopy.Spec.DpuProductName, "isDpuSide", dpuCRCopy.Spec.IsDpuSide)
-			return nil
+			return true, nil
 		}
-		return fmt.Errorf("Failed to get DPU CR %s: %v", identifier, err)
+		return false, fmt.Errorf("Failed to get DPU CR %s: %v", identifier, err)
 	}
 
 	// CR exists, update it to reflect all fields
@@ -354,7 +434,7 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 		currentDpuCR.Spec = dpuCR.Spec
 		err := d.client.Update(context.TODO(), currentDpuCR)
 		if err != nil {
-			return fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
+			return false, fmt.Errorf("Failed to update DPU CR spec %s: %v", identifier, err)
 		}
 	}
 
@@ -362,15 +442,16 @@ func (d *Daemon) syncSingleDpuCR(dpuCR *configv1.DataProcessingUnit, existingCRM
 		currentDpuCR.Status = dpuCR.Status
 		err := d.client.Status().Update(context.TODO(), currentDpuCR)
 		if err != nil {
-			return fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
+			return false, fmt.Errorf("Failed to update DPU CR status %s: %v", identifier, err)
 		}
 	}
 
 	if needsSpecUpdate || needsStatusUpdate {
 		d.log.Info("Updated DPU CR", "name", identifier, "dpuProductName", dpuCR.Spec.DpuProductName, "isDpuSide", dpuCR.Spec.IsDpuSide)
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 // conditionsNeedUpdate compares the latest condition and returns true if it differs.

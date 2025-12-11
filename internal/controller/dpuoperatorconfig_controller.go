@@ -140,11 +140,11 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Ensure Ready condition is set if finalizer is present
-	if !meta.IsStatusConditionTrue(dpuOperatorConfig.Status.Conditions, "Ready") {
-		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionTrue, "FinalizerAdded", "Finalizer has been added and resource is ready")
+	// Set initial condition if finalizer is present but resource isn't ready yet
+	if meta.FindStatusCondition(dpuOperatorConfig.Status.Conditions, "Ready") == nil {
+		r.setReadyCondition(dpuOperatorConfig, metav1.ConditionFalse, "FinalizerAdded", "Finalizer has been added, beginning component reconciliation")
 		if err := r.Status().Update(ctx, dpuOperatorConfig); err != nil {
-			logger.Error(err, "Failed to update Ready condition")
+			logger.Error(err, "Failed to set initial Ready condition")
 			return ctrl.Result{}, err
 		}
 	}
