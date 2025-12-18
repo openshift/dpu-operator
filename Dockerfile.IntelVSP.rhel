@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -9,7 +9,7 @@ COPY . .
 # As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
 RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-intel-vsp
 
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
 ARG TARGETARCH
 ENV PYTHONUNBUFFERED=1
 WORKDIR /
