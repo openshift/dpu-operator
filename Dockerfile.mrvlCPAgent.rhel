@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS stage1
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22 AS stage1
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -58,7 +58,7 @@ RUN GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go b
 
 # Use distroless as minimal base image to package the Marvell CP agent binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
 COPY --from=stage1 /cpagent-bin/ /usr/bin/
 
 RUN yum update -y \
