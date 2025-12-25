@@ -13,6 +13,11 @@ service NetworkFunctionService {
   rpc DeleteNetworkFunction(NFRequest) returns (Empty);
 }
 
+service DataProcessingUnitManagementService {
+  rpc DpuRebootFunction(DPUManagementRequest) returns (DPUManagementResponse);
+  rpc DpuFirmwareUpgradeFunction(DPUManagementRequest) returns (DPUManagementResponse);
+}
+
 message InitRequest {
   bool dpu_mode = 1;
   string dpu_identifier = 2;
@@ -66,4 +71,16 @@ message PingResponse {
   int64 timestamp = 1;
   string responder_id = 2;
   bool healthy = 3;
+}
+
+message DPUManagementRequest{
+  string nodeName = 1;
+  string pciAddress = 2;
+  string firmwareType = 3;
+  string firmwareImagePath = 4;
+}
+
+message DPUManagementResponse{
+  string status = 1;
+  string message = 2;
 }
