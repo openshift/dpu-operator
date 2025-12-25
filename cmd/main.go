@@ -145,14 +145,20 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "DpuOperatorConfig")
 			os.Exit(1)
 		}
+		if err = (&configv1.DataProcessingUnitConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "DataProcessingUnitConfig")
+			os.Exit(1)
+		}
 	}
-	if err := (&controller.DataProcessingUnitConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DataProcessingUnitConfig")
-		os.Exit(1)
-	}
+	// Note: DataProcessingUnitConfig webhook validates generic structure only.
+	// Vendor-specific firmware defaults and registry allowlists are enforced in each VSP.
+	// if err := (&controller.DataProcessingUnitConfigReconciler{
+	// 	Client: mgr.GetClient(),
+	// 	Scheme: mgr.GetScheme(),
+	// }).SetupWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create controller", "controller", "DataProcessingUnitConfig")
+	// 	os.Exit(1)
+	// }
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

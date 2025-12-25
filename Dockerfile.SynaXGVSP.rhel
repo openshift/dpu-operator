@@ -1,0 +1,30 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+COPY . .
+
+# Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
+# As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue
+RUN mkdir -p /bin && \
+    GOMAXPROCS=2 CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build-synaxg-vsp
+
+FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+ARG TARGETARCH
+COPY --from=builder /workspace/bin/vsp-synaxg.${TARGETARCH} /vsp-synaxg
+
+RUN yum update -y \
+    && yum install -y \
+       ethtool \
+       net-tools \
+       kmod \
+       pciutils \
+       iputils \
+       iproute \
+    && yum clean all \
+    && rm -rf /var/cache/dnf
+
+USER 0
+
+ENTRYPOINT ["/vsp-synaxg"]

@@ -7,6 +7,7 @@ const (
 	VspImageIntel          = "intel_ipu"
 	VspImageMarvell        = "marvell_dpu"
 	VspImageIntelNetSec    = "intel_netsec"
+	VspImageSynaXG         = "synaxg"
 	VspImageP4Intel        = "IntelVspP4Image"
 	VspImageMarvellCpAgent = "MarvellVspCpAgentImage"
 	DpuOperatorDaemonImage = "DpuOperatorDaemonImage"
@@ -28,6 +29,7 @@ func AllImageKeys() []string {
 		VspImageIntel,
 		VspImageMarvell,
 		VspImageIntelNetSec,
+		VspImageSynaXG,
 		VspImageP4Intel,
 		VspImageMarvellCpAgent,
 	}

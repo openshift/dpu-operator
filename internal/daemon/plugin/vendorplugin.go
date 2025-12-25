@@ -34,6 +34,15 @@ type VendorPlugin interface {
 	GetDevices() (*pb.DeviceListResponse, error)
 	SetNumVfs(vfCount int32) (*pb.VfCount, error)
 	SetDpuNetworkConfig(isAccelerated bool) error
+	// Ping checks the liveness of the DPU via the vendor-specific plugin.
+	// Returns a PingResponse and error. This allows the VSP to proxy the ping
+	// to the DPU-side component (e.g., OAM) through whatever channel is available.
+	Ping(ctx context.Context) (*nfapi.PingResponse, error)
+	// RebootDpu sends a reboot command to the DPU. The VSP knows which DPU
+	// it manages, so the request only carries optional parameters (e.g. force).
+	RebootDpu(ctx context.Context, req *nfapi.DPURebootRequest) (*nfapi.DPUManagementResponse, error)
+	// UpgradeFirmware sends a firmware upgrade command to the DPU.
+	UpgradeFirmware(ctx context.Context, req *nfapi.DPUFirmwareUpgradeRequest) (*nfapi.DPUManagementResponse, error)
 }
 
 type GrpcPlugin struct {
@@ -44,6 +53,8 @@ type GrpcPlugin struct {
 	nfclient               nfapi.NetworkFunctionServiceClient
 	dsClient               pb.DeviceServiceClient
 	dpuNetworkConfigClient nfapi.DpuNetworkConfigServiceClient
+	heartbeatClient        nfapi.HeartbeatServiceClient
+	dmsClient              nfapi.DataProcessingUnitManagementServiceClient
 	dpuMode                bool
 	dpuIdentifier          DpuIdentifier
 	conn                   *grpc.ClientConn
@@ -106,6 +117,8 @@ func (g *GrpcPlugin) Close() {
 		g.opiClient = nil
 		g.dsClient = nil
 		g.dpuNetworkConfigClient = nil
+		g.heartbeatClient = nil
+		g.dmsClient = nil
 	}
 }
 
@@ -155,6 +168,8 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	g.dsClient = pb.NewDeviceServiceClient(conn)
 	g.dpuNetworkConfigClient = nfapi.NewDpuNetworkConfigServiceClient(conn)
+	g.heartbeatClient = nfapi.NewHeartbeatServiceClient(conn)
+	g.dmsClient = nfapi.NewDataProcessingUnitManagementServiceClient(conn)
 	return nil
 }
 
@@ -228,6 +243,22 @@ func (g *GrpcPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
 	return err
 }
 
+func (g *GrpcPlugin) RebootDpu(ctx context.Context, req *nfapi.DPURebootRequest) (*nfapi.DPUManagementResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("RebootDpu failed to ensure GRPC connection: %v", err)
+	}
+	return g.dmsClient.DpuRebootFunction(ctx, req)
+}
+
+func (g *GrpcPlugin) UpgradeFirmware(ctx context.Context, req *nfapi.DPUFirmwareUpgradeRequest) (*nfapi.DPUManagementResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("UpgradeFirmware failed to ensure GRPC connection: %v", err)
+	}
+	return g.dmsClient.DpuFirmwareUpgradeFunction(ctx, req)
+}
+
 // IsInitialized returns true if the VSP has been successfully initialized
 func (g *GrpcPlugin) IsInitialized() bool {
 	g.initMutex.RLock()
@@ -240,4 +271,16 @@ func (g *GrpcPlugin) SetInitDone(initialized bool) {
 	g.initMutex.Lock()
 	defer g.initMutex.Unlock()
 	g.initialized = initialized
+}
+
+func (g *GrpcPlugin) Ping(ctx context.Context) (*nfapi.PingResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("Ping failed to ensure GRPC connection: %v", err)
+	}
+	req := &nfapi.PingRequest{
+		Timestamp: time.Now().UnixNano(),
+		SenderId:  "host-daemon",
+	}
+	return g.heartbeatClient.Ping(ctx, req)
 }

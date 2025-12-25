@@ -22,6 +22,7 @@ type vspServer struct {
 	nfapi.UnimplementedDpuNetworkConfigServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
+	pb.UnimplementedHeartbeatServiceServer
 	log           logr.Logger
 	wg            sync.WaitGroup
 	startedWg     sync.WaitGroup
@@ -88,13 +89,13 @@ func (vsp *vspServer) Listen() (net.Listener, error) {
 		return nil, fmt.Errorf("failed to listen on the vendor plugin socket: %v", err)
 	}
 	vsp.log.Info("Starting to listen in Mock VSP", "path", vsp.pathManager.VendorPluginSocket())
-
 	vsp.grpcServer = grpc.NewServer()
 	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
 	nfapi.RegisterDpuNetworkConfigServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)
+	pb.RegisterHeartbeatServiceServer(vsp.grpcServer, vsp)
 	vsp.log.Info("gRPC server is listening", "listener.Addr()", listener.Addr())
 	return listener, nil
 }
