@@ -10,7 +10,6 @@ import (
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
-	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/networkfn"
@@ -21,6 +20,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	lifecycleapi "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"k8s.io/client-go/rest"
@@ -32,8 +32,8 @@ import (
 
 type DpuSideManager struct {
 	pb.UnimplementedBridgePortServiceServer
-	pb2.UnimplementedDeviceServiceServer
-	pb2.UnimplementedHeartbeatServiceServer
+	lifecycleapi.UnimplementedDeviceServiceServer
+	lifecycleapi.UnimplementedHeartbeatServiceServer
 
 	vsp          plugin.VendorPlugin
 	dp           deviceplugin.DevicePlugin
@@ -74,13 +74,13 @@ func (s *DpuSideManager) getPing() time.Time {
 	return s.lastPingTime
 }
 
-func (s *DpuSideManager) Ping(ctx context.Context, req *pb2.PingRequest) (*pb2.PingResponse, error) {
+func (s *DpuSideManager) Ping(ctx context.Context, req *lifecycleapi.PingRequest) (*lifecycleapi.PingResponse, error) {
 	s.log.V(2).Info("Received heartbeat ping", "from", req.SenderId, "timestamp", req.Timestamp)
 
 	// Record the time we received this ping
 	s.setPing(time.Now())
 
-	return &pb2.PingResponse{
+	return &lifecycleapi.PingResponse{
 		Timestamp:   time.Now().UnixNano(),
 		ResponderId: "dpu-daemon",
 		Healthy:     true,
@@ -188,7 +188,7 @@ func (d *DpuSideManager) Listen() (net.Listener, error) {
 	}
 
 	pb.RegisterBridgePortServiceServer(d.server, d)
-	pb2.RegisterHeartbeatServiceServer(d.server, d)
+	lifecycleapi.RegisterHeartbeatServiceServer(d.server, d)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", d.addr, d.port))
 	if err != nil {

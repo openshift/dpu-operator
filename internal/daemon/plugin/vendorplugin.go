@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	nfapi "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	pb "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -38,7 +40,7 @@ type GrpcPlugin struct {
 	client        pb.LifeCycleServiceClient
 	k8sClient     client.Client
 	opiClient     opi.BridgePortServiceClient
-	nfclient      pb.NetworkFunctionServiceClient
+	nfclient      nfapi.NetworkFunctionServiceClient
 	dsClient      pb.DeviceServiceClient
 	dpuMode       bool
 	dpuIdentifier DpuIdentifier
@@ -146,7 +148,7 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.conn = conn
 
 	g.client = pb.NewLifeCycleServiceClient(conn)
-	g.nfclient = pb.NewNetworkFunctionServiceClient(conn)
+	g.nfclient = nfapi.NewNetworkFunctionServiceClient(conn)
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	g.dsClient = pb.NewDeviceServiceClient(conn)
 	return nil
@@ -175,7 +177,7 @@ func (g *GrpcPlugin) CreateNetworkFunction(input string, output string) error {
 	if err != nil {
 		return fmt.Errorf("CreateNetworkFunction failed to ensure GRPC connection: %v", err)
 	}
-	req := pb.NFRequest{Input: input, Output: output}
+	req := nfapi.NFRequest{Input: input, Output: output}
 	_, err = g.nfclient.CreateNetworkFunction(context.TODO(), &req)
 	return err
 }
@@ -186,7 +188,7 @@ func (g *GrpcPlugin) DeleteNetworkFunction(input string, output string) error {
 	if err != nil {
 		return fmt.Errorf("DeleteNetworkFunction failed to ensure GRPC connection: %v", err)
 	}
-	req := pb.NFRequest{Input: input, Output: output}
+	req := nfapi.NFRequest{Input: input, Output: output}
 	_, err = g.nfclient.DeleteNetworkFunction(context.TODO(), &req)
 	return err
 }
@@ -196,7 +198,7 @@ func (g *GrpcPlugin) GetDevices() (*pb.DeviceListResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetDevices failed to ensure GRPC connection: %v", err)
 	}
-	return g.dsClient.GetDevices(context.Background(), &pb.Empty{})
+	return g.dsClient.GetDevices(context.Background(), &emptypb.Empty{})
 }
 
 func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {

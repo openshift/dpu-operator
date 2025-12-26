@@ -28,7 +28,7 @@ import (
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	pb "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"

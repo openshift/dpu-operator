@@ -168,4 +168,3 @@ func CleanUp() error {
 	log.Info("firewalld cleanup complete")
 	return nil
 }
-

@@ -13,12 +13,13 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	nfapi "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	vspnetutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/common"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	pb "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap/zapcore"
@@ -68,7 +69,7 @@ const (
 type intelNetSecVspServer struct {
 	// Common interfaces for VSP
 	pb.UnimplementedLifeCycleServiceServer
-	pb.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedNetworkFunctionServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
 	log            logr.Logger
@@ -360,7 +361,7 @@ func (vsp *intelNetSecVspServer) Init(ctx context.Context, in *pb.InitRequest) (
 }
 
 // GetDevices retrieves the list of devices (VFs or VETH Tunnel Pair Devices) based on the mode (DPU or Host).
-func (vsp *intelNetSecVspServer) GetDevices(ctx context.Context, in *pb.Empty) (*pb.DeviceListResponse, error) {
+func (vsp *intelNetSecVspServer) GetDevices(ctx context.Context, in *emptypb.Empty) (*pb.DeviceListResponse, error) {
 	vsp.log.V(2).Info("Received GetDevices() request")
 	devices := make(map[string]*pb.Device)
 
@@ -590,7 +591,7 @@ func (vsp *intelNetSecVspServer) ifDownAndDelFromBridge(ifName string) error {
 	return nil
 }
 
-func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 	vsp.log.Info("Received CreateNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 
 	// The expectation is that 2 devices would be allocated for the Network Function and we use the mac addresses
@@ -625,11 +626,11 @@ func (vsp *intelNetSecVspServer) CreateNetworkFunction(ctx context.Context, in *
 
 	vsp.log.Info("CreateNetworkFunction(): Added Flow Rules to OvS Bridge", "InportVeth", inportVeth.IfName, "OutportVeth", outportVeth.IfName)
 	vsp.numNfs++
-	out := new(pb.Empty)
+	out := new(nfapi.Empty)
 	return out, nil
 }
 
-func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (vsp *intelNetSecVspServer) DeleteNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 	vsp.log.Info("Received DeleteNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 
 	vsp.numNfs--
@@ -866,7 +867,7 @@ func (vsp *intelNetSecVspServer) Listen() (net.Listener, error) {
 		return nil, fmt.Errorf("failed to listen on the vendor plugin socket: %v", err)
 	}
 	vsp.grpcServer = grpc.NewServer()
-	pb.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
+	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)

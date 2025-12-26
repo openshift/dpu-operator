@@ -13,7 +13,8 @@ import (
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	pb "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
+	"google.golang.org/protobuf/types/known/emptypb"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
@@ -47,7 +48,7 @@ func NewDevicePluginService(mode string) *DevicePluginService {
 	return &DevicePluginService{mode: mode}
 }
 
-func (s *DevicePluginService) GetDevices(context.Context, *pb.Empty) (*pb.DeviceListResponse, error) {
+func (s *DevicePluginService) GetDevices(context.Context, *emptypb.Empty) (*pb.DeviceListResponse, error) {
 
 	devices, err := discoverHostDevices(s.mode)
 	if err != nil {

@@ -7,9 +7,10 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	nfapi "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	pb "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -17,7 +18,7 @@ import (
 
 type vspServer struct {
 	pb.UnimplementedLifeCycleServiceServer
-	pb.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedNetworkFunctionServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
 	log         logr.Logger
@@ -36,7 +37,7 @@ func (vsp *vspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort,
 	}, nil
 }
 
-func (vsp *vspServer) GetDevices(ctx context.Context, in *pb.Empty) (*pb.DeviceListResponse, error) {
+func (vsp *vspServer) GetDevices(ctx context.Context, in *emptypb.Empty) (*pb.DeviceListResponse, error) {
 	devices := map[string]*pb.Device{
 		"ens5f0": {ID: "ens5f0", Health: "Healthy"},
 		"ens5f1": {ID: "ens5f1", Health: "Healthy"},
@@ -59,12 +60,12 @@ func (vsp *vspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBridge
 	return nil, nil
 }
 
-func (vsp *vspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (vsp *vspServer) CreateNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 	vsp.log.Info("Received CreateNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 	return nil, nil
 }
 
-func (vsp *vspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (vsp *vspServer) DeleteNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 	vsp.log.Info("Received DeleteNetworkFunction() request", "Input", in.Input, "Output", in.Output)
 	return nil, nil
 }
@@ -81,10 +82,10 @@ func (vsp *vspServer) Listen() (net.Listener, error) {
 	vsp.log.Info("Starting to listen in Mock VSP", "path", vsp.pathManager.VendorPluginSocket())
 
 	vsp.grpcServer = grpc.NewServer()
-	pb.RegisterNetworkFunctionServiceServer(vsp.grpcServer, &vspServer{})
-	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, &vspServer{})
-	pb.RegisterDeviceServiceServer(vsp.grpcServer, &vspServer{})
-	opi.RegisterBridgePortServiceServer(vsp.grpcServer, &vspServer{})
+	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
+	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
+	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
+	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)
 	vsp.log.Info("gRPC server is listening", "listener.Addr()", listener.Addr())
 	return listener, nil
 }

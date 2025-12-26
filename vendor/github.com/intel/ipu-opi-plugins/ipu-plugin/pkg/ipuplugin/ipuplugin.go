@@ -22,8 +22,9 @@ import (
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
-	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
+	nfapi "github.com/openshift/dpu-operator/dpu-api/gen"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	lifecycle "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -211,12 +212,12 @@ func (s *server) Run() error {
 			return fmt.Errorf("host bridge error")
 		}
 	}
-	pb2.RegisterLifeCycleServiceServer(s.grpcSrvr, NewLifeCycleService(s.daemonHostIp, s.daemonIpuIp, s.daemonPort, s.mode, s.p4rtClient, s.bridgeCtlr))
+	lifecycle.RegisterLifeCycleServiceServer(s.grpcSrvr, NewLifeCycleService(s.daemonHostIp, s.daemonIpuIp, s.daemonPort, s.mode, s.p4rtClient, s.bridgeCtlr))
 	if s.mode == types.IpuMode {
 		pb.RegisterBridgePortServiceServer(s.grpcSrvr, s)
-		pb2.RegisterNetworkFunctionServiceServer(s.grpcSrvr, NewNetworkFunctionService(s.Ports, s.bridgeCtlr, s.p4rtClient))
+		nfapi.RegisterNetworkFunctionServiceServer(s.grpcSrvr, NewNetworkFunctionService(s.Ports, s.bridgeCtlr, s.p4rtClient))
 	}
-	pb2.RegisterDeviceServiceServer(s.grpcSrvr, NewDevicePluginService(s.mode))
+	lifecycle.RegisterDeviceServiceServer(s.grpcSrvr, NewDevicePluginService(s.mode))
 
 	s.log.WithField("addr", listen.Addr().String()).Info("IPU plugin server listening on at:")
 	go func() {

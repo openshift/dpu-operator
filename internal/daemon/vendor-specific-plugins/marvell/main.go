@@ -12,13 +12,14 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	nfapi "github.com/openshift/dpu-operator/dpu-api/gen"
 	vspnetutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/common"
 	debugdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/debug-dp"
 	mrvlutils "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/mrvl-utils"
 	ovsdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/ovs-dp"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	pb "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap/zapcore"
@@ -81,7 +82,7 @@ type mrvlNfPortMap struct {
 }
 type mrvlVspServer struct {
 	pb.UnimplementedLifeCycleServiceServer
-	pb.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedNetworkFunctionServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
 	log           logr.Logger
@@ -512,7 +513,7 @@ func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBr
 
 // CreateNetworkFunction function to create a network function with the given context and NFRequest
 // It will return the Empty and error
-func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 	klog.Infof("Received CreateNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
 	vsp.isNF = true
 	inpDpInterfaceName := vsp.deviceStore[in.Input].dpInterfaceName
@@ -523,7 +524,7 @@ func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRe
 
 // AddNetworkFunction function to add a network function with the given Interface Name and NFName
 // It will return the Empty and error
-func (vsp *mrvlVspServer) AddNetworkFunction(inpDpInterfaceName string, outDpInterfaceName string, nfName string) (*pb.Empty, error) {
+func (vsp *mrvlVspServer) AddNetworkFunction(inpDpInterfaceName string, outDpInterfaceName string, nfName string) (*nfapi.Empty, error) {
 	if err := vsp.mrvlDP.AddPortToDataPlane(vsp.bridgeName, inpDpInterfaceName, "", isDPDK); err != nil {
 		klog.Errorf("Error occurred in adding Port to Bridge: %v", err)
 		return nil, err
@@ -583,10 +584,10 @@ func (vsp *mrvlVspServer) AddNetworkFunction(inpDpInterfaceName string, outDpInt
 		return nil, err
 	}
 	klog.Info("Flow Rule Added to Bridge Successfully from RPM Interface to outPort")
-	out := new(pb.Empty)
+	out := new(nfapi.Empty)
 	return out, nil
 }
-func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 	klog.Infof("Received DeleteNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
 	vsp.isNF = false
 	inpDpInterfaceName := vsp.deviceStore[in.Input].dpInterfaceName
@@ -597,7 +598,7 @@ func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRe
 
 // DeleteNetworkFunction function to delete a network function with the given context and NFRequest
 // It will return the Empty and error
-func (vsp *mrvlVspServer) DeleteNetworkFunctionPort(inpDpInterfaceName string, outDpInterfaceName string, nfName string) (*pb.Empty, error) {
+func (vsp *mrvlVspServer) DeleteNetworkFunctionPort(inpDpInterfaceName string, outDpInterfaceName string, nfName string) (*nfapi.Empty, error) {
 	dpuVfsName := vsp.networkStore[nfName].vfPort
 	for _, vf := range dpuVfsName {
 		if err := vsp.mrvlDP.DeleteFlowRuleFromDataPlane(vsp.bridgeName, vf.vfName, inpDpInterfaceName, ""); err != nil {
@@ -638,13 +639,13 @@ func (vsp *mrvlVspServer) DeleteNetworkFunctionPort(inpDpInterfaceName string, o
 		return nil, err
 	}
 	klog.Info("Output Port Deleted from Bridge Successfully")
-	out := new(pb.Empty)
+	out := new(nfapi.Empty)
 	return out, nil
 }
 
 // GetDevices function to get all the devices with the given context and Empty
 // It will return the DeviceListResponse and error
-func (vsp *mrvlVspServer) GetDevices(ctx context.Context, in *pb.Empty) (*pb.DeviceListResponse, error) {
+func (vsp *mrvlVspServer) GetDevices(ctx context.Context, in *emptypb.Empty) (*pb.DeviceListResponse, error) {
 	klog.Info("Received GetDevices() request")
 	devices := make(map[string]*pb.Device)
 	if vsp.deviceStore == nil {
@@ -761,7 +762,7 @@ func (vsp *mrvlVspServer) Listen() (net.Listener, error) {
 		return nil, fmt.Errorf("failed to listen on the vendor plugin socket: %v", err)
 	}
 	vsp.grpcServer = grpc.NewServer()
-	pb.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
+	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)
