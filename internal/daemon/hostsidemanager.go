@@ -10,7 +10,6 @@ import (
 
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/go-logr/logr"
-	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
@@ -21,6 +20,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	lifecycleapi "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/client-go/rest"
@@ -33,7 +33,7 @@ type HostSideManager struct {
 	log                logr.Logger
 	conn               *grpc.ClientConn
 	client             pb.BridgePortServiceClient
-	heartbeatClient    pb2.HeartbeatServiceClient
+	heartbeatClient    lifecycleapi.HeartbeatServiceClient
 	clientMutex        sync.Mutex
 	lastSuccessfulPing time.Time
 	pingMutex          sync.RWMutex
@@ -179,7 +179,7 @@ func (d *HostSideManager) connectWithRetry() error {
 	d.log.Info("Dial succeeded", "addr", d.addr, "port", d.port)
 	d.conn = conn
 	d.client = pb.NewBridgePortServiceClient(conn)
-	d.heartbeatClient = pb2.NewHeartbeatServiceClient(conn)
+	d.heartbeatClient = lifecycleapi.NewHeartbeatServiceClient(conn)
 	return nil
 }
 
@@ -250,7 +250,7 @@ func (d *HostSideManager) Ping() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req := &pb2.PingRequest{
+	req := &lifecycleapi.PingRequest{
 		Timestamp: time.Now().UnixNano(),
 		SenderId:  "host-daemon",
 	}

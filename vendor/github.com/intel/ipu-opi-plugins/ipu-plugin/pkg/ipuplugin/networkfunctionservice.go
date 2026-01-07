@@ -23,7 +23,7 @@ import (
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/p4rtclient"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/types"
 	"github.com/intel/ipu-opi-plugins/ipu-plugin/pkg/utils"
-	pb "github.com/openshift/dpu-operator/dpu-api/gen"
+	nfapi "github.com/openshift/dpu-operator/dpu-api/gen"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,7 +34,7 @@ const (
 )
 
 type NetworkFunctionServiceServer struct {
-	pb.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedNetworkFunctionServiceServer
 	Ports      map[string]*types.BridgePortInfo
 	bridgeCtlr types.BridgeController
 	p4rtClient types.P4RTClient
@@ -77,14 +77,14 @@ func FreeAccInterfaceForNF(intfIds [PRS_LEN]uint) error {
 	return nil
 }
 
-func deriveKey(in *pb.NFRequest) string {
+func deriveKey(in *nfapi.NFRequest) string {
 	nfReqHash := md5.Sum([]byte(in.Input + in.Output))
 	nfReqHashStr := hex.EncodeToString(nfReqHash[:])
 	log.Infof("deriveKey->%s", nfReqHashStr)
 	return nfReqHashStr
 }
 
-func (s *NetworkFunctionServiceServer) CreateNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (s *NetworkFunctionServiceServer) CreateNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 
 	mapKey := deriveKey(in)
 	_, ok := s.nfReqMap[mapKey]
@@ -138,10 +138,10 @@ func (s *NetworkFunctionServiceServer) CreateNetworkFunction(ctx context.Context
 
 	s.nfReqMap[deriveKey(in)] = intfIds
 
-	return &pb.Empty{}, nil
+	return &nfapi.Empty{}, nil
 }
 
-func (s *NetworkFunctionServiceServer) DeleteNetworkFunction(ctx context.Context, in *pb.NFRequest) (*pb.Empty, error) {
+func (s *NetworkFunctionServiceServer) DeleteNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
 
 	mapKey := deriveKey(in)
 	intfIds, ok := s.nfReqMap[mapKey]
@@ -178,5 +178,5 @@ func (s *NetworkFunctionServiceServer) DeleteNetworkFunction(ctx context.Context
 		s.p4rtClient.GetBin(), vfMacList, in.Input, in.Output, AccApfInfo[NF_IN_PR].Mac, AccApfInfo[NF_OUT_PR].Mac)
 	p4rtclient.DeleteNFP4Rules(s.p4rtClient, vfMacList, in.Input, in.Output, AccApfInfo[NF_IN_PR].Mac, AccApfInfo[NF_OUT_PR].Mac)
 
-	return &pb.Empty{}, nil
+	return &nfapi.Empty{}, nil
 }

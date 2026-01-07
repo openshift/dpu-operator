@@ -16,13 +16,13 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
-	pb2 "github.com/openshift/dpu-operator/dpu-api/gen"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cni"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/internal/testutils"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
+	lifecyclev1alpha1 "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
@@ -146,13 +146,13 @@ func (d *DummyDpuDaemon) Serve(ctx context.Context, listen net.Listener) error {
 	return nil
 }
 
-func (d *DummyPlugin) GetDevices() (*pb2.DeviceListResponse, error) {
-	ret := pb2.DeviceListResponse{}
+func (d *DummyPlugin) GetDevices() (*lifecyclev1alpha1.DeviceListResponse, error) {
+	ret := lifecyclev1alpha1.DeviceListResponse{}
 	return &ret, nil
 }
 
-func (g *DummyPlugin) SetNumVfs(count int32) (*pb2.VfCount, error) {
-	c := &pb2.VfCount{
+func (g *DummyPlugin) SetNumVfs(count int32) (*lifecyclev1alpha1.VfCount, error) {
+	c := &lifecyclev1alpha1.VfCount{
 		VfCnt: count,
 	}
 	return c, nil
