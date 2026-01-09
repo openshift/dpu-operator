@@ -33,6 +33,8 @@ type VendorPlugin interface {
 	DeleteNetworkFunction(input string, output string) error
 	GetDevices() (*pb.DeviceListResponse, error)
 	SetNumVfs(vfCount int32) (*pb.VfCount, error)
+	RebootDpu(dmr pb.DPUManagementRequest) (*pb.DPUManagementResponse, error)
+	UpgradeFirmware(dmr pb.DPUManagementRequest) (*pb.DPUManagementResponse, error)
 }
 
 type GrpcPlugin struct {
@@ -42,6 +44,7 @@ type GrpcPlugin struct {
 	opiClient     opi.BridgePortServiceClient
 	nfclient      nfapi.NetworkFunctionServiceClient
 	dsClient      pb.DeviceServiceClient
+	dmsClient     pb.DataProcessingUnitManagementServiceClient
 	dpuMode       bool
 	dpuIdentifier DpuIdentifier
 	conn          *grpc.ClientConn
@@ -151,6 +154,7 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.nfclient = nfapi.NewNetworkFunctionServiceClient(conn)
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	g.dsClient = pb.NewDeviceServiceClient(conn)
+	g.dmsClient = pb.NewDataProcessingUnitManagementServiceClient(conn)
 	return nil
 }
 
@@ -210,6 +214,24 @@ func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {
 		VfCnt: count,
 	}
 	return g.dsClient.SetNumVfs(context.Background(), c)
+}
+
+func (g *GrpcPlugin) RebootDpu(dmr pb.DPUManagementRequest) (*pb.DPUManagementResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("RebootDpu failed to ensure GRPC connection: %v", err)
+	}
+	dpuMgrInfo := &dmr
+	return g.dmsClient.DpuRebootFunction(ctx, dpuMgrInfo)
+}
+
+func (g *GrpcPlugin) UpgradeFirmware(dmr pb.DPUManagementRequest) (*pb.DPUManagementResponse, error) {
+	err := g.ensureConnected()
+	if err != nil {
+		return nil, fmt.Errorf("UpgradeFirmware failed to ensure GRPC connection: %v", err)
+	}
+	dpuMgrInfo := &dmr
+	return g.dmsClient.DpuUpgradeFirmwareFunction(ctx, dpuMgrInfo)
 }
 
 // IsInitialized returns true if the VSP has been successfully initialized

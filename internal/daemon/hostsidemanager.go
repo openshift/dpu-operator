@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"github.com/openshift/dpu-operator/internal/controller"
 )
 
 type HostSideManager struct {
@@ -49,6 +50,7 @@ type HostSideManager struct {
 	pathManager        utils.PathManager
 	stopRequested      bool
 	dpListener         net.Listener
+	dpuMgrClient       pb2.DataProcessingUnitManagementServiceClient
 }
 
 func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
@@ -434,6 +436,15 @@ func (d *HostSideManager) setupReconcilers() {
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
 			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
 		}
+
+		//set dataprocessingUnitConfig reconciler
+		//inject vsp in order to implement different scheme of rebooting and upgrading 
+		dpuConfigReconciler := controller.NewDataProcessingUnitConfigReconciler(mgr.GetClient(), mgr.GetScheme(), d.vsp)
+
+		if err = dpuConfigReconciler.SetupWithManager(mgr); err != nil {
+			d.log.Error(err, "unable to create controller", "controller", "DataProcessingUnitConfig_controller")
+		}
+
 		d.manager = mgr
 	}
 }
