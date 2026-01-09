@@ -1,13 +1,9 @@
 reviewers:
   - bn222
-  - danwinship
-  - thom311
   - vrindle
   - wizhaoredhat
 approvers:
   - bn222
-  - danwinship
-  - thom311
   - vrindle
   - wizhaoredhat
 component: "Networking"
