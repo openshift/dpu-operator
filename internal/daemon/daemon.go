@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	"kmod"
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
@@ -252,6 +253,9 @@ func (d *Daemon) Serve(ctx context.Context) error {
 							Message: "DPU plugin is initialized but ping failed.",
 						}
 					}
+                                        if err := kmod.Reload("idpf"); err != nil {
+                                               log.Fatalf("failed to reload idpf: %v", err)
+                                        }
 				} else {
 					newCondition = metav1.Condition{
 						Type:    plugin.ReadyConditionType,
