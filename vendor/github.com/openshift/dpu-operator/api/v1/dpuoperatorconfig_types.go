@@ -41,6 +41,7 @@ type DpuOperatorConfigStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:scope=Cluster
 
 // DpuOperatorConfig is the Schema for the dpuoperatorconfigs API
 type DpuOperatorConfig struct {
