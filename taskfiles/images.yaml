@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 tasks:
   go-cache:
@@ -12,10 +12,10 @@ tasks:
       - task: helper-prep-tmp-dir
     desc: Build {{.PLATFORM}} image using buildah
     vars:
-      NAME: '{{ .NAME }}'
-      DOCKERFILE: '{{ .DOCKERFILE }}'
-      PLATFORM: '{{.PLATFORM}}'
-      INCREMENTAL: '{{ .INCREMENTAL }}'
+      NAME: "{{ .NAME }}"
+      DOCKERFILE: "{{ .DOCKERFILE }}"
+      PLATFORM: "{{.PLATFORM}}"
+      INCREMENTAL: "{{ .INCREMENTAL }}"
       BUILDAH_OPTIONS:
         sh: |
           if [ "{{.INCREMENTAL}}" = "true" ]; then
@@ -54,15 +54,26 @@ tasks:
   helper-prepare-multi-arch:
     internal: true
     status:
-      - test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+      - |
+        if [ "$(uname -m)" = "aarch64" ]; then
+          test -f /proc/sys/fs/binfmt_misc/qemu-x86_64
+        else
+          test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+        fi
     cmds:
-      - sudo podman run --rm --privileged quay.io/bnemeth/multiarch-qemu-user-static --reset -p yes
-      - setenforce 0
+      - sudo podman run --rm --privileged docker.io/tonistiigi/binfmt --install all
+      - |
+        if command -v getenforce >/dev/null 2>&1; then
+          mode="$(getenforce || true)"
+          if [ "$mode" != "Disabled" ]; then
+            sudo setenforce 0 || true
+          fi
+        fi
 
   clean-image-layer:
     internal: true
     vars:
-      NAME: '{{.NAME}}'
+      NAME: "{{.NAME}}"
     status:
       - sh -c '! buildah manifest inspect localhost/{{.NAME}}:dev-manifest'
     cmds:
@@ -72,46 +83,46 @@ tasks:
     internal: true
     desc: Clean up image {{.NAME}}
     vars:
-      NAME: '{{.NAME}}'
+      NAME: "{{.NAME}}"
     cmds:
       - buildah manifest rm localhost/{{.NAME}}:dev-base-manifest || true
       - task: clean-image-layer
         vars:
-          NAME: '{{.NAME}}'
+          NAME: "{{.NAME}}"
 
   build-image:
     internal: true
     desc: Building {{.PLATFORM}} image {{.NAME}}
     vars:
-      NAME: '{{.NAME}}'
-      DOCKERFILE: '{{.DOCKERFILE}}'
-      PLATFORM: '{{.PLATFORM }}'
+      NAME: "{{.NAME}}"
+      DOCKERFILE: "{{.DOCKERFILE}}"
+      PLATFORM: "{{.PLATFORM }}"
     cmds:
       - task: helper-buildah
         vars:
-          NAME: 'localhost/{{.NAME}}:dev-base'
-          DOCKERFILE: '{{.DOCKERFILE}}'
+          NAME: "localhost/{{.NAME}}:dev-base"
+          DOCKERFILE: "{{.DOCKERFILE}}"
           INCREMENTAL: "false"
-          PLATFORM: '{{.PLATFORM}}'
+          PLATFORM: "{{.PLATFORM}}"
       # - cmd: buildah tag localhost/{{.NAME}}:dev-base-{{.PLATFORM}} localhost/{{.NAME}}:dev-base
       - task: prep-incremental-docker-file
         vars:
-          BASE_NAME: 'localhost/{{.NAME}}:dev-base-{{.PLATFORM}}'
-          IN_FILE: '{{.DOCKERFILE}}'
-          OUT_FILE: '{{.DOCKERFILE}}.inc'
+          BASE_NAME: "localhost/{{.NAME}}:dev-base-{{.PLATFORM}}"
+          IN_FILE: "{{.DOCKERFILE}}"
+          OUT_FILE: "{{.DOCKERFILE}}.inc"
       - task: helper-buildah
         vars:
-          NAME: 'localhost/{{.NAME}}:dev'
-          DOCKERFILE: '{{.DOCKERFILE}}.inc'
+          NAME: "localhost/{{.NAME}}:dev"
+          DOCKERFILE: "{{.DOCKERFILE}}.inc"
           INCREMENTAL: "true"
-          PLATFORM: '{{.PLATFORM}}'
+          PLATFORM: "{{.PLATFORM}}"
 
   prep-incremental-docker-file:
     internal: true
     vars:
-      BASE_NAME: '{{ .BASE_NAME }}'
-      IN_FILE: '{{ .IN_FILE }}'
-      OUT_FILE: '{{ .OUT_FILE }}'
+      BASE_NAME: "{{ .BASE_NAME }}"
+      IN_FILE: "{{ .IN_FILE }}"
+      OUT_FILE: "{{ .OUT_FILE }}"
     cmds:
       - >
         go run tools/incremental/incremental.go
@@ -282,7 +293,6 @@ tasks:
         vars:
           NAME: intel-vsp
 
-
   build-image-intel-vsp-p4:
     deps:
       - task: clean-image-layer
@@ -331,7 +341,7 @@ tasks:
           NAME: network-resources-injector
 
   clean-image-all:
-    cmds: # can't run in parallel since multiple concurrent pulls are not supported 
+    cmds: # can't run in parallel since multiple concurrent pulls are not supported
       - task: clean-image-manager
       - task: clean-image-daemon
       - task: clean-image-intel-vsp
@@ -346,7 +356,7 @@ tasks:
     # they will be picked up by the build-image-* targets
     deps:
       - build-bin-all
-    cmds: # can't run in parallel since multiple concurrent pulls are not supported 
+    cmds: # can't run in parallel since multiple concurrent pulls are not supported
       - task: build-image-manager
       - task: build-image-daemon
       - task: build-image-intel-vsp
@@ -361,34 +371,33 @@ tasks:
     deps:
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/dpu-operator:dev'
-          IMAGE: '{{.REGISTRY}}/dpu-operator:dev'
+          SOURCE: "localhost/dpu-operator:dev"
+          IMAGE: "{{.REGISTRY}}/dpu-operator:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/dpu-daemon:dev'
-          IMAGE: '{{.REGISTRY}}/dpu-daemon:dev'
+          SOURCE: "localhost/dpu-daemon:dev"
+          IMAGE: "{{.REGISTRY}}/dpu-daemon:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/mrvl-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/mrvl-vsp:dev'
+          SOURCE: "localhost/mrvl-vsp:dev"
+          IMAGE: "{{.REGISTRY}}/mrvl-vsp:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/mrvl-cpagent:dev'
-          IMAGE: '{{.REGISTRY}}/mrvl-cpagent:dev'
+          SOURCE: "localhost/mrvl-cpagent:dev"
+          IMAGE: "{{.REGISTRY}}/mrvl-cpagent:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/intel-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/intel-vsp:dev'
+          SOURCE: "localhost/intel-vsp:dev"
+          IMAGE: "{{.REGISTRY}}/intel-vsp:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/intel-vsp-p4:dev'
-          IMAGE: '{{.REGISTRY}}/intel-vsp-p4:dev'
+          SOURCE: "localhost/intel-vsp-p4:dev"
+          IMAGE: "{{.REGISTRY}}/intel-vsp-p4:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/intel-netsec-vsp:dev'
-          IMAGE: '{{.REGISTRY}}/intel-netsec-vsp:dev'
+          SOURCE: "localhost/intel-netsec-vsp:dev"
+          IMAGE: "{{.REGISTRY}}/intel-netsec-vsp:dev"
       - task: push-image-helper
         vars:
-          SOURCE: 'localhost/network-resources-injector:dev'
-          IMAGE: '{{.REGISTRY}}/network-resources-injector:dev'
-
+          SOURCE: "localhost/network-resources-injector:dev"
+          IMAGE: "{{.REGISTRY}}/network-resources-injector:dev"
