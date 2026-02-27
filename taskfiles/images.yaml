@@ -1,5 +1,8 @@
 version: "3"
 
+vars:
+  DOCKERFILE_SUFFIX: '{{ default "" .DOCKERFILE_SUFFIX }}'
+
 tasks:
   go-cache:
     cmds:
@@ -16,6 +19,13 @@ tasks:
       DOCKERFILE: "{{ .DOCKERFILE }}"
       PLATFORM: "{{.PLATFORM}}"
       INCREMENTAL: "{{ .INCREMENTAL }}"
+      BUILDPLATFORM:
+        sh: |
+          case "$(uname -m)" in
+            x86_64) echo "linux/amd64" ;;
+            aarch64|arm64) echo "linux/arm64" ;;
+            *) echo "linux/$(uname -m)" ;;
+          esac
       BUILDAH_OPTIONS:
         sh: |
           if [ "{{.INCREMENTAL}}" = "true" ]; then
@@ -40,6 +50,9 @@ tasks:
         {{.BUILDAH_OPTIONS}}
         --manifest {{.NAME}}-manifest
         --platform linux/{{.PLATFORM}}
+        --build-arg BUILDPLATFORM={{.BUILDPLATFORM}}
+        --build-arg TARGETOS=linux
+        --build-arg TARGETARCH={{.PLATFORM}}
         -v {{.DPU_OPERATOR_TEMP_DIR}}/go-cache:/go:z
         -f {{.DOCKERFILE}}
         -t {{.NAME}}-{{.PLATFORM}}
@@ -145,12 +158,12 @@ tasks:
       - task: build-image
         vars:
           NAME: dpu-operator
-          DOCKERFILE: Dockerfile.rhel
+          DOCKERFILE: Dockerfile{{.DOCKERFILE_SUFFIX}}
           PLATFORM: amd64
       - task: build-image
         vars:
           NAME: dpu-operator
-          DOCKERFILE: Dockerfile.rhel
+          DOCKERFILE: Dockerfile{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-manager:
@@ -174,12 +187,12 @@ tasks:
       - task: build-image
         vars:
           NAME: dpu-daemon
-          DOCKERFILE: Dockerfile.daemon.rhel
+          DOCKERFILE: Dockerfile.daemon{{.DOCKERFILE_SUFFIX}}
           PLATFORM: amd64
       - task: build-image
         vars:
           NAME: dpu-daemon
-          DOCKERFILE: Dockerfile.daemon.rhel
+          DOCKERFILE: Dockerfile.daemon{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-daemon:
@@ -203,12 +216,12 @@ tasks:
       - task: build-image
         vars:
           NAME: mrvl-vsp
-          DOCKERFILE: Dockerfile.mrvlVSP.rhel
+          DOCKERFILE: Dockerfile.mrvlVSP{{.DOCKERFILE_SUFFIX}}
           PLATFORM: amd64
       - task: build-image
         vars:
           NAME: mrvl-vsp
-          DOCKERFILE: Dockerfile.mrvlVSP.rhel
+          DOCKERFILE: Dockerfile.mrvlVSP{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-marvell-vsp:
@@ -226,7 +239,7 @@ tasks:
       - task: build-image
         vars:
           NAME: mrvl-cpagent
-          DOCKERFILE: Dockerfile.mrvlCPAgent.rhel
+          DOCKERFILE: Dockerfile.mrvlCPAgent{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-marvell-cpagent:
@@ -250,12 +263,12 @@ tasks:
       - task: build-image
         vars:
           NAME: intel-netsec-vsp
-          DOCKERFILE: Dockerfile.IntelNetSecVSP.rhel
+          DOCKERFILE: Dockerfile.IntelNetSecVSP{{.DOCKERFILE_SUFFIX}}
           PLATFORM: amd64
       - task: build-image
         vars:
           NAME: intel-netsec-vsp
-          DOCKERFILE: Dockerfile.IntelNetSecVSP.rhel
+          DOCKERFILE: Dockerfile.IntelNetSecVSP{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-intel-netsec-vsp:
@@ -279,12 +292,12 @@ tasks:
       - task: build-image
         vars:
           NAME: intel-vsp
-          DOCKERFILE: Dockerfile.IntelVSP.rhel
+          DOCKERFILE: Dockerfile.IntelVSP{{.DOCKERFILE_SUFFIX}}
           PLATFORM: amd64
       - task: build-image
         vars:
           NAME: intel-vsp
-          DOCKERFILE: Dockerfile.IntelVSP.rhel
+          DOCKERFILE: Dockerfile.IntelVSP{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-intel-vsp:
@@ -302,7 +315,7 @@ tasks:
       - task: build-image
         vars:
           NAME: intel-vsp-p4
-          DOCKERFILE: Dockerfile.IntelP4.rhel
+          DOCKERFILE: Dockerfile.IntelP4{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-intel-vsp-p4:
@@ -326,12 +339,12 @@ tasks:
       - task: build-image
         vars:
           NAME: network-resources-injector
-          DOCKERFILE: Dockerfile.networkResourcesInjector.rhel
+          DOCKERFILE: Dockerfile.networkResourcesInjector{{.DOCKERFILE_SUFFIX}}
           PLATFORM: amd64
       - task: build-image
         vars:
           NAME: network-resources-injector
-          DOCKERFILE: Dockerfile.networkResourcesInjector.rhel
+          DOCKERFILE: Dockerfile.networkResourcesInjector{{.DOCKERFILE_SUFFIX}}
           PLATFORM: arm64
 
   clean-image-network-resources-injector:
@@ -342,6 +355,17 @@ tasks:
 
   clean-image-all:
     cmds: # can't run in parallel since multiple concurrent pulls are not supported
+      - task: clean-image-manager
+      - task: clean-image-daemon
+      - task: clean-image-intel-vsp
+      - task: clean-image-intel-vsp-p4
+      - task: clean-image-marvell-vsp
+      - task: clean-image-marvell-cpagent
+      - task: clean-image-intel-netsec-vsp
+      - task: clean-image-network-resources-injector
+
+  clean-image-all-rhel:
+    cmds:
       - task: clean-image-manager
       - task: clean-image-daemon
       - task: clean-image-intel-vsp
@@ -365,6 +389,36 @@ tasks:
       - task: build-image-intel-netsec-vsp
       - task: build-image-marvell-cpagent
       - task: build-image-network-resources-injector
+      - task: push-image-all
+
+  build-image-all-rhel:
+    deps:
+      - build-bin-all
+    cmds:
+      - task: build-image-manager
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-daemon
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-intel-vsp
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-intel-vsp-p4
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-marvell-vsp
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-intel-netsec-vsp
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-marvell-cpagent
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
+      - task: build-image-network-resources-injector
+        vars:
+          DOCKERFILE_SUFFIX: .rhel
       - task: push-image-all
 
   push-image-all:
