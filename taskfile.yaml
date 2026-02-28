@@ -21,6 +21,7 @@ vars:
       else
         hostname | sed 's/$/:5000/'
       fi
+  PUSH_TLS_VERIFY: '{{ default "true" .PUSH_TLS_VERIFY }}'
   ENVTEST_K8S_VERSION: 1.27.1
   KUSTOMIZE_VERSION: v5.6.0
   GINKGO_VERSION:
@@ -64,7 +65,7 @@ tasks:
       SOURCE: '{{.SOURCE}}'
       IMAGE: '{{.IMAGE}}'
     cmds:
-      - buildah manifest push --all '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
+      - buildah manifest push --all --tls-verify={{.PUSH_TLS_VERIFY}} '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
 
   undeploy-helper:
     internal: true
@@ -115,7 +116,7 @@ tasks:
       - test -s {{.BINDIR}}/setup-envtest
       - ./{{.BINDIR}}/setup-envtest --help | head -1 | grep -q {{.SETUP_ENVTEST_VERSION}}
     cmds:
-      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.SETUP_ENVTEST_VERSION}}
+      - env -u GOOS -u GOARCH GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.SETUP_ENVTEST_VERSION}}
 
   deploy:
     deps:
@@ -261,7 +262,7 @@ tasks:
       - test -s {{.BINDIR}}/controller-gen
       - ./{{.BINDIR}}/controller-gen --version | grep -q {{.CONTROLLER_TOOLS_VERSION}}
     cmds:
-      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+      - env -u GOOS -u GOARCH GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
 
   test:
     deps:
