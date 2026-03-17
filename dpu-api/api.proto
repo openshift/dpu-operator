@@ -8,6 +8,10 @@ service LifeCycleService {
   rpc Init(InitRequest) returns (IpPort);
 }
 
+service DpuNetworkConfigService {
+  rpc SetDpuNetworkConfig(DpuNetworkConfigRequest) returns (Empty);
+}
+
 service NetworkFunctionService {
   rpc CreateNetworkFunction(NFRequest) returns (Empty);
   rpc DeleteNetworkFunction(NFRequest) returns (Empty);
@@ -26,6 +30,10 @@ message IpPort {
 message NFRequest {
   string input = 1;
   string output = 2;
+}
+
+message DpuNetworkConfigRequest {
+  bool is_accelerated = 1;
 }
 
 message Empty {}

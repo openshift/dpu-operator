@@ -158,6 +158,10 @@ func (g *DummyPlugin) SetNumVfs(count int32) (*lifecyclev1alpha1.VfCount, error)
 	return c, nil
 }
 
+func (g *DummyPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
+	return nil
+}
+
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {
 	cniConfig := "{\"cniVersion\": \"" + cniVersion + "\",\"name\": \"dpucni\",\"type\": \"dpucni\", \"OrigVfState\": {\"EffectiveMac\": \"00:11:22:33:44:55\"}, \"vlan\": 7}"
 	cmdArgs := &skel.CmdArgs{

@@ -83,6 +83,7 @@ type mrvlNfPortMap struct {
 type mrvlVspServer struct {
 	pb.UnimplementedLifeCycleServiceServer
 	nfapi.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedDpuNetworkConfigServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
 	log           logr.Logger
@@ -94,6 +95,7 @@ type mrvlVspServer struct {
 	pathManager   utils.PathManager
 	version       string
 	isDPUMode     bool
+	isAccelerated bool
 	deviceStore   map[string]mrvlDeviceInfo
 	noOfPortPairs int
 	portType      string
@@ -326,6 +328,13 @@ func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpP
 	result, err := vsp.doInit(in.DpuMode)
 	klog.Infof("Received Init() request done: DpuMode: %v, IpPort: %v, err: %v", in.DpuMode, result, err)
 	return result, err
+}
+
+func (vsp *mrvlVspServer) SetDpuNetworkConfig(ctx context.Context, in *nfapi.DpuNetworkConfigRequest) (*nfapi.Empty, error) {
+	klog.Infof("Received SetDpuNetworkConfig() request: IsAccelerated: %v", in.IsAccelerated)
+	vsp.isAccelerated = in.IsAccelerated
+	klog.Infof("SetDpuNetworkConfig() done: isAccelerated set to %v", vsp.isAccelerated)
+	return &nfapi.Empty{}, nil
 }
 
 // getVFName function to get the VF Name of the given BridgePortName on DPU
@@ -763,6 +772,7 @@ func (vsp *mrvlVspServer) Listen() (net.Listener, error) {
 	}
 	vsp.grpcServer = grpc.NewServer()
 	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
+	nfapi.RegisterDpuNetworkConfigServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)
