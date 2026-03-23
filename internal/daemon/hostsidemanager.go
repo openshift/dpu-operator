@@ -50,7 +50,7 @@ type HostSideManager struct {
 	pathManager        utils.PathManager
 	stopRequested      bool
 	dpListener         net.Listener
-	dpuMgrClient       pb2.DataProcessingUnitManagementServiceClient
+	dpuManagerClient       pb2.DataProcessingUnitManagementServiceClient
 }
 
 func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {

@@ -104,13 +104,6 @@ type DataProcessingUnitConfigSpec struct {
 
 // DpuNodeOperationStatus defines the observed state of DataProcessingUnitConfig.
 type DpuNodeOperationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	NodeName string `json:"nodeName"`
-
-	// PciAddress of the target DPU device on this node.
-	// +optional
-	PciAddress string `json:"pciAddress,omitempty"`
 
 	// Sub-operation type: distinguish between FirmwareUpgrade and Restart
 	SubOperation DpuOperationType `json:"subOperation"`
@@ -128,7 +121,7 @@ type DpuNodeOperationStatus struct {
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 
 	// Upgrade-related versions (valid only when SubOperation is FirmwareUpgrade)
-	OriginalVersion string `json:"originalVersion,omitempty"` // Version before upgrade
+	PreviousVersion string `json:"originalVersion"` // Version before upgrade
 	TargetVersion   string `json:"targetVersion,omitempty"`   // Target version for upgrade
 	
 	// Error message (required when operation fails)

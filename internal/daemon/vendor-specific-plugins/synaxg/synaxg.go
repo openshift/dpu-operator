@@ -258,7 +258,50 @@ func execCommand(command string) ([]byte, error) {
 	return out, nil
 }
 
-func Reboot(deviceID string) error {
+// SetNumVfs function to set the number of VFs with the given context and VfCount
+func (vsp *mrvlVspServer) SetNumVfs(ctx context.Context, in *pb.VfCount) (*pb.VfCount, error) {
+	klog.Infof("Received SetNumVfs() request: VfCnt: %v", in.VfCnt)
+	if vsp.isDPUMode {
+		return nil, errors.New("SetNumVfs is not supported in DPU Mode")
+	}
+	pciAddress, err := mrvlutils.GetPCIByDeviceID(HostDeviceID)
+	if pciAddress == "" || err != nil {
+		return nil, errors.New("PCI Address not found")
+	}
+	vfcnt := in.VfCnt
+	if vfcnt < 0 {
+		return nil, errors.New("invalid VF Count")
+	}
+
+	// reset sriov_numvfs to 0 before setting to a number
+	resetCmd := exec.Command("sh", "-c", fmt.Sprintf("echo 0 > /sys/bus/pci/devices/%s/sriov_numvfs", pciAddress))
+	_, err = resetCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset sriov_numvfs to 0: %v", err)
+	}
+
+	// set sriov_numvfs to the given number
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("echo %d > /sys/bus/pci/devices/%s/sriov_numvfs", vfcnt, pciAddress))
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to set sriov_numvfs to %v: %v", vfcnt, err)
+	}
+
+	err = vsp.reloadVFs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load VFs after creating them: %v", err)
+	}
+
+	if len(vsp.deviceStore) != int(vfcnt) {
+		return nil, fmt.Errorf("failed to load expected number %v of VFs but got %v", vfcnt, vsp.deviceStore)
+	}
+
+	return &pb.VfCount{
+		VfCnt: vfcnt,
+	}, nil
+}
+
+func Reboot(dmr pb.DPUManagementRequest) error {
 	var err error
 
 	commd := fmt.Sprintf(`echo "%s" > %s`, deviceID, filePathUnbind)
@@ -282,13 +325,13 @@ func Reboot(deviceID string) error {
 	return nil
 }
 
-func (vsp *sgVspServer) DpuRebootFunction(ctx context.Context, in *pb.ManualOperationRequest) (*pb.ManualOperationResponse, error){
+func (vsp *sgVspServer) DpuRebootFunction(ctx context.Context, in *pb.DPUManagementRequest) (*pb.DPUManagementResponse, error){
 		err := Reboot(in.PciAddress)
 		if err != nil{
-			return &pb.ManualOperationResponse{Status: "fail", Message: err.Error()}, err
+			return &pb.DPUManagementResponse{Status: "fail", Message: err.Error()}, err
 		}
 
-		return &pb.ManualOperationResponse{Status: "Success", Message: "reboot success"}, nil
+		return &pb.DPUManagementResponse{Status: "Success", Message: "reboot success"}, nil
 
 }
 

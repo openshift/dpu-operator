@@ -221,6 +221,8 @@ func (g *GrpcPlugin) RebootDpu(dmr pb.DPUManagementRequest) (*pb.DPUManagementRe
 	}
 	dpuMgrInfo := &dmr
 	return g.dmsClient.DpuRebootFunction(ctx, dpuMgrInfo)
+	/**************************************************************/
+	//FIXME do health check, in order to acuurate the current status of reboot
 }
 
 func (g *GrpcPlugin) UpgradeFirmware(dmr pb.DPUManagementRequest) (*pb.DPUManagementResponse, error) {
@@ -230,6 +232,8 @@ func (g *GrpcPlugin) UpgradeFirmware(dmr pb.DPUManagementRequest) (*pb.DPUManage
 	}
 	dpuMgrInfo := &dmr
 	return g.dmsClient.DpuUpgradeFirmwareFunction(ctx, dpuMgrInfo)
+	/**************************************************************/
+	//FIXME do health check, in order to acuurate the current status of reboot
 }
 
 // IsInitialized returns true if the VSP has been successfully initialized
