@@ -27,9 +27,11 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -90,6 +92,7 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 //+kubebuilder:rbac:groups="",resources=services,verbs=*
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=*
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cert-manager.io,resources=issuers;certificates,verbs=*
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
@@ -299,6 +302,7 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 		"ImagePullPolicy": r.imagePullPolicy,
 		"ResourceName":    "openshift.io/dpu", // FIXME: Hardcode for now
 		"CniDir":          p,
+		"ClusterFlavour":  string(flavour),
 	}
 
 	return data
@@ -321,9 +325,47 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cf
 
 func (r *DpuOperatorConfigReconciler) ensureNetworkResourcesInjector(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
+	ce := utils.NewClusterEnvironment(r.Client)
+	flavour, err := ce.Flavour(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to detect cluster flavour for network resources injector: %w", err)
+	}
+
+	binDataPath := "network-resources-injector"
+	switch flavour {
+	case utils.OpenShiftFlavour, utils.MicroShiftFlavour:
+		binDataPath = "network-resources-injector"
+	default:
+		if err := r.ensureCertManagerInstalled(ctx, flavour); err != nil {
+			return err
+		}
+		binDataPath = "network-resources-injector-certmanager"
+	}
+
 	logger.Info("Create Network Resources Injector")
-	return r.createAndApplyAllFromBinData(logger, "network-resources-injector", cfg)
+	logger.Info("Selected network resources injector manifest set", "flavour", flavour, "path", binDataPath)
+	return r.createAndApplyAllFromBinData(logger, binDataPath, cfg)
 }
+
+func (r *DpuOperatorConfigReconciler) ensureCertManagerInstalled(ctx context.Context, flavour utils.Flavour) error {
+	requiredCRDs := []string{
+		"certificates.cert-manager.io",
+		"issuers.cert-manager.io",
+	}
+
+	for _, crdName := range requiredCRDs {
+		crd := &apiextensionsv1.CustomResourceDefinition{}
+		if err := r.Get(ctx, types.NamespacedName{Name: crdName}, crd); err != nil {
+			if apierrors.IsNotFound(err) {
+				return fmt.Errorf("cert-manager is required on %s clusters for network-resources-injector TLS provisioning: missing CRD %q", flavour, crdName)
+			}
+			return fmt.Errorf("failed to verify cert-manager CRD %q on %s cluster: %w", crdName, flavour, err)
+		}
+	}
+
+	return nil
+}
+
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
 
