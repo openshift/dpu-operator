@@ -15,7 +15,13 @@ vars:
   BINDIR_ABS:
     sh: if [[ "{{.BINDIR}}" = /* ]]; then echo "{{.BINDIR}}"; else echo "$(pwd)/{{.BINDIR}}"; fi
   REGISTRY:
-    sh: hostname | sed 's/$/:5000/'
+    sh: |
+      if [ -n "${REGISTRY:-}" ]; then
+        echo "${REGISTRY}"
+      else
+        hostname | sed 's/$/:5000/'
+      fi
+  PUSH_TLS_VERIFY: '{{ default "true" .PUSH_TLS_VERIFY }}'
   ENVTEST_K8S_VERSION: 1.27.1
   KUSTOMIZE_VERSION: v5.6.0
   GINKGO_VERSION:
@@ -59,7 +65,7 @@ tasks:
       SOURCE: '{{.SOURCE}}'
       IMAGE: '{{.IMAGE}}'
     cmds:
-      - buildah manifest push --all '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
+      - buildah manifest push --all --tls-verify={{.PUSH_TLS_VERIFY}} '{{.SOURCE}}-manifest' 'docker://{{.IMAGE}}'
 
   undeploy-helper:
     internal: true
@@ -68,13 +74,13 @@ tasks:
     vars:
       KUBECONFIG: '{{.KUBECONFIG}}'
     status:
-      - NS=$(KUBECONFIG={{.KUBECONFIG}} oc get ns openshift-dpu-operator)
+      - NS=$(KUBECONFIG={{.KUBECONFIG}} kubectl get ns openshift-dpu-operator)
         if [[ -n "$NS" ]]; then false else true fi
     cmds:
       # this will block untill everything is cleaned up and bringing system back into a clean state as if the operator was never installed
-      - KUBECONFIG={{.KUBECONFIG}} oc delete -f examples/config.yaml || true
-      - bin/kustomize build config/default | KUBECONFIG={{.KUBECONFIG}} oc delete --ignore-not-found=true -f -
-      - KUBECONFIG={{.KUBECONFIG}} oc wait --for=delete ns openshift-dpu-operator --timeout=300s
+      - KUBECONFIG={{.KUBECONFIG}} kubectl delete -f examples/config.yaml || true
+      - bin/kustomize build config/default | KUBECONFIG={{.KUBECONFIG}} kubectl delete --ignore-not-found=true -f -
+      - KUBECONFIG={{.KUBECONFIG}} kubectl wait --for=delete ns openshift-dpu-operator --timeout=300s
       - echo "Namespace 'openshift-dpu-operator' has been removed."
 
   undeploy:
@@ -103,6 +109,54 @@ tasks:
         -template-file config/dev/local-images-template.yaml
         -output-file bin/local-images.yaml
       - cp config/dev/kustomization.yaml bin
+
+  deploy-webhook-compat:
+    internal: true
+    vars:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    cmds:
+      - |
+        KUBECONFIG={{.KUBECONFIG}} python3 - <<'PY'
+        import json
+        import os
+        import subprocess
+
+        env = dict(os.environ)
+        env["KUBECONFIG"] = os.environ["KUBECONFIG"]
+
+        data = json.loads(subprocess.check_output([
+            "kubectl",
+            "get",
+            "validatingwebhookconfigurations",
+            "-o",
+            "json",
+        ], env=env))
+
+        for item in data.get("items", []):
+            name = item.get("metadata", {}).get("name", "")
+            if name == "dpu-operator-validating-webhook-configuration":
+                continue
+
+            for webhook in item.get("webhooks", []):
+                if webhook.get("name") == "vdpuoperatorconfig.kb.io":
+                    subprocess.run([
+                        "kubectl",
+                        "delete",
+                        "validatingwebhookconfiguration",
+                        name,
+                        "--ignore-not-found=true",
+                    ], env=env, check=False)
+                    break
+        PY
+      - |
+        if KUBECONFIG={{.KUBECONFIG}} kubectl get --raw /apis/route.openshift.io/v1 >/dev/null 2>&1; then
+          KUBECONFIG={{.KUBECONFIG}} kubectl annotate validatingwebhookconfiguration dpu-operator-validating-webhook-configuration cert-manager.io/inject-ca-from- --overwrite || true
+          KUBECONFIG={{.KUBECONFIG}} kubectl -n openshift-dpu-operator delete certificate dpu-operator-serving-cert --ignore-not-found=true
+          KUBECONFIG={{.KUBECONFIG}} kubectl -n openshift-dpu-operator delete issuer dpu-operator-selfsigned-issuer --ignore-not-found=true
+          KUBECONFIG={{.KUBECONFIG}} kubectl -n openshift-dpu-operator delete secret webhook-server-cert --ignore-not-found=true
+          KUBECONFIG={{.KUBECONFIG}} kubectl -n openshift-dpu-operator wait --for=create secret/webhook-server-cert --timeout=180s
+          KUBECONFIG={{.KUBECONFIG}} kubectl wait --for=jsonpath='{.webhooks[0].clientConfig.caBundle}' validatingwebhookconfiguration/dpu-operator-validating-webhook-configuration --timeout=180s
+        fi
   
   ## Download envtest-setup locally if necessary
   envtest:
@@ -110,7 +164,7 @@ tasks:
       - test -s {{.BINDIR}}/setup-envtest
       - ./{{.BINDIR}}/setup-envtest --help | head -1 | grep -q {{.SETUP_ENVTEST_VERSION}}
     cmds:
-      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.SETUP_ENVTEST_VERSION}}
+      - env -u GOOS -u GOARCH GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.SETUP_ENVTEST_VERSION}}
 
   deploy:
     deps:
@@ -120,12 +174,18 @@ tasks:
         vars:
           KUBECONFIG_DPU: "{{.KUBECONFIG_DPU}}"
           KUBECONFIG_HOST: "{{.KUBECONFIG_HOST}}"
-      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_DPU}}" oc apply -f -
-      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_HOST}}" oc apply -f -
-      - KUBECONFIG="{{.KUBECONFIG_DPU}}" oc -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
-      - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
-      - KUBECONFIG="{{.KUBECONFIG_DPU}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
-      - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_DPU}}" kubectl apply -f -
+      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_HOST}}" kubectl apply -f -
+      - task: deploy-webhook-compat
+        vars:
+          KUBECONFIG: "{{.KUBECONFIG_DPU}}"
+      - task: deploy-webhook-compat
+        vars:
+          KUBECONFIG: "{{.KUBECONFIG_HOST}}"
+      - KUBECONFIG="{{.KUBECONFIG_DPU}}" kubectl -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
+      - KUBECONFIG="{{.KUBECONFIG_HOST}}" kubectl -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
+      - KUBECONFIG="{{.KUBECONFIG_DPU}}" kubectl -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+      - KUBECONFIG="{{.KUBECONFIG_HOST}}" kubectl -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
       - echo "DPU operator deployment complete - controller manager and webhook are ready"
 
   deploy-1c:
@@ -135,9 +195,12 @@ tasks:
       - task: undeploy-1c
         vars:
           KUBECONFIG_HOST: "{{.KUBECONFIG_HOST}}"
-      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_HOST}}" oc apply -f -
-      - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
-      - KUBECONFIG="{{.KUBECONFIG_HOST}}" oc -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
+      - bin/kustomize build bin | KUBECONFIG="{{.KUBECONFIG_HOST}}" kubectl apply -f -
+      - task: deploy-webhook-compat
+        vars:
+          KUBECONFIG: "{{.KUBECONFIG_HOST}}"
+      - KUBECONFIG="{{.KUBECONFIG_HOST}}" kubectl -n openshift-dpu-operator wait --for=condition=Available deployment/dpu-operator-controller-manager --timeout=300s
+      - KUBECONFIG="{{.KUBECONFIG_HOST}}" kubectl -n openshift-dpu-operator wait --for=condition=ready pod --all --timeout=300s
 
   prepare-e2e-test:
     cmds:
@@ -189,14 +252,6 @@ tasks:
         KUBEBUILDER_ASSETS="$({{.BINDIR}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.BINDIR_ABS}} -p path)"
         {{.BINDIR}}/ginkgo -coverprofile cover.out ./e2e_test/...
       - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} sh hack/traffic_flow_tests.sh
-
-  prepare-e2e-test:
-    cmds:
-      - >
-        if [ "{{.SUBMODULES}}" = "true" ]; then
-            hack/prepare-submodules.sh
-        fi
-            hack/prepare-venv.sh
 
   redeploy:
     cmds:
@@ -256,7 +311,7 @@ tasks:
       - test -s {{.BINDIR}}/controller-gen
       - ./{{.BINDIR}}/controller-gen --version | grep -q {{.CONTROLLER_TOOLS_VERSION}}
     cmds:
-      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+      - env -u GOOS -u GOARCH GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
 
   test:
     deps:

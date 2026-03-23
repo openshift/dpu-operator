@@ -114,7 +114,7 @@ kubectl create -f examples/config.yaml
 
 After creating the `DpuOperatorConfig` CR, you should see the following pods:
 ```sh
-oc get pods -n openshift-dpu-operator -o wide
+kubectl get pods -n openshift-dpu-operator -o wide
 NAME                                              READY   STATUS    RESTARTS   AGE   IP                NODE             NOMINATED NODE   READINESS GATES
 dpu-daemon-rn6mc                                  1/1     Running   0          22h   192.168.122.218   worker-229       <none>           <none>
 dpu-daemon-xrrlg                                  1/1     Running   0          22h   192.168.122.90    worker-229-ptl   <none>           <none>

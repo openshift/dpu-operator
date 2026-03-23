@@ -43,8 +43,8 @@ spec:
       type: ""
     name: host-proc
   - hostPath:
-      path: /opt/p4/p4-cp-nws/var
-      type: ""
+      path: {{.P4StateHostPath}}
+      type: DirectoryOrCreate
     name: host-opt
   - hostPath:
       path: /var/run/

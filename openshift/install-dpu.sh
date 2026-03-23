@@ -16,7 +16,9 @@ fi
 python3 -m pip install --upgrade pip
 
 # Install the packages in order of build dependency to avoid issues during installation.
-python3 -m pip install ${PIP_OPTS} -r requirements-build.txt
+# CentOS/RHEL-family images often ship setuptools via RPM; ignore-installed avoids pip trying
+# (and failing) to uninstall the RPM-provided setuptools when requirements pin a newer version.
+python3 -m pip install ${PIP_OPTS} --ignore-installed -r requirements-build.txt
 python3 -m pip install ${PIP_OPTS} -r requirements.txt
 
 rm -rf ${REMOTE_SOURCES_DIR}

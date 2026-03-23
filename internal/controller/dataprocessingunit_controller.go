@@ -26,6 +26,7 @@ import (
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
+	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	corev1 "k8s.io/api/core/v1"
@@ -67,6 +68,7 @@ func (r *DataProcessingUnitReconciler) WithImagePullPolicy(policy string) *DataP
 }
 
 // +kubebuilder:rbac:groups="",resources=pods,verbs=*
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=*
 // +kubebuilder:rbac:groups="",resources=services,verbs=*
@@ -137,11 +139,17 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 		return fmt.Errorf("failed to get VSP image for DPU type %s: %v", dpu.Spec.DpuProductName, err)
 	}
 
+	p4StateHostPath, err := r.resolveP4StateHostPath(ctx, dpu)
+	if err != nil {
+		return err
+	}
+
 	additionalVars := map[string]string{
 		"Namespace":                 vars.Namespace,
 		"VspName":                   r.getVSPName(dpu),
 		"DpuName":                   dpu.Name,
 		"NodeName":                  dpu.Spec.NodeName,
+		"P4StateHostPath":           p4StateHostPath,
 		"VendorSpecificPluginImage": vspImage,
 		"ImagePullPolicy":           r.imagePullPolicy,
 		"Command":                   "[]",
@@ -168,6 +176,31 @@ func (r *DataProcessingUnitReconciler) ensureVSPResources(ctx context.Context, d
 
 	logger.Info("Successfully ensured all VSP resources", "dpu", dpu.Name, "vspName", r.getVSPName(dpu))
 	return nil
+}
+
+func (r *DataProcessingUnitReconciler) resolveP4StateHostPath(ctx context.Context, dpu *configv1.DataProcessingUnit) (string, error) {
+	node := &corev1.Node{}
+	if err := r.Get(ctx, client.ObjectKey{Name: dpu.Spec.NodeName}, node); err != nil {
+		return "", fmt.Errorf("failed to get node %s for DataProcessingUnit %s: %w", dpu.Spec.NodeName, dpu.Name, err)
+	}
+
+	if node.Labels == nil {
+		return "", fmt.Errorf("missing %s label on node %s for DataProcessingUnit %s", utils.P4HostPathLabelKey, dpu.Spec.NodeName, dpu.Name)
+	}
+
+	mode, exists := node.Labels[utils.P4HostPathLabelKey]
+	if !exists {
+		return "", fmt.Errorf("missing %s label on node %s for DataProcessingUnit %s", utils.P4HostPathLabelKey, dpu.Spec.NodeName, dpu.Name)
+	}
+
+	switch mode {
+	case utils.P4HostPathLabelValueOpt:
+		return "/opt/p4/p4-cp-nws/var", nil
+	case utils.P4HostPathLabelValueVarOpt:
+		return "/var/opt/p4/p4-cp-nws/var", nil
+	default:
+		return "", fmt.Errorf("invalid %s label value %q on node %s for DataProcessingUnit %s", utils.P4HostPathLabelKey, mode, dpu.Spec.NodeName, dpu.Name)
+	}
 }
 
 func (r *DataProcessingUnitReconciler) applyVSPResourcesWithTracking(logger logr.Logger, binDataPath string, data map[string]string, owner client.Object, dpuName string) error {
