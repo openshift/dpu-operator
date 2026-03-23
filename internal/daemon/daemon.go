@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 
+	"golang.org/x/sys/unix"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,7 @@ import (
 
 var ()
 
-const DpuSideLabelKey = "dpu.config.openshift.io/dpuside"
+const DpuSideLabelKey = utils.DpuSideLabelKey
 
 type SideManager interface {
 	StartVsp(ctx context.Context) error
@@ -562,48 +563,92 @@ func (d *Daemon) updateNodeLabels() error {
 		return fmt.Errorf("Failed to get node %s: %v", d.nodeName, err)
 	}
 
-	// Determine the label value based on detected DPUs
-	var labelValue string
-	if len(d.managedDpus) == 0 {
-		// No DPUs detected, remove the label if it exists
-		if node.Labels != nil {
-			if _, exists := node.Labels[DpuSideLabelKey]; exists {
-				delete(node.Labels, DpuSideLabelKey)
-				err := d.client.Update(context.TODO(), node)
-				if err != nil {
-					return fmt.Errorf("Failed to remove DPU side label from node %s: %v", d.nodeName, err)
-				}
-				d.log.Info("Removed DPU side label from node", "nodeName", d.nodeName)
-			}
-		}
-		return nil
-	}
-
-	for _, managedDpu := range d.managedDpus {
-		if managedDpu.DpuCR.Spec.IsDpuSide {
-			labelValue = "dpu"
-		} else {
-			labelValue = "dpu-host"
-		}
-		break // It is a bug if there is node with managedDPU that is both hosting a DPU and is a DPU itself. Hense we only need to look at the first managedDPU DPU CR.
+	p4HostPathMode, err := detectP4HostPathMode()
+	if err != nil {
+		d.log.Error(err, "Failed to auto-detect host P4 path mode, defaulting to /opt")
+		p4HostPathMode = utils.P4HostPathLabelValueOpt
 	}
 
 	if node.Labels == nil {
 		node.Labels = make(map[string]string)
 	}
 
+	changed := false
+	if node.Labels[utils.P4HostPathLabelKey] != p4HostPathMode {
+		node.Labels[utils.P4HostPathLabelKey] = p4HostPathMode
+		changed = true
+	}
+
+	// Determine the label value based on detected DPUs
+	var labelValue string
+	if len(d.managedDpus) == 0 {
+		// No DPUs detected, remove the label if it exists
+		if _, exists := node.Labels[DpuSideLabelKey]; exists {
+			delete(node.Labels, DpuSideLabelKey)
+			changed = true
+		}
+
+		if changed {
+			err := d.client.Update(context.TODO(), node)
+			if err != nil {
+				return fmt.Errorf("Failed to update labels on node %s: %v", d.nodeName, err)
+			}
+			d.log.Info("Updated node labels", "nodeName", d.nodeName, "p4HostPathMode", p4HostPathMode)
+		}
+
+		return nil
+	}
+
+	for _, managedDpu := range d.managedDpus {
+		if managedDpu.DpuCR.Spec.IsDpuSide {
+			labelValue = utils.DpuSideLabelValueDpu
+		} else {
+			labelValue = utils.DpuSideLabelValueHost
+		}
+		break // It is a bug if there is node with managedDPU that is both hosting a DPU and is a DPU itself. Hense we only need to look at the first managedDPU DPU CR.
+	}
+
 	// Check if the label needs to be updated
 	currentValue, exists := node.Labels[DpuSideLabelKey]
 	if !exists || currentValue != labelValue {
 		node.Labels[DpuSideLabelKey] = labelValue
+		changed = true
+	}
+
+	if changed {
 		err := d.client.Update(context.TODO(), node)
 		if err != nil {
-			return fmt.Errorf("Failed to update DPU side label on node %s: %v", d.nodeName, err)
+			return fmt.Errorf("Failed to update labels on node %s: %v", d.nodeName, err)
 		}
-		d.log.Info("Updated DPU side label on node", "nodeName", d.nodeName, "labelValue", labelValue)
+		d.log.Info("Updated node labels", "nodeName", d.nodeName, "dpuSide", labelValue, "p4HostPathMode", p4HostPathMode)
 	}
 
 	return nil
+}
+
+func detectP4HostPathMode() (string, error) {
+	paths := []string{"/proc/1/root/opt", "/opt"}
+	var lastErr error
+
+	for _, path := range paths {
+		var fsStat unix.Statfs_t
+		if err := unix.Statfs(path, &fsStat); err != nil {
+			lastErr = err
+			continue
+		}
+
+		if fsStat.Flags&unix.ST_RDONLY != 0 {
+			return utils.P4HostPathLabelValueVarOpt, nil
+		}
+
+		return utils.P4HostPathLabelValueOpt, nil
+	}
+
+	if lastErr != nil {
+		return "", fmt.Errorf("failed to stat host /opt filesystem: %w", lastErr)
+	}
+
+	return "", fmt.Errorf("failed to stat host /opt filesystem")
 }
 
 // setOwnerReference sets the DpuOperatorConfig as the owner of the DataProcessingUnit CR
