@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: network-resources-injector-serving-cert
+  namespace: {{.Namespace}}
+spec:
+  secretName: network-resources-injector-secret
+  issuerRef:
+    name: network-resources-injector-selfsigned
+    kind: Issuer
+  dnsNames:
+  - network-resources-injector-service
+  - network-resources-injector-service.{{.Namespace}}
+  - network-resources-injector-service.{{.Namespace}}.svc
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
