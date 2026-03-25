@@ -77,10 +77,35 @@ tasks:
       - NS=$(KUBECONFIG={{.KUBECONFIG}} kubectl get ns openshift-dpu-operator)
         if [[ -n "$NS" ]]; then false else true fi
     cmds:
-      # this will block untill everything is cleaned up and bringing system back into a clean state as if the operator was never installed
-      - KUBECONFIG={{.KUBECONFIG}} kubectl delete -f examples/config.yaml || true
-      - bin/kustomize build config/default | KUBECONFIG={{.KUBECONFIG}} kubectl delete --ignore-not-found=true -f -
-      - KUBECONFIG={{.KUBECONFIG}} kubectl wait --for=delete ns openshift-dpu-operator --timeout=300s
+      - KUBECONFIG={{.KUBECONFIG}} kubectl -n openshift-dpu-operator delete pod -l app=vsp --ignore-not-found=true --wait=false || true
+      - KUBECONFIG={{.KUBECONFIG}} kubectl delete -f examples/config.yaml --ignore-not-found=true --wait=false || true
+      - |
+        if KUBECONFIG={{.KUBECONFIG}} kubectl get dpuoperatorconfig.config.openshift.io dpu-operator-config >/dev/null 2>&1; then
+          if ! KUBECONFIG={{.KUBECONFIG}} kubectl wait --for=delete dpuoperatorconfig.config.openshift.io/dpu-operator-config --timeout=120s; then
+            echo "Timed out waiting for DpuOperatorConfig deletion, removing finalizers"
+            KUBECONFIG={{.KUBECONFIG}} kubectl patch dpuoperatorconfig.config.openshift.io dpu-operator-config --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+          fi
+        fi
+      - bin/kustomize build config/default | KUBECONFIG={{.KUBECONFIG}} kubectl delete --ignore-not-found=true --wait=false -f -
+      - |
+        if KUBECONFIG={{.KUBECONFIG}} kubectl get ns openshift-dpu-operator >/dev/null 2>&1; then
+          if ! KUBECONFIG={{.KUBECONFIG}} kubectl wait --for=delete ns openshift-dpu-operator --timeout=300s; then
+            echo "Timed out waiting for namespace openshift-dpu-operator deletion"
+            echo "Namespace phase/finalizers:"
+            KUBECONFIG={{.KUBECONFIG}} kubectl get ns openshift-dpu-operator -o jsonpath='{.status.phase}{"\n"}{.spec.finalizers}{"\n"}' || true
+            echo "Remaining common resources in openshift-dpu-operator:"
+            KUBECONFIG={{.KUBECONFIG}} kubectl get pod,deploy,ds,rs,svc,sa,cm,secret,role,rolebinding -n openshift-dpu-operator --ignore-not-found=true || true
+            if [ "${FORCE_UNDEPLOY:-false}" = "true" ]; then
+              echo "FORCE_UNDEPLOY=true set, clearing namespace finalizers"
+              KUBECONFIG={{.KUBECONFIG}} kubectl patch ns openshift-dpu-operator --type=merge -p '{"spec":{"finalizers":[]}}' || true
+              KUBECONFIG={{.KUBECONFIG}} kubectl wait --for=delete ns openshift-dpu-operator --timeout=120s || true
+            fi
+            if KUBECONFIG={{.KUBECONFIG}} kubectl get ns openshift-dpu-operator >/dev/null 2>&1; then
+              echo "Namespace 'openshift-dpu-operator' is still present after cleanup attempts"
+              exit 1
+            fi
+          fi
+        fi
       - echo "Namespace 'openshift-dpu-operator' has been removed."
 
   undeploy:
@@ -246,9 +271,9 @@ tasks:
         KUBECONFIG_HOST={{.KUBECONFIG_HOST}}
         KUBECONFIG_DPU={{.KUBECONFIG_DPU}}
         REGISTRY={{.REGISTRY}}
-        NF_INGRESS_IP=10.20.30.2
-        EXTERNAL_CLIENT_DEV=eno12409
-        EXTERNAL_CLIENT_IP=10.20.30.100
+        NF_INGRESS_IP=${NF_INGRESS_IP:-10.20.30.2}
+        EXTERNAL_CLIENT_DEV=${EXTERNAL_CLIENT_DEV:-eno12409}
+        EXTERNAL_CLIENT_IP=${EXTERNAL_CLIENT_IP:-10.20.30.100}
         KUBEBUILDER_ASSETS="$({{.BINDIR}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.BINDIR_ABS}} -p path)"
         {{.BINDIR}}/ginkgo -coverprofile cover.out ./e2e_test/...
       - KUBECONFIG_HOST={{.KUBECONFIG_HOST}} sh hack/traffic_flow_tests.sh
