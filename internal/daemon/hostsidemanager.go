@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type HostSideManager struct {
@@ -100,9 +101,15 @@ func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager))
 		opt(h)
 	}
 
-	h.dp = deviceplugin.NewDevicePlugin(vsp, false, h.pathManager)
 	if h.config == nil {
 		h.config = ctrl.GetConfigOrDie()
+	}
+
+	if k8sClient, err := client.New(h.config, client.Options{Scheme: scheme.Scheme}); err != nil {
+		h.log.Error(err, "Failed to create Kubernetes client for device plugin; falling back to default-only registration")
+		h.dp = deviceplugin.NewDevicePluginManager(vsp, false, h.pathManager, nil)
+	} else {
+		h.dp = deviceplugin.NewDevicePluginManager(vsp, false, h.pathManager, k8sClient)
 	}
 	return h, nil
 }

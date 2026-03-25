@@ -71,6 +71,10 @@ func (g *DummyPlugin) DeleteNetworkFunction(input string, output string) error {
 	return nil
 }
 
+func (g *DummyPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
+	return nil
+}
+
 type SriovManagerStub struct{}
 
 func (m SriovManagerStub) SetupVF(conf *cnitypes.NetConf, podifName string, netns ns.NetNS) error {
@@ -156,10 +160,6 @@ func (g *DummyPlugin) SetNumVfs(count int32) (*lifecyclev1alpha1.VfCount, error)
 		VfCnt: count,
 	}
 	return c, nil
-}
-
-func (g *DummyPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
-	return nil
 }
 
 func PrepArgs(cniVersion string, command string) *skel.CmdArgs {

@@ -652,22 +652,68 @@ func (vsp *mrvlVspServer) DeleteNetworkFunctionPort(inpDpInterfaceName string, o
 	return out, nil
 }
 
+func (vsp *mrvlVspServer) getAcceleratedDevices() (map[string]*pb.Device, error) {
+	devices := make(map[string]*pb.Device)
+
+	vfNames, err := mrvlutils.GetAllVfsNameByDeviceID(DPUdeviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate SDP VFs: %w", err)
+	}
+
+	// VF index 0 (enP2p1s0v0) is the management interface used by
+	// configureIP() for the gRPC control channel. The data-path VFs
+	// start at index 1 and map 1:1 to the host-side VFs:
+
+	for _, name := range vfNames[1:] {
+		health := vsp.GetDeviceHealth(name)
+		devices[name] = &pb.Device{
+			ID:     name,
+			Health: health,
+		}
+	}
+
+	rpmNames, err := mrvlutils.GetAllVfsNameByDeviceID(DpuRpmDeviceID)
+	if err != nil {
+		klog.Errorf("Failed to enumerate RPM devices for GetDevices in accelerated mode: %v", err)
+	}
+	for _, ifName := range rpmNames {
+		health := vsp.GetDeviceHealth(ifName)
+		devices["accelerated:"+ifName] = &pb.Device{
+			ID:     "accelerated:" + ifName,
+			Health: health,
+		}
+	}
+
+	return devices, nil
+}
+
 // GetDevices function to get all the devices with the given context and Empty
 // It will return the DeviceListResponse and error
 func (vsp *mrvlVspServer) GetDevices(ctx context.Context, in *emptypb.Empty) (*pb.DeviceListResponse, error) {
 	klog.Info("Received GetDevices() request")
 	devices := make(map[string]*pb.Device)
-	if vsp.deviceStore == nil {
-		return nil, errors.New("device Store is empty")
-	}
 	if vsp.isDPUMode {
-		for _, mrvlDeviceInfo := range vsp.deviceStore {
-			devices[mrvlDeviceInfo.secInterfaceName] = &pb.Device{
-				ID:     mrvlDeviceInfo.secInterfaceName,
-				Health: mrvlDeviceInfo.health,
+		if vsp.isAccelerated {
+			acceleratedDevices, err := vsp.getAcceleratedDevices()
+			if err != nil {
+				return nil, err
+			}
+			devices = acceleratedDevices
+		} else {
+			if vsp.deviceStore == nil {
+				return nil, errors.New("device Store is empty")
+			}
+			for _, mrvlDeviceInfo := range vsp.deviceStore {
+				devices[mrvlDeviceInfo.secInterfaceName] = &pb.Device{
+					ID:     mrvlDeviceInfo.secInterfaceName,
+					Health: mrvlDeviceInfo.health,
+				}
 			}
 		}
 	} else {
+		if vsp.deviceStore == nil {
+			return nil, errors.New("device Store is empty")
+		}
 		for _, mrvlDeviceInfo := range vsp.deviceStore {
 			devices[mrvlDeviceInfo.pciAddress] = &pb.Device{
 				ID:     mrvlDeviceInfo.pciAddress,
