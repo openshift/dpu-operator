@@ -517,6 +517,126 @@ func (x *PingResponse) GetHealthy() bool {
 	return false
 }
 
+type DPUManagementRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	NodeName          string                 `protobuf:"bytes,1,opt,name=nodeName,proto3" json:"nodeName,omitempty"`
+	PciAddress        string                 `protobuf:"bytes,2,opt,name=pciAddress,proto3" json:"pciAddress,omitempty"`
+	FirmwareType      string                 `protobuf:"bytes,3,opt,name=firmwareType,proto3" json:"firmwareType,omitempty"`
+	FirmwareImagePath string                 `protobuf:"bytes,4,opt,name=firmwareImagePath,proto3" json:"firmwareImagePath,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *DPUManagementRequest) Reset() {
+	*x = DPUManagementRequest{}
+	mi := &file_api_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DPUManagementRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DPUManagementRequest) ProtoMessage() {}
+
+func (x *DPUManagementRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DPUManagementRequest.ProtoReflect.Descriptor instead.
+func (*DPUManagementRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DPUManagementRequest) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *DPUManagementRequest) GetPciAddress() string {
+	if x != nil {
+		return x.PciAddress
+	}
+	return ""
+}
+
+func (x *DPUManagementRequest) GetFirmwareType() string {
+	if x != nil {
+		return x.FirmwareType
+	}
+	return ""
+}
+
+func (x *DPUManagementRequest) GetFirmwareImagePath() string {
+	if x != nil {
+		return x.FirmwareImagePath
+	}
+	return ""
+}
+
+type DPUManagementResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DPUManagementResponse) Reset() {
+	*x = DPUManagementResponse{}
+	mi := &file_api_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DPUManagementResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DPUManagementResponse) ProtoMessage() {}
+
+func (x *DPUManagementResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DPUManagementResponse.ProtoReflect.Descriptor instead.
+func (*DPUManagementResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DPUManagementResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *DPUManagementResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_api_proto protoreflect.FileDescriptor
 
 const file_api_proto_rawDesc = "" +
@@ -551,12 +671,25 @@ const file_api_proto_rawDesc = "" +
 	"\fPingResponse\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12!\n" +
 	"\fresponder_id\x18\x02 \x01(\tR\vresponderId\x12\x18\n" +
-	"\ahealthy\x18\x03 \x01(\bR\ahealthy2?\n" +
+	"\ahealthy\x18\x03 \x01(\bR\ahealthy\"\xa4\x01\n" +
+	"\x14DPUManagementRequest\x12\x1a\n" +
+	"\bnodeName\x18\x01 \x01(\tR\bnodeName\x12\x1e\n" +
+	"\n" +
+	"pciAddress\x18\x02 \x01(\tR\n" +
+	"pciAddress\x12\"\n" +
+	"\ffirmwareType\x18\x03 \x01(\tR\ffirmwareType\x12,\n" +
+	"\x11firmwareImagePath\x18\x04 \x01(\tR\x11firmwareImagePath\"I\n" +
+	"\x15DPUManagementResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2?\n" +
 	"\x10LifeCycleService\x12+\n" +
 	"\x04Init\x12\x13.Vendor.InitRequest\x1a\x0e.Vendor.IpPort2\x8e\x01\n" +
 	"\x16NetworkFunctionService\x129\n" +
 	"\x15CreateNetworkFunction\x12\x11.Vendor.NFRequest\x1a\r.Vendor.Empty\x129\n" +
-	"\x15DeleteNetworkFunction\x12\x11.Vendor.NFRequest\x1a\r.Vendor.Empty2w\n" +
+	"\x15DeleteNetworkFunction\x12\x11.Vendor.NFRequest\x1a\r.Vendor.Empty2\xd2\x01\n" +
+	"#DataProcessingUnitManagementService\x12P\n" +
+	"\x11DpuRebootFunction\x12\x1c.Vendor.DPUManagementRequest\x1a\x1d.Vendor.DPUManagementResponse\x12Y\n" +
+	"\x1aDpuFirmwareUpgradeFunction\x12\x1c.Vendor.DPUManagementRequest\x1a\x1d.Vendor.DPUManagementResponse2w\n" +
 	"\rDeviceService\x127\n" +
 	"\n" +
 	"GetDevices\x12\r.Vendor.Empty\x1a\x1a.Vendor.DeviceListResponse\x12-\n" +
@@ -576,38 +709,44 @@ func file_api_proto_rawDescGZIP() []byte {
 	return file_api_proto_rawDescData
 }
 
-var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_api_proto_goTypes = []any{
-	(*InitRequest)(nil),        // 0: Vendor.InitRequest
-	(*IpPort)(nil),             // 1: Vendor.IpPort
-	(*NFRequest)(nil),          // 2: Vendor.NFRequest
-	(*Empty)(nil),              // 3: Vendor.Empty
-	(*VfCount)(nil),            // 4: Vendor.VfCount
-	(*TopologyInfo)(nil),       // 5: Vendor.TopologyInfo
-	(*Device)(nil),             // 6: Vendor.Device
-	(*DeviceListResponse)(nil), // 7: Vendor.DeviceListResponse
-	(*PingRequest)(nil),        // 8: Vendor.PingRequest
-	(*PingResponse)(nil),       // 9: Vendor.PingResponse
-	nil,                        // 10: Vendor.DeviceListResponse.DevicesEntry
+	(*InitRequest)(nil),           // 0: Vendor.InitRequest
+	(*IpPort)(nil),                // 1: Vendor.IpPort
+	(*NFRequest)(nil),             // 2: Vendor.NFRequest
+	(*Empty)(nil),                 // 3: Vendor.Empty
+	(*VfCount)(nil),               // 4: Vendor.VfCount
+	(*TopologyInfo)(nil),          // 5: Vendor.TopologyInfo
+	(*Device)(nil),                // 6: Vendor.Device
+	(*DeviceListResponse)(nil),    // 7: Vendor.DeviceListResponse
+	(*PingRequest)(nil),           // 8: Vendor.PingRequest
+	(*PingResponse)(nil),          // 9: Vendor.PingResponse
+	(*DPUManagementRequest)(nil),  // 10: Vendor.DPUManagementRequest
+	(*DPUManagementResponse)(nil), // 11: Vendor.DPUManagementResponse
+	nil,                           // 12: Vendor.DeviceListResponse.DevicesEntry
 }
 var file_api_proto_depIdxs = []int32{
 	5,  // 0: Vendor.Device.topology:type_name -> Vendor.TopologyInfo
-	10, // 1: Vendor.DeviceListResponse.devices:type_name -> Vendor.DeviceListResponse.DevicesEntry
+	12, // 1: Vendor.DeviceListResponse.devices:type_name -> Vendor.DeviceListResponse.DevicesEntry
 	6,  // 2: Vendor.DeviceListResponse.DevicesEntry.value:type_name -> Vendor.Device
 	0,  // 3: Vendor.LifeCycleService.Init:input_type -> Vendor.InitRequest
 	2,  // 4: Vendor.NetworkFunctionService.CreateNetworkFunction:input_type -> Vendor.NFRequest
 	2,  // 5: Vendor.NetworkFunctionService.DeleteNetworkFunction:input_type -> Vendor.NFRequest
-	3,  // 6: Vendor.DeviceService.GetDevices:input_type -> Vendor.Empty
-	4,  // 7: Vendor.DeviceService.SetNumVfs:input_type -> Vendor.VfCount
-	8,  // 8: Vendor.HeartbeatService.Ping:input_type -> Vendor.PingRequest
-	1,  // 9: Vendor.LifeCycleService.Init:output_type -> Vendor.IpPort
-	3,  // 10: Vendor.NetworkFunctionService.CreateNetworkFunction:output_type -> Vendor.Empty
-	3,  // 11: Vendor.NetworkFunctionService.DeleteNetworkFunction:output_type -> Vendor.Empty
-	7,  // 12: Vendor.DeviceService.GetDevices:output_type -> Vendor.DeviceListResponse
-	4,  // 13: Vendor.DeviceService.SetNumVfs:output_type -> Vendor.VfCount
-	9,  // 14: Vendor.HeartbeatService.Ping:output_type -> Vendor.PingResponse
-	9,  // [9:15] is the sub-list for method output_type
-	3,  // [3:9] is the sub-list for method input_type
+	10, // 6: Vendor.DataProcessingUnitManagementService.DpuRebootFunction:input_type -> Vendor.DPUManagementRequest
+	10, // 7: Vendor.DataProcessingUnitManagementService.DpuFirmwareUpgradeFunction:input_type -> Vendor.DPUManagementRequest
+	3,  // 8: Vendor.DeviceService.GetDevices:input_type -> Vendor.Empty
+	4,  // 9: Vendor.DeviceService.SetNumVfs:input_type -> Vendor.VfCount
+	8,  // 10: Vendor.HeartbeatService.Ping:input_type -> Vendor.PingRequest
+	1,  // 11: Vendor.LifeCycleService.Init:output_type -> Vendor.IpPort
+	3,  // 12: Vendor.NetworkFunctionService.CreateNetworkFunction:output_type -> Vendor.Empty
+	3,  // 13: Vendor.NetworkFunctionService.DeleteNetworkFunction:output_type -> Vendor.Empty
+	11, // 14: Vendor.DataProcessingUnitManagementService.DpuRebootFunction:output_type -> Vendor.DPUManagementResponse
+	11, // 15: Vendor.DataProcessingUnitManagementService.DpuFirmwareUpgradeFunction:output_type -> Vendor.DPUManagementResponse
+	7,  // 16: Vendor.DeviceService.GetDevices:output_type -> Vendor.DeviceListResponse
+	4,  // 17: Vendor.DeviceService.SetNumVfs:output_type -> Vendor.VfCount
+	9,  // 18: Vendor.HeartbeatService.Ping:output_type -> Vendor.PingResponse
+	11, // [11:19] is the sub-list for method output_type
+	3,  // [3:11] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name
@@ -624,9 +763,9 @@ func file_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_rawDesc), len(file_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
-			NumServices:   4,
+			NumServices:   5,
 		},
 		GoTypes:           file_api_proto_goTypes,
 		DependencyIndexes: file_api_proto_depIdxs,
