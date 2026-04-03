@@ -1,0 +1,15 @@
+apiVersion: config.openshift.io/v1
+kind: DpuNetwork
+metadata:
+  name: net2
+spec:
+  dpuSelector:
+    matchExpressions:
+      - key: vfId
+        operator: In
+        values:
+          - "4-6"
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/worker: ""
+  isAccelerated: true

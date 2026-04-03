@@ -33,21 +33,23 @@ type VendorPlugin interface {
 	DeleteNetworkFunction(input string, output string) error
 	GetDevices() (*pb.DeviceListResponse, error)
 	SetNumVfs(vfCount int32) (*pb.VfCount, error)
+	SetDpuNetworkConfig(isAccelerated bool) error
 }
 
 type GrpcPlugin struct {
-	log           logr.Logger
-	client        pb.LifeCycleServiceClient
-	k8sClient     client.Client
-	opiClient     opi.BridgePortServiceClient
-	nfclient      nfapi.NetworkFunctionServiceClient
-	dsClient      pb.DeviceServiceClient
-	dpuMode       bool
-	dpuIdentifier DpuIdentifier
-	conn          *grpc.ClientConn
-	pathManager   utils.PathManager
-	initialized   bool
-	initMutex     sync.RWMutex
+	log                    logr.Logger
+	client                 pb.LifeCycleServiceClient
+	k8sClient              client.Client
+	opiClient              opi.BridgePortServiceClient
+	nfclient               nfapi.NetworkFunctionServiceClient
+	dsClient               pb.DeviceServiceClient
+	dpuNetworkConfigClient nfapi.DpuNetworkConfigServiceClient
+	dpuMode                bool
+	dpuIdentifier          DpuIdentifier
+	conn                   *grpc.ClientConn
+	pathManager            utils.PathManager
+	initialized            bool
+	initMutex              sync.RWMutex
 }
 
 func (g *GrpcPlugin) Start(ctx context.Context) (string, int32, error) {
@@ -103,6 +105,7 @@ func (g *GrpcPlugin) Close() {
 		g.nfclient = nil
 		g.opiClient = nil
 		g.dsClient = nil
+		g.dpuNetworkConfigClient = nil
 	}
 }
 
@@ -151,6 +154,7 @@ func (g *GrpcPlugin) ensureConnected() error {
 	g.nfclient = nfapi.NewNetworkFunctionServiceClient(conn)
 	g.opiClient = opi.NewBridgePortServiceClient(conn)
 	g.dsClient = pb.NewDeviceServiceClient(conn)
+	g.dpuNetworkConfigClient = nfapi.NewDpuNetworkConfigServiceClient(conn)
 	return nil
 }
 
@@ -210,6 +214,18 @@ func (g *GrpcPlugin) SetNumVfs(count int32) (*pb.VfCount, error) {
 		VfCnt: count,
 	}
 	return g.dsClient.SetNumVfs(context.Background(), c)
+}
+
+func (g *GrpcPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
+	err := g.ensureConnected()
+	if err != nil {
+		return fmt.Errorf("SetDpuNetworkConfig failed to ensure GRPC connection: %v", err)
+	}
+	req := &nfapi.DpuNetworkConfigRequest{
+		IsAccelerated: isAccelerated,
+	}
+	_, err = g.dpuNetworkConfigClient.SetDpuNetworkConfig(context.TODO(), req)
+	return err
 }
 
 // IsInitialized returns true if the VSP has been successfully initialized

@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
@@ -113,7 +114,12 @@ func NewDpuSideManager(vsp plugin.VendorPlugin, config *rest.Config, opts ...fun
 		opt(d)
 	}
 
-	d.dp = deviceplugin.NewDevicePlugin(vsp, true, d.pathManager)
+	if k8sClient, err := client.New(d.config, client.Options{Scheme: scheme.Scheme}); err != nil {
+		d.log.Error(err, "Failed to create Kubernetes client for device plugin; falling back to default-only registration")
+		d.dp = deviceplugin.NewDevicePluginManager(vsp, true, d.pathManager, nil)
+	} else {
+		d.dp = deviceplugin.NewDevicePluginManager(vsp, true, d.pathManager, k8sClient)
+	}
 
 	return d, nil
 }
