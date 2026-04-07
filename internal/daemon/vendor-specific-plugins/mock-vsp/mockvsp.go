@@ -19,14 +19,16 @@ import (
 type vspServer struct {
 	pb.UnimplementedLifeCycleServiceServer
 	nfapi.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedDpuNetworkConfigServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
-	log         logr.Logger
-	wg          sync.WaitGroup
-	startedWg   sync.WaitGroup
-	done        chan error
-	grpcServer  *grpc.Server
-	pathManager utils.PathManager
+	log           logr.Logger
+	wg            sync.WaitGroup
+	startedWg     sync.WaitGroup
+	done          chan error
+	grpcServer    *grpc.Server
+	pathManager   utils.PathManager
+	isAccelerated bool
 }
 
 func (vsp *vspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpPort, error) {
@@ -70,6 +72,12 @@ func (vsp *vspServer) DeleteNetworkFunction(ctx context.Context, in *nfapi.NFReq
 	return nil, nil
 }
 
+func (vsp *vspServer) SetDpuNetworkConfig(ctx context.Context, in *nfapi.DpuNetworkConfigRequest) (*nfapi.Empty, error) {
+	vsp.log.Info("Received SetDpuNetworkConfig() request", "IsAccelerated", in.IsAccelerated)
+	vsp.isAccelerated = in.IsAccelerated
+	return &nfapi.Empty{}, nil
+}
+
 func (vsp *vspServer) Listen() (net.Listener, error) {
 	err := vsp.pathManager.EnsureSocketDirExists(vsp.pathManager.VendorPluginSocket())
 	if err != nil {
@@ -83,6 +91,7 @@ func (vsp *vspServer) Listen() (net.Listener, error) {
 
 	vsp.grpcServer = grpc.NewServer()
 	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
+	nfapi.RegisterDpuNetworkConfigServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)

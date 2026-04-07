@@ -787,44 +787,6 @@ func MutateHandler(w http.ResponseWriter, req *http.Request) {
 	defaultNetSelection, defExist := getNetworkSelections(defaultNetworkAnnotationKey, pod, userDefinedPatch)
 	additionalNetSelections, addExists := getNetworkSelections(networksAnnotationKey, pod, userDefinedPatch)
 
-	dpuNetInjected := false
-	if !addExists {
-		if dpuNet, ok := pod.ObjectMeta.Annotations["dpu.config.openshift.io/dpu-network"]; ok && dpuNet != "" {
-			nadName := dpuNet + "-nad"
-			count := int64(0)
-			resName := corev1.ResourceName("openshift.io/dpunetwork-" + dpuNet)
-			for _, c := range pod.Spec.Containers {
-				if q, exists := c.Resources.Requests[resName]; exists {
-					count += q.Value()
-				}
-			}
-			if count > 0 {
-				parts := make([]string, count)
-				for i := range parts {
-					parts[i] = nadName
-				}
-
-				accelNadName := "dpu-accel-nad"
-				accelResName := corev1.ResourceName("openshift.io/dpu-accelerated")
-				accelCount := int64(0)
-				for _, c := range pod.Spec.Containers {
-					if q, exists := c.Resources.Requests[accelResName]; exists {
-						accelCount += q.Value()
-					}
-				}
-				for i := int64(0); i < accelCount; i++ {
-					parts = append(parts, accelNadName)
-				}
-
-				additionalNetSelections = strings.Join(parts, ",")
-				addExists = true
-				dpuNetInjected = true
-				glog.Infof("DPU network injection: injecting %d NAD references (%d VF + %d accelerated) for network %s on pod %s/%s",
-					count+accelCount, count, accelCount, dpuNet, pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
-			}
-		}
-	}
-
 	if defExist || addExists {
 		/* map of resources request needed by a pod and a number of them */
 		resourceRequests := make(map[string]int64)
@@ -956,23 +918,6 @@ func MutateHandler(w http.ResponseWriter, req *http.Request) {
 			patch = appendUserDefinedPatch(patch, pod, userDefinedPatch)
 		}
 		patch = createNodeSelectorPatch(patch, pod.Spec.NodeSelector, desiredNsMap)
-
-		if dpuNetInjected {
-			if pod.ObjectMeta.Annotations == nil {
-				patch = append(patch, types.JsonPatchOperation{
-					Operation: "add",
-					Path:      "/metadata/annotations",
-					Value:     map[string]string{networksAnnotationKey: additionalNetSelections},
-				})
-			} else {
-				patch = append(patch, types.JsonPatchOperation{
-					Operation: "add",
-					Path:      "/metadata/annotations/k8s.v1.cni.cncf.io~1networks",
-					Value:     additionalNetSelections,
-				})
-			}
-		}
-
 		glog.Infof("patch after all mutations: %v for pod %s/%s", patch, pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
 
 		patchBytes, _ := json.Marshal(patch)

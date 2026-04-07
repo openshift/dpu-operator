@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,7 +59,8 @@ func GetAllVfsNameByDeviceID(deviceID string) ([]string, error) {
 	for _, vfpci := range dpuVfsPCI {
 		vfName, err := GetNameByPCI(vfpci)
 		if err != nil {
-			return nil, err
+			klog.V(4).Infof("Skipping VF %s (likely in pod namespace): %v", vfpci, err)
+			continue
 		}
 		dpuVfsName = append(dpuVfsName, vfName)
 	}
@@ -223,6 +225,55 @@ func GetPCIByName(portName string) (string, error) {
 		return "", err
 	}
 	return link.Attrs().Name, nil
+}
+
+// MinAcceleratedRPMSpeedMbps is the minimum link speed (in Mbps) for an RPM
+// netdev to be considered a data-plane port eligible for assignment to NF
+// pods in accelerated mode.
+//
+// Marvell cn10k DPUs wire their data-plane front-panel RPM ports at 25 Gbps
+// or higher (typically 25/50/100/200 Gbps), while the host/lab management
+// uplink (when routed through an RPM) is at 1 Gbps or 10 Gbps. Anything
+// reporting less than this threshold is assumed to be the management
+// interface and is reserved for the host.
+const MinAcceleratedRPMSpeedMbps = 25000
+
+// GetLinkSpeedMbps returns the current link speed of the netdev in Mbps as
+// reported by /sys/class/net/<ifName>/speed. It returns an error if the file
+// cannot be read, the value cannot be parsed, or the link reports a negative
+// speed (which the kernel does for interfaces with no carrier / unknown PHY).
+func GetLinkSpeedMbps(ifName string) (int, error) {
+	speedPath := filepath.Join("/sys/class/net", ifName, "speed")
+	raw, err := os.ReadFile(speedPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read %s: %w", speedPath, err)
+	}
+	speed, err := strconv.Atoi(strings.TrimSpace(string(raw)))
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %s contents %q: %w", speedPath, string(raw), err)
+	}
+	if speed < 0 {
+		return speed, fmt.Errorf("interface %s reports speed=%d (likely no carrier or unknown PHY)", ifName, speed)
+	}
+	return speed, nil
+}
+
+// IsAcceleratedRPMCandidate reports whether the named RPM netdev is eligible
+// to be advertised to the K8s device plugin as an "accelerated:" resource for
+// NF pods. The check uses link speed: only data-plane front-panel ports
+// (>= MinAcceleratedRPMSpeedMbps) qualify. The lab/host management uplink,
+// which always runs at 1G or 10G on this hardware family, is excluded so it
+// can never be moved into a pod netns and disconnect the node.
+//
+// On any error reading the link speed (no carrier, missing sysfs entry, etc.)
+// it returns false so callers fail closed and treat the interface as
+// host-owned rather than risk leaking it.
+func IsAcceleratedRPMCandidate(ifName string) (bool, error) {
+	speed, err := GetLinkSpeedMbps(ifName)
+	if err != nil {
+		return false, err
+	}
+	return speed >= MinAcceleratedRPMSpeedMbps, nil
 }
 
 // GetPCIDriver returns the driver in use for the PCI address

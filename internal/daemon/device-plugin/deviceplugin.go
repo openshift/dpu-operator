@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	DefaultDpuResourceName = "openshift.io/dpu"
+	DefaultDpuResourceName  = "openshift.io/dpu"
 	AcceleratedResourceName = "openshift.io/dpu-accelerated"
 
 	acceleratedDevicePrefix = "accelerated:"
@@ -928,4 +928,3 @@ func vfRangesEqual(a, b []string) bool {
 	}
 	return true
 }
-
