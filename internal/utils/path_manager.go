@@ -10,7 +10,8 @@ import (
 )
 
 type PathManager struct {
-	rootDir string
+	rootDir            string
+	pluginEndpointPath string // if set, overrides the default dpuNet.sock path
 }
 
 func NewPathManager(rootDir string) *PathManager {
@@ -27,11 +28,29 @@ func (p *PathManager) KubeletEndPoint() string {
 }
 
 func (p *PathManager) PluginEndpoint() string {
+	if p.pluginEndpointPath != "" {
+		return p.pluginEndpointPath
+	}
 	return p.wrap("/var/lib/kubelet/device-plugins/dpuNet.sock")
+}
+
+// PluginEndpointFor returns a unique socket path for the given suffix,
+// e.g. PluginEndpointFor("net1") -> ".../dpuNet-net1.sock".
+func (p *PathManager) PluginEndpointFor(suffix string) string {
+	return p.wrap(fmt.Sprintf("/var/lib/kubelet/device-plugins/dpuNet-%s.sock", suffix))
 }
 
 func (p *PathManager) PluginEndpointFilename() string {
 	return filepath.Base(p.PluginEndpoint())
+}
+
+// PathManagerFor returns a copy of this PathManager whose PluginEndpoint()
+// returns PluginEndpointFor(suffix). Everything else stays the same.
+func (p *PathManager) PathManagerFor(suffix string) PathManager {
+	return PathManager{
+		rootDir:            p.rootDir,
+		pluginEndpointPath: p.PluginEndpointFor(suffix),
+	}
 }
 
 func (p *PathManager) CniPath() string {
