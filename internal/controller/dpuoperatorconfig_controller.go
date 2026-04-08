@@ -20,6 +20,8 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -42,6 +44,13 @@ import (
 var binData embed.FS
 
 const dpuOperatorConfigFinalizer = "config.openshift.io/dpuoperatorconfig-finalizer"
+
+const (
+	nriTLSProviderAuto        = "auto"
+	nriTLSProviderOpenShift   = "openshift"
+	nriTLSProviderCertManager = "cert-manager"
+	nriTLSProviderDisabled    = "disabled"
+)
 
 type componentError struct {
 	component string
@@ -331,11 +340,18 @@ func (r *DpuOperatorConfigReconciler) ensureNetworkResourcesInjector(ctx context
 		return fmt.Errorf("failed to detect cluster flavour for network resources injector: %w", err)
 	}
 
+	provider, err := resolveNriTLSProvider(flavour)
+	if err != nil {
+		return err
+	}
+
+	if provider == nriTLSProviderDisabled {
+		logger.Info("Skipping Network Resources Injector deployment", "flavour", flavour, "provider", provider)
+		return nil
+	}
+
 	binDataPath := "network-resources-injector"
-	switch flavour {
-	case utils.OpenShiftFlavour, utils.MicroShiftFlavour:
-		binDataPath = "network-resources-injector"
-	default:
+	if provider == nriTLSProviderCertManager {
 		if err := r.ensureCertManagerInstalled(ctx, flavour); err != nil {
 			return err
 		}
@@ -343,8 +359,32 @@ func (r *DpuOperatorConfigReconciler) ensureNetworkResourcesInjector(ctx context
 	}
 
 	logger.Info("Create Network Resources Injector")
-	logger.Info("Selected network resources injector manifest set", "flavour", flavour, "path", binDataPath)
+	logger.Info("Selected network resources injector manifest set", "flavour", flavour, "provider", provider, "path", binDataPath)
 	return r.createAndApplyAllFromBinData(logger, binDataPath, cfg)
+}
+
+func resolveNriTLSProvider(flavour utils.Flavour) (string, error) {
+	// NRI_TLS_PROVIDER controls which TLS provisioning path to use:
+	// - auto: OpenShift/MicroShift -> openshift, Kubernetes -> disabled
+	// - openshift: OpenShift service-ca/serving-cert annotations
+	// - cert-manager: cert-manager issuer/certificate flow
+	// - disabled: skip NRI webhook deployment
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("NRI_TLS_PROVIDER")))
+	if provider == "" || provider == nriTLSProviderAuto {
+		switch flavour {
+		case utils.OpenShiftFlavour, utils.MicroShiftFlavour:
+			return nriTLSProviderOpenShift, nil
+		default:
+			return nriTLSProviderDisabled, nil
+		}
+	}
+
+	switch provider {
+	case nriTLSProviderOpenShift, nriTLSProviderCertManager, nriTLSProviderDisabled:
+		return provider, nil
+	default:
+		return "", fmt.Errorf("unsupported NRI_TLS_PROVIDER value %q (supported: auto, openshift, cert-manager, disabled)", provider)
+	}
 }
 
 func (r *DpuOperatorConfigReconciler) ensureCertManagerInstalled(ctx context.Context, flavour utils.Flavour) error {
@@ -357,9 +397,9 @@ func (r *DpuOperatorConfigReconciler) ensureCertManagerInstalled(ctx context.Con
 		crd := &apiextensionsv1.CustomResourceDefinition{}
 		if err := r.Get(ctx, types.NamespacedName{Name: crdName}, crd); err != nil {
 			if apierrors.IsNotFound(err) {
-				return fmt.Errorf("cert-manager is required on %s clusters for network-resources-injector TLS provisioning: missing CRD %q", flavour, crdName)
+				return fmt.Errorf("cert-manager is required when NRI_TLS_PROVIDER=cert-manager on %s cluster: missing CRD %q", flavour, crdName)
 			}
-			return fmt.Errorf("failed to verify cert-manager CRD %q on %s cluster: %w", crdName, flavour, err)
+			return fmt.Errorf("failed to verify cert-manager CRD %q on %s cluster when NRI_TLS_PROVIDER=cert-manager: %w", crdName, flavour, err)
 		}
 	}
 

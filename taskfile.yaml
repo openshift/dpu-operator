@@ -144,6 +144,9 @@ tasks:
       - |
         if [ "{{.DEPLOY_PROFILE}}" = "upstream" ]; then
           cp config/dev/kustomization-upstream.yaml bin/kustomization.yaml
+        elif [ "{{.DEPLOY_PROFILE}}" = "upstream-certmanager" ]; then
+          cp config/dev/kustomization-upstream-certmanager.yaml bin/kustomization.yaml
+          cp config/dev/nri-tls-provider-certmanager.yaml bin/nri-tls-provider-certmanager.yaml
         else
           cp config/dev/kustomization.yaml bin/kustomization.yaml
         fi
@@ -151,7 +154,6 @@ tasks:
   # Remove stale duplicate validating webhook configurations that conflict with
   # dpu-operator's canonical webhook name.
   reconcile-validating-webhook-configs:
-    internal: true
     vars:
       KUBECONFIG: '{{.KUBECONFIG}}'
     cmds:
@@ -193,19 +195,28 @@ tasks:
   # On OpenShift clusters, reconcile webhook cert objects so OpenShift serving
   # cert and webhook CA bundle propagation can settle on the active owner.
   reconcile-openshift-webhook-tls:
-    internal: true
     vars:
       KUBECONFIG: '{{.KUBECONFIG}}'
     cmds:
       - |
         if KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} get --raw /apis/route.openshift.io/v1 >/dev/null 2>&1; then
           KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} annotate validatingwebhookconfiguration dpu-operator-validating-webhook-configuration cert-manager.io/inject-ca-from- --overwrite || true
-          KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator delete certificate dpu-operator-serving-cert --ignore-not-found=true
-          KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator delete issuer dpu-operator-selfsigned-issuer --ignore-not-found=true
+          if KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} get crd certificates.cert-manager.io >/dev/null 2>&1; then
+            KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator delete certificate dpu-operator-serving-cert --ignore-not-found=true
+            KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator delete issuer dpu-operator-selfsigned-issuer --ignore-not-found=true
+          fi
           KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator delete secret webhook-server-cert --ignore-not-found=true
-          KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator wait --for=create secret/webhook-server-cert --timeout=180s
-          KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} wait --for=jsonpath='{.webhooks[0].clientConfig.caBundle}' validatingwebhookconfiguration/dpu-operator-validating-webhook-configuration --timeout=180s
+          task wait-webhook-ca-sync KUBECONFIG={{.KUBECONFIG}}
         fi
+
+  # Wait until webhook serving certificate and validating webhook CA bundle are
+  # populated.
+  wait-webhook-ca-sync:
+    vars:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    cmds:
+      - KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator wait --for=create secret/webhook-server-cert --timeout=180s
+      - KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} wait --for=jsonpath='{.webhooks[0].clientConfig.caBundle}' validatingwebhookconfiguration/dpu-operator-validating-webhook-configuration --timeout=180s
 
   # Run post-deploy webhook reconciliation when webhook resources are enabled
   # in the selected deployment profile.
@@ -217,9 +228,15 @@ tasks:
       - |
         if KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} get validatingwebhookconfiguration dpu-operator-validating-webhook-configuration >/dev/null 2>&1; then
           task reconcile-validating-webhook-configs KUBECONFIG={{.KUBECONFIG}}
-          task reconcile-openshift-webhook-tls KUBECONFIG={{.KUBECONFIG}}
+          if [ "{{.DEPLOY_PROFILE}}" = "upstream-certmanager" ]; then
+            task wait-webhook-ca-sync KUBECONFIG={{.KUBECONFIG}}
+            KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator rollout restart deployment/dpu-operator-controller-manager
+            KUBECONFIG={{.KUBECONFIG}} {{.K8S_CLI}} -n openshift-dpu-operator rollout status deployment/dpu-operator-controller-manager --timeout=300s
+          else
+            task reconcile-openshift-webhook-tls KUBECONFIG={{.KUBECONFIG}}
+          fi
         fi
-  
+
   ## Download envtest-setup locally if necessary
   envtest:
     status:
@@ -275,6 +292,18 @@ tasks:
       - task: deploy-1c
         vars:
           DEPLOY_PROFILE: upstream
+
+  deploy-upstream-certmanager:
+    cmds:
+      - task: deploy
+        vars:
+          DEPLOY_PROFILE: upstream-certmanager
+
+  deploy-upstream-certmanager-1c:
+    cmds:
+      - task: deploy-1c
+        vars:
+          DEPLOY_PROFILE: upstream-certmanager
 
   prepare-e2e-test:
     cmds:

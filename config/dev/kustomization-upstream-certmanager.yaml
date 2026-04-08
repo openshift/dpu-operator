@@ -1,0 +1,5 @@
+resources:
+- ../config/default-upstream-certmanager
+patches:
+- path: local-images.yaml
+- path: nri-tls-provider-certmanager.yaml

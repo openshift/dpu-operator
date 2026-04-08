@@ -34,5 +34,7 @@ spec:
           value: Always
         - name: NRIWebhookImage
           value: {{ .RegistryURL }}/network-resources-injector:dev
+        - name: NRI_TLS_PROVIDER
+          value: auto
         image: {{ .RegistryURL }}/dpu-operator:dev
         imagePullPolicy: Always

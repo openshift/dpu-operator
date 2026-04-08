@@ -46,6 +46,20 @@ compatibility adjustments), use:
 task deploy-upstream
 ```
 
+To run upstream semantics with cert-manager-backed NRI TLS provisioning, use:
+
+```sh
+task deploy-upstream-certmanager
+```
+
+The manager supports `NRI_TLS_PROVIDER` with the following values:
+
+- `auto` (default): OpenShift/MicroShift uses OpenShift webhook cert path;
+  Kubernetes disables NRI webhook deployment unless explicitly enabled.
+- `openshift`: force OpenShift webhook cert path.
+- `cert-manager`: require cert-manager CRDs and use cert-manager TLS objects.
+- `disabled`: skip NRI webhook deployment.
+
 4. **Undeploy**
 
 Undoes what deploying did:
