@@ -39,6 +39,13 @@ For 1 cluster deployment, you will only need /root/kubeconfig.ocpcluster. 1 clus
 task deploy-1c
 ```
 
+For upstream-style deployment semantics (without OpenShift-specific webhook
+compatibility adjustments), use:
+
+```sh
+task deploy-upstream
+```
+
 4. **Undeploy**
 
 Undoes what deploying did:

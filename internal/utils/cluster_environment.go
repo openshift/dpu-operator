@@ -25,17 +25,29 @@ func NewClusterEnvironment(client client.Client) *ClusterEnvironment {
 type Flavour string
 
 const (
-	VanillaFlavour    Flavour = "Vanilla"
+	KubernetesFlavour Flavour = "Kubernetes"
 	OpenShiftFlavour  Flavour = "OpenShift"
 	MicroShiftFlavour Flavour = "MicroShift"
 	KindFlavour       Flavour = "Kind"
 	UnknownFlavour    Flavour = "Unknown"
 )
 
+const (
+	DpuSideLabelKey = "dpu.config.openshift.io/dpuside"
+
+	DpuSideLabelValueDpu  = "dpu"
+	DpuSideLabelValueHost = "dpu-host"
+
+	P4HostPathLabelKey = "dpu.config.openshift.io/p4hostpath"
+
+	P4HostPathLabelValueOpt    = "opt"
+	P4HostPathLabelValueVarOpt = "varopt"
+)
+
 func (ce *ClusterEnvironment) Flavour(ctx context.Context) (Flavour, error) {
 	microShift, err := ce.isMicroShift(ctx)
 	if err != nil {
-		return VanillaFlavour, err
+		return KubernetesFlavour, err
 	}
 	if microShift {
 		return MicroShiftFlavour, nil
@@ -43,7 +55,7 @@ func (ce *ClusterEnvironment) Flavour(ctx context.Context) (Flavour, error) {
 
 	openShift, err := ce.isOpenShift(ctx)
 	if err != nil {
-		return VanillaFlavour, err
+		return KubernetesFlavour, err
 	}
 	if openShift {
 		return OpenShiftFlavour, nil
@@ -51,13 +63,13 @@ func (ce *ClusterEnvironment) Flavour(ctx context.Context) (Flavour, error) {
 
 	kind, err := ce.isKind(ctx)
 	if err != nil {
-		return VanillaFlavour, err
+		return KubernetesFlavour, err
 	}
 	if kind {
 		return KindFlavour, nil
 	}
 
-	return VanillaFlavour, nil
+	return KubernetesFlavour, nil
 }
 
 func (ce *ClusterEnvironment) isMicroShift(ctx context.Context) (bool, error) {

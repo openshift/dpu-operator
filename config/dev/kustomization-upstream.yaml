@@ -1,0 +1,4 @@
+resources:
+- ../config/default-upstream
+patches:
+- path: local-images.yaml

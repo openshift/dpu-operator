@@ -45,10 +45,10 @@ func (p *PathManager) CniHostDir(clusterFlavour Flavour, filesystemMode Filesyst
 	case clusterFlavour == MicroShiftFlavour && filesystemMode == ImageMode:
 		return p.wrap("/run/cni"), nil
 	// OpenShift typically uses /var/lib/cni regardless of filesystem mode since nodes are always coreos based
-	case clusterFlavour == OpenShiftFlavour || (clusterFlavour == VanillaFlavour && filesystemMode == ImageMode):
+	case clusterFlavour == OpenShiftFlavour || (clusterFlavour == KubernetesFlavour && filesystemMode == ImageMode):
 		return p.wrap("/var/lib/cni"), nil
 	// MicroShift with PackageMode and Kind use /opt/cni
-	case (clusterFlavour == MicroShiftFlavour && filesystemMode == PackageMode) || (clusterFlavour == VanillaFlavour && filesystemMode == PackageMode) || clusterFlavour == KindFlavour:
+	case (clusterFlavour == MicroShiftFlavour && filesystemMode == PackageMode) || (clusterFlavour == KubernetesFlavour && filesystemMode == PackageMode) || clusterFlavour == KindFlavour:
 		return p.wrap("/opt/cni"), nil
 	default:
 		return "", fmt.Errorf("unknown combination of cluster flavour (%s) and filesystem mode (%s)", clusterFlavour, filesystemMode)

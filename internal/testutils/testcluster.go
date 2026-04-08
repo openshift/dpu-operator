@@ -861,7 +861,7 @@ func LabelNodesWithDpu(c client.Client) error {
 	switch flavour {
 	case utils.MicroShiftFlavour, utils.KindFlavour:
 		return LabelAllNodesWithDpu(c)
-	case utils.OpenShiftFlavour, utils.VanillaFlavour:
+	case utils.OpenShiftFlavour, utils.KubernetesFlavour:
 		return LabelWorkerNodesWithDpu(c)
 	default:
 		return fmt.Errorf("unsupported cluster flavor %s", flavour)
