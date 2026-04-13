@@ -61,6 +61,7 @@ type Daemon struct {
 	// Readiness state tracking
 	readyMutex sync.RWMutex
 	isReady    bool
+	mu         sync.RWMutex
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
@@ -623,4 +624,36 @@ func (d *Daemon) setOwnerReference(dpuCR *configv1.DataProcessingUnit) error {
 	}
 
 	return nil
+}
+
+//get 
+func (d *Daemon) GetSpecificDpuPlugin(name string) *plugin.GrpcPlugin {
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if mDpu, ok := d.managedDpus[name]; ok {
+		return mDpu.Plugin
+	}
+	
+	return nil
+}
+
+func (d *Daemon) GetManagedDpus() map[string]*ManagedDpu {
+    d.mu.RLock()
+	defer d.mu.RUnlock()
+	//create a copy
+	res := make(map[string]*ManagedDpu, len(d.managedDpus))
+	for key, value := range d.managedDpus {
+		res[key] = value
+	}
+
+	reture res
+}
+
+func (d *Daemon) GetManagedDpusByIdentifier(string identifier) *ManagedDpu {
+    d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.managedDpus[identifier]
 }
