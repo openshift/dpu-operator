@@ -1,0 +1,119 @@
+@startuml dpunetwork_cr_update
+
+actor user
+box "Kubernetes Control Plane"
+participant k8s_api
+participant dpu_network_controller
+participant configmap as "ConfigMap\ndpu-device-plugin-config"
+end box
+
+box "Host Node"
+participant kubelet_host as "kubelet (Host)"
+participant dpu_daemon_host as "dpu-daemon (Host)\n(Device Plugin Manager + Device Plugin)"
+participant vsp_host as "vsp (Host)"
+end box
+
+box "DPU Node"
+participant kubelet_dpu as "kubelet (DPU)"
+participant dpu_daemon_dpu as "dpu-daemon (DPU)\n(Device Plugin Manager + Device Plugin)"
+participant vsp_dpu as "vsp (DPU)"
+end box
+
+autonumber
+
+== DpuNetwork Update (ConfigMap Approach) ==
+
+note right of user: **Prerequisites:**\nDpuNetwork CR already created\nSee: dpunetwork_cr_creation.puml
+
+user -> k8s_api: Update DpuNetwork CR\n(change vfId ranges: "0-2", "5-7")
+activate k8s_api
+
+k8s_api -> dpu_network_controller: Reconcile Event
+activate dpu_network_controller
+
+dpu_network_controller -> dpu_network_controller: Re-evaluate VF selection\n(new ranges: [0,1,2,5,6,7])
+
+dpu_network_controller -> dpu_network_controller: Generate updated ConfigMap data\n(update network-1 resource definition)
+
+dpu_network_controller -> k8s_api: Update ConfigMap\ndpu-device-plugin-config
+activate k8s_api
+note right: **ConfigMap Updated**\n\nconfig.json updated:\n  "resources": [\n    {\n      "resourceName": "openshift.io/dpunetwork-dpu-network-1",\n      "vfRanges": ["0-2", "5-7"],\n      ...\n    }\n  ]
+k8s_api -> configmap: ConfigMap Updated
+activate configmap
+k8s_api -> dpu_network_controller: ConfigMap Updated
+deactivate k8s_api
+
+== Host dpu-daemon Reloads ConfigMap ==
+
+configmap -> dpu_daemon_host: ConfigMap Change Event\n(resource definition updated)
+activate dpu_daemon_host
+
+dpu_daemon_host -> k8s_api: Get Updated ConfigMap
+activate k8s_api
+k8s_api -> dpu_daemon_host: ConfigMap with updated host entry
+deactivate k8s_api
+
+dpu_daemon_host -> dpu_daemon_host: Parse config.json\nFilter node-role = host
+note right: Host entry still only lists VF ranges\nOld: [0,1,2,3,5,6,7]\nNew: [0,1,2,5,6,7] (VF 3 removed)
+
+dpu_daemon_host -> vsp_host: GetDevices()
+activate vsp_host
+vsp_host -> vsp_host: Return host-visible VF devices
+vsp_host -> dpu_daemon_host: Device inventory
+deactivate vsp_host
+
+dpu_daemon_host -> dpu_daemon_host: Rebuild device list\nApply new vfRanges (remove VF 3)
+
+dpu_daemon_host -> dpu_daemon_host: Update ListAndWatch\n(advertise host resource only)
+
+dpu_daemon_host -> kubelet_host: ListAndWatch Update\n(device-3 removed from resource)
+activate kubelet_host
+kubelet_host -> kubelet_host: Update node capacity\n"openshift.io/dpunetwork-dpu-network-1": 6 (host)
+deactivate kubelet_host
+
+deactivate dpu_daemon_host
+
+== DPU dpu-daemon Reloads ConfigMap ==
+
+configmap -> dpu_daemon_dpu: ConfigMap Change Event\n(resource definition updated)
+activate dpu_daemon_dpu
+
+dpu_daemon_dpu -> k8s_api: Get Updated ConfigMap
+activate k8s_api
+k8s_api -> dpu_daemon_dpu: ConfigMap with updated DPU entry
+deactivate k8s_api
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Parse config.json\nFilter node-role = dpu
+note right: DPU entry mirrors host VF change\n(and may include RPM/veth adjustments)
+
+dpu_daemon_dpu -> vsp_dpu: GetDevices()
+activate vsp_dpu
+vsp_dpu -> vsp_dpu: Return VF/RPM/veth inventory
+vsp_dpu -> dpu_daemon_dpu: Device inventory
+deactivate vsp_dpu
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Rebuild device lists\n- VF repr filtered with new ranges\n- RPM/veth unchanged (if not in diff)
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Update ListAndWatch\n(advertise VF + RPM + veth)
+
+dpu_daemon_dpu -> kubelet_dpu: ListAndWatch Update\n(update capacities per resource)
+activate kubelet_dpu
+kubelet_dpu -> kubelet_dpu: Update node capacity\n"openshift.io/dpunetwork-dpu-network-1": 6 (DPU VF)\n(RPM/veth counts unchanged)
+deactivate kubelet_dpu
+
+deactivate dpu_daemon_dpu
+deactivate configmap
+
+dpu_network_controller -> k8s_api: Update NetworkAttachmentDefinition
+activate k8s_api
+k8s_api -> dpu_network_controller: NAD Updated
+deactivate k8s_api
+
+dpu_network_controller -> k8s_api: Update DpuNetwork Status
+deactivate dpu_network_controller
+deactivate k8s_api
+
+note right of user: **Related Diagrams:**\n- dpunetwork_cr_creation.puml (initial setup)\n- dpunetwork_cr_deletion.puml (cleanup flow)
+
+@enduml
+

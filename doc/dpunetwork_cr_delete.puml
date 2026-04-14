@@ -1,0 +1,116 @@
+@startuml dpunetwork_cr_deletion
+
+actor user
+box "Kubernetes Control Plane"
+participant k8s_api
+participant dpu_network_controller
+participant configmap as "ConfigMap\\ndpu-device-plugin-config"
+end box
+
+box "Host Node"
+participant kubelet_host as "kubelet (Host)"
+participant dpu_daemon_host as "dpu-daemon (Host)\\n(Device Plugin Manager + Device Plugin)"
+participant vsp_host as "vsp (Host)"
+end box
+
+box "DPU Node"
+participant kubelet_dpu as "kubelet (DPU)"
+participant dpu_daemon_dpu as "dpu-daemon (DPU)\\n(Device Plugin Manager + Device Plugin)"
+participant vsp_dpu as "vsp (DPU)"
+end box
+
+autonumber
+
+== DpuNetwork Deletion (ConfigMap Approach) ==
+
+note right of user: **Prerequisites:**\nDpuNetwork CR already created\nSee: dpunetwork_cr_creation.puml
+
+user -> k8s_api: Delete DpuNetwork CR
+activate k8s_api
+
+k8s_api -> dpu_network_controller: Reconcile Event (Deletion)
+activate dpu_network_controller
+
+dpu_network_controller -> dpu_network_controller: Aggregate remaining DpuNetwork CRs\n(remove deleted network from list)
+
+dpu_network_controller -> dpu_network_controller: Generate updated ConfigMap data\n(remove network-1 resource definition)
+
+dpu_network_controller -> k8s_api: Update ConfigMap\ndpu-device-plugin-config
+activate k8s_api
+note right: **ConfigMap Updated**\n\nconfig.json updated:\n  "resources": [\n    // network-1 removed\n    {\n      "resourceName": "openshift.io/dpunetwork-dpu-network-2",\n      ...\n    }\n  ]
+k8s_api -> configmap: ConfigMap Updated
+activate configmap
+k8s_api -> dpu_network_controller: ConfigMap Updated
+deactivate k8s_api
+
+== ConfigMap Change Propagates to Host and DPU Nodes ==
+
+configmap -> dpu_daemon_host: ConfigMap Change Event\\n(resource removed)
+activate dpu_daemon_host
+
+dpu_daemon_host -> k8s_api: Get Updated ConfigMap
+activate k8s_api
+k8s_api -> dpu_daemon_host: ConfigMap without network-1
+deactivate k8s_api
+
+dpu_daemon_host -> dpu_daemon_host: Parse config.json\\nDetect removed resource "openshift.io/dpunetwork-dpu-network-1"
+
+dpu_daemon_host -> dpu_daemon_host: Update single device plugin instance\\n(reload config, rebuild advertised list)
+
+dpu_daemon_host -> vsp_host: ReleaseHostVfPool(bridge_id="x1")
+activate vsp_host
+vsp_host -> vsp_host: Remove VF entries bound to host pods
+vsp_host -> dpu_daemon_host: VF pool released
+deactivate vsp_host
+
+dpu_daemon_host -> kubelet_host: ListAndWatch Update\\n(unregister CR-specific resource)
+activate kubelet_host
+kubelet_host -> kubelet_host: Remove node capacity\\n"openshift.io/dpunetwork-dpu-network-1"
+kubelet_host -> dpu_daemon_host: Resource Removed
+deactivate kubelet_host
+
+deactivate dpu_daemon_host
+
+configmap -> dpu_daemon_dpu: ConfigMap Change Event\\n(resource removed)
+activate dpu_daemon_dpu
+
+dpu_daemon_dpu -> k8s_api: Get Updated ConfigMap
+activate k8s_api
+k8s_api -> dpu_daemon_dpu: ConfigMap without network-1
+deactivate k8s_api
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Parse config.json\\nDetect removal of VF, RPM, veth entries for bridge "x1"
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Update device plugin instance\\n(stop advertising VF resource, adjust RPM/Veth counts)
+
+dpu_daemon_dpu -> vsp_dpu: DeleteNetworkResources(bridge_id="x1")
+activate vsp_dpu
+vsp_dpu -> vsp_dpu: Tear down NF map entry\\nremove VF + RPM interfaces
+vsp_dpu -> vsp_dpu: Delete flow rules and bridge br-x1
+vsp_dpu -> dpu_daemon_dpu: Network resources deleted
+deactivate vsp_dpu
+
+dpu_daemon_dpu -> kubelet_dpu: ListAndWatch Update\\n(unregister VF resource, update RPM/veth counts)
+activate kubelet_dpu
+kubelet_dpu -> kubelet_dpu: Remove node capacity\\n"openshift.io/dpunetwork-dpu-network-1" on DPU node
+kubelet_dpu -> dpu_daemon_dpu: Resource Removed
+deactivate kubelet_dpu
+
+deactivate dpu_daemon_dpu
+deactivate configmap
+
+dpu_network_controller -> k8s_api: Delete NetworkAttachmentDefinition
+activate k8s_api
+k8s_api -> dpu_network_controller: NAD Deleted
+deactivate k8s_api
+
+dpu_network_controller -> k8s_api: Remove Finalizer
+deactivate dpu_network_controller
+
+k8s_api -> k8s_api: DpuNetwork CR Deleted
+deactivate k8s_api
+
+note right of user: **Related Diagrams:**\n- dpunetwork_cr_creation.puml (host setup)\n- dpunetwork_cr_creation-dpu.puml (DPU setup)\n- dpunetwork_cr_update.puml (update flow)
+
+@enduml
+

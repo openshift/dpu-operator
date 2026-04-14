@@ -1,0 +1,175 @@
+@startuml dpunetwork_cr_creation
+
+actor user
+box "Kubernetes Control Plane"
+participant k8s_api
+participant dpu_network_controller
+participant configmap as "ConfigMap\ndpu-device-plugin-config"
+end box
+
+box "Host Node"
+participant kubelet_host as "kubelet (Host)"
+participant dpu_daemon_host as "dpu-daemon (Host)\n(Device Plugin Manager + Device Plugin)"
+participant vsp_host as "vsp (Host)"
+end box
+
+box "DPU Node"
+participant kubelet_dpu as "kubelet (DPU)"
+participant dpu_daemon_dpu as "dpu-daemon (DPU)\n(Device Plugin Manager + Device Plugin)"
+participant vsp_dpu as "vsp (DPU)"
+end box
+
+autonumber
+
+== DpuNetwork CR Creation (Multiple Networks) ==
+
+user -> k8s_api: Create DpuNetwork CR 1
+activate k8s_api
+note right: **DpuNetwork 1: "dpu-network-1"**\n\napiVersion: networking.example.com/v1\nkind: DpuNetwork\nmetadata:\n  name: dpu-network-1\nspec:\n  nodeSelector:\n    matchLabels:\n      node-role: dpu-node\n  dpuSelector:\n    matchExpressions:\n      - key: dpu-type\n        operator: In\n        values: ["IPU Adapter E2100"]\n      - key: vfId\n        operator: In\n        values: ["0-3", "5-7"]\n  IsDisruptive: true
+
+k8s_api -> dpu_network_controller: Reconcile Event
+activate dpu_network_controller
+
+== DpuNetwork Controller Reconciliation ==
+
+dpu_network_controller -> k8s_api: List Nodes (match nodeSelector)
+activate k8s_api
+k8s_api -> dpu_network_controller: Matching Nodes
+deactivate k8s_api
+
+dpu_network_controller -> k8s_api: List Dpu CRs
+activate k8s_api
+k8s_api -> dpu_network_controller: All Dpu CRs
+note right: Dpu CR contains:\n  netdevs:\n    - name: "ens2f0v0" vfId: 0\n    - name: "ens2f0v1" vfId: 1\n    - name: "ens2f0v2" vfId: 2\n    - name: "ens2f0v3" vfId: 3\n    - name: "ens2f0v4" vfId: 4\n    - name: "ens2f0v5" vfId: 5\n    - name: "ens2f0v6" vfId: 6\n    - name: "ens2f0v7" vfId: 7
+deactivate k8s_api
+
+dpu_network_controller -> dpu_network_controller: Evaluate dpuSelector\n(match dpu-type and vfId)
+
+dpu_network_controller -> dpu_network_controller: Parse vfId ranges\n("0-3" -> [0,1,2,3]\n"5-7" -> [5,6,7])
+
+dpu_network_controller -> dpu_network_controller: Filter VFs from Dpu CRs\n(match selected VFs: 0,1,2,3,5,6,7)
+
+dpu_network_controller -> dpu_network_controller: Generate ResourceName\n"openshift.io/dpunetwork-<dpuNetworkCR Name>"
+
+== ConfigMap-Based Device Plugin Registration ==
+
+dpu_network_controller -> dpu_network_controller: Aggregate all DpuNetwork CRs\nfor this node
+
+dpu_network_controller -> dpu_network_controller: Generate ConfigMap data\n(config.json with resource definitions)
+
+dpu_network_controller -> k8s_api: Create/Update ConfigMap\ndpu-device-plugin-config
+activate k8s_api
+note right: **ConfigMap Approach (Single Source of Truth)**\n\n**One ConfigMap describes resources for both Host and DPU nodes.**\n**Each entry carries a nodeSelector so local daemons only advertise their slice.**\n\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: dpu-device-plugin-config\n  namespace: dpu-operator-system\ndata:\n  config.json: |\n    {\n      "resources": [\n        {\n          "resourceName": "openshift.io/dpunetwork-dpu-network-1",\n          "dpuNetworkName": "dpu-network-1",\n          "nodeSelector": {"matchLabels": {"node-role": "host"}},\n          "vfRanges": ["0-3", "5-7"]\n        },\n        {\n          "resourceName": "openshift.io/dpunetwork-dpu-network-1",\n          "dpuNetworkName": "dpu-network-1",\n          "nodeSelector": {"matchLabels": {"node-role": "dpu"}},\n          "vfRanges": ["0-3", "5-7"],\n          "rpmRanges": ["0-0"],\n          "vethRanges": ["0-1"]\n        }\n        // Additional resources per DpuNetwork CR\n      ]\n    }
+k8s_api -> configmap: ConfigMap Created/Updated
+activate configmap
+k8s_api -> dpu_network_controller: ConfigMap Updated
+deactivate k8s_api
+
+== Host dpu-daemon Watches ConfigMap ==
+
+configmap -> dpu_daemon_host: ConfigMap Change Event\n(watch notification)
+activate dpu_daemon_host
+
+dpu_daemon_host -> k8s_api: Get ConfigMap\ndpu-device-plugin-config
+activate k8s_api
+k8s_api -> dpu_daemon_host: ConfigMap with config.json
+deactivate k8s_api
+
+dpu_daemon_host -> dpu_daemon_host: Parse config.json\nFilter entries where node-role = host
+
+note over dpu_daemon_host: **Per-Node Architecture Decision:**\n**Single device plugin instance per node**\n- Host instance only advertises host-scoped resources\n- Reads shared ConfigMap, filters via nodeSelector\n- Updates in-place on ConfigMap changes
+
+alt Host Device Plugin Not Running
+  dpu_daemon_host -> dpu_daemon_host: Start Device Plugin Instance\n(read host resources)
+else Host Device Plugin Already Running
+  dpu_daemon_host -> dpu_daemon_host: Reload Config\n(apply new host resource set)
+end
+
+dpu_daemon_host -> vsp_host: GetDevices()
+activate vsp_host
+vsp_host -> vsp_host: Return host-visible devices\n(VF repr set shared with DPU)
+vsp_host -> dpu_daemon_host: Host device inventory
+deactivate vsp_host
+
+dpu_daemon_host -> dpu_daemon_host: Build device list\nApply vfRanges [0-3,5-7]
+note right: Host Resource\n"openshift.io/dpunetwork-dpu-network-1"\nDevices: VFs 0,1,2,3,5,6,7 (no RPM/veth)
+
+dpu_daemon_host -> dpu_daemon_host: ListAndWatch()\n(advertise host resource only)
+
+dpu_daemon_host -> kubelet_host: Register Device Plugin\nResource "openshift.io/dpunetwork-dpu-network-1"
+activate kubelet_host
+kubelet_host -> dpu_daemon_host: Registration Accepted
+kubelet_host -> kubelet_host: Add node capacity\n"openshift.io/dpunetwork-dpu-network-1": 7 (host)
+deactivate kubelet_host
+
+deactivate dpu_daemon_host
+
+== DPU dpu-daemon Watches ConfigMap ==
+
+configmap -> dpu_daemon_dpu: ConfigMap Change Event\n(watch notification)
+activate dpu_daemon_dpu
+
+dpu_daemon_dpu -> k8s_api: Get ConfigMap\ndpu-device-plugin-config
+activate k8s_api
+k8s_api -> dpu_daemon_dpu: ConfigMap with config.json
+deactivate k8s_api
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Parse config.json\nFilter entries where node-role = dpu
+
+note over dpu_daemon_dpu: **Per-Node Architecture Decision:**\n**Single DPU-side device plugin instance**\n- Reads same ConfigMap, filters for node-role=dpu\n- Advertises VF + RPM + veth resources\n- No restart required on updates
+
+alt DPU Device Plugin Not Running
+  dpu_daemon_dpu -> dpu_daemon_dpu: Start Device Plugin Instance\n(read DPU resources)
+else DPU Device Plugin Already Running
+  dpu_daemon_dpu -> dpu_daemon_dpu: Reload Config\n(apply new DPU resource set)
+end
+
+dpu_daemon_dpu -> vsp_dpu: GetDevices()
+activate vsp_dpu
+vsp_dpu -> vsp_dpu: Return devices by type\n(VF repr, RPM, veth)
+vsp_dpu -> dpu_daemon_dpu: DPU device inventory
+deactivate vsp_dpu
+
+dpu_daemon_dpu -> dpu_daemon_dpu: Build device lists\n- VF repr filtered by vfRanges\n- RPM list via rpmRanges\n- veth list via vethRanges
+note right: DPU Resources Advertised\n1. "openshift.io/dpunetwork-dpu-network-1" (VF x7)\n2. "openshift.io/rpm-disruptive" (rpmRange 0-0)\n3. "openshift.io/veth-nondisruptive" (vethRange 0-1)
+
+dpu_daemon_dpu -> dpu_daemon_dpu: ListAndWatch()\n(advertise three resources)
+
+dpu_daemon_dpu -> kubelet_dpu: Register Device Plugin\nAll DPU resources
+activate kubelet_dpu
+kubelet_dpu -> dpu_daemon_dpu: Registration Accepted
+kubelet_dpu -> kubelet_dpu: Add node capacity\nVF=7, RPM=1, veth=2
+deactivate kubelet_dpu
+
+deactivate dpu_daemon_dpu
+deactivate configmap
+
+== BridgeID and NAD Generation (1 NAD per DpuNetwork CR) ==
+
+dpu_network_controller -> dpu_network_controller: Create BridgeID
+
+dpu_network_controller -> dpu_network_controller: Create single NAD\nfor all VFs in network\n(shared config: IsDisruptive, IPAM)
+
+dpu_network_controller -> k8s_api: Create NetworkAttachmentDefinition
+activate k8s_api
+note right: **NAD 1 for DpuNetwork 1**\n\nmetadata:\n  name: dpunetwork-1-nad\n  namespace: default\n  annotations:\n    dpu.config.openshift.io/dpu-network: dpu-network-1\n    k8s.v1.cni.cncf.io/resourceName: openshift.io/dpunetwork-dpu-network-1\nspec:\n  config: {\n    "type": "dpu-cni",\n    "cniVersion": "0.4.0",\n    "name": "dpu-cni",\n    "BridgeID": "<created-bridgeID>",\n    "IsDisruptive": "true",\n    "ipam": {...}\n  }\n\n**VFs (0,1,2,3,5,6,7) use this NAD**\n**Multiple pods can use this NAD**\n**Each pod gets allocated a VF from the pool**
+k8s_api -> dpu_network_controller: NAD Created
+deactivate k8s_api
+
+note over dpu_network_controller: **About NRI (Network Resources Injector):**\nNRI webhook is installed once (via DpuOperatorConfig) and is not re-registered per DpuNetwork.\nDpuNetwork creation only needs to create NAD(s) and (optionally) publish a mapping (e.g., in DpuNetwork.status)\nso NRI can translate `dpu.config.openshift.io/dpu-network: <name>` into\n`k8s.v1.cni.cncf.io/networks: <nad list>` during Pod CREATE.
+
+dpu_network_controller -> k8s_api: Update DpuNetwork 1 Status
+activate k8s_api
+note right: status:\n  conditions:\n    - type: Ready\n      status: True\n      message: NAD and Device Plugin created\n  resourceName: "openshift.io/dpunetwork-dpu-network-1"\n  selectedVFs: [0,1,2,3,5,6,7]\n  excludedVFs: [4]
+k8s_api -> dpu_network_controller: Status Updated
+deactivate k8s_api
+
+deactivate dpu_network_controller
+deactivate k8s_api
+
+note over k8s_api: **Architecture Summary:**\n**Single ConfigMap, per-node device plugin instances**\n**- Host dpu-daemon filters node-role=host resources**\n**- DPU dpu-daemon filters node-role=dpu resources (VF+RPM+veth)**\n**- Each node runs exactly one device plugin instance**\n**- Entries share resourceName when devices overlap**\n**- NAD per DpuNetwork CR stays unchanged**\n\n**When new DpuNetwork CR created:**\n**- Controller updates ConfigMap with host + DPU entries**\n**- Both daemons detect change and reload in-place**\n**- No new pods/daemons required, only ListAndWatch updates**
+
+note right of user: **See:**\n- pod_creation_regular.puml for pod creation flow\n- pod_creation_nf_disruptive.puml for NF pod flow\n- dpunetwork_cr_update.puml for update flow\n- dpunetwork_cr_deletion.puml for deletion flow
+
+@enduml
+
