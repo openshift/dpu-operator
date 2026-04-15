@@ -1,11 +1,11 @@
 module github.com/openshift/dpu-operator
 
-go 1.22.4
+go 1.24.0
 
 require (
 	github.com/containernetworking/cni v1.2.3
 	github.com/containernetworking/plugins v1.5.0
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.13.0
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
@@ -19,9 +19,9 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/net v0.30.0
-	google.golang.org/grpc v1.65.0
-	google.golang.org/protobuf v1.34.2
+	golang.org/x/net v0.48.0
+	google.golang.org/grpc v1.79.3
+	google.golang.org/protobuf v1.36.10
 	k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver v0.31.1
 	k8s.io/apimachinery v0.31.1
@@ -56,7 +56,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241017200806-017d972448fc // indirect
 	github.com/google/safetext v0.0.0-20220905092116-b49f7bc46da2 // indirect
@@ -89,15 +89,15 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/oauth2 v0.23.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/term v0.38.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
-	golang.org/x/tools v0.26.0 // indirect
+	golang.org/x/tools v0.39.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
