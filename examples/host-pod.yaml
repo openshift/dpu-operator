@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: host-pod
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/networks: net1-nad
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  containers:
+    - name: app-container
+      image: ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest
+      resources:
+        requests:
+          openshift.io/dpunetwork-net1: "1"
+        limits:
+          openshift.io/dpunetwork-net1: "1"

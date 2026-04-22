@@ -322,11 +322,18 @@ func CmdDel(req *cnitypes.PodRequest) error {
 	conf := req.CNIConf
 
 	if req.Netns == "" {
+		klog.Warning("CmdDel: netns is empty, device may be orphaned")
 		return nil
 	}
 
 	containerNs, err := ns.GetNS(req.Netns)
 	if err != nil {
+		if _, ok := err.(ns.NSPathNotExistErr); ok {
+			klog.Warningf("CmdDel: netns %q no longer exists for device %s — attempting recovery",
+				req.Netns, conf.DeviceID)
+			recoverOrphanedDevice(conf.DeviceID)
+			return nil
+		}
 		return fmt.Errorf("failed to open netns %q: %v", req.Netns, err)
 	}
 	defer containerNs.Close()
@@ -346,4 +353,42 @@ func CmdDel(req *cnitypes.PodRequest) error {
 	}
 
 	return nil
+}
+
+// recoverOrphanedDevice attempts to find a device that was left behind in a
+// now-destroyed namespace and restore it to the init namespace.
+// Hardware-backed VF representors survive namespace destruction (unlike veths
+// which are auto-cleaned by the kernel), so they may be found under the
+// temporary name assigned by moveLinkInNetNamespace with the original name
+// stored in the device's alias.
+// For veth pairs this is a safe no-op: the kernel already destroyed both ends.
+func recoverOrphanedDevice(deviceName string) {
+	if _, err := netlink.LinkByName(deviceName); err == nil {
+		klog.Infof("recoverOrphanedDevice: %s already in init namespace", deviceName)
+		return
+	}
+
+	links, err := netlink.LinkList()
+	if err != nil {
+		klog.Errorf("recoverOrphanedDevice: failed to list links: %v", err)
+		return
+	}
+	for _, link := range links {
+		if link.Attrs().Alias == deviceName {
+			klog.Infof("recoverOrphanedDevice: found %s under temp name %s, renaming back",
+				deviceName, link.Attrs().Name)
+			if err := netlink.LinkSetName(link, deviceName); err != nil {
+				klog.Errorf("recoverOrphanedDevice: failed to rename %s to %s: %v",
+					link.Attrs().Name, deviceName, err)
+				return
+			}
+			if err := netlink.LinkSetUp(link); err != nil {
+				klog.Warningf("recoverOrphanedDevice: failed to bring up %s: %v", deviceName, err)
+			}
+			return
+		}
+	}
+
+	klog.Warningf("recoverOrphanedDevice: %s not found in init namespace — "+
+		"device was likely a veth pair already cleaned up by the kernel", deviceName)
 }

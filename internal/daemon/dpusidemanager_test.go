@@ -36,7 +36,7 @@ func waitAllNodesDpuAllocatable(client client.Client) {
 		}
 		readyNodes := 0
 		for _, node := range latestNodes.Items {
-			allocatableQuantity, ok := node.Status.Allocatable[deviceplugin.DpuResourceName]
+			allocatableQuantity, ok := node.Status.Allocatable[deviceplugin.DefaultDpuResourceName]
 			if ok {
 				allocatable, _ := allocatableQuantity.AsInt64()
 				if allocatable > 0 {

@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - '*'
+  - configmaps
   - serviceaccounts
   verbs:
   - create
@@ -60,6 +61,7 @@ rules:
   resources:
   - dataprocessingunitconfigs
   - dataprocessingunits
+  - dpunetworks
   - dpuoperatorconfigs
   - servicefunctionchains
   - servicefunctionchains/finalizers
@@ -76,6 +78,7 @@ rules:
   resources:
   - dataprocessingunitconfigs/finalizers
   - dataprocessingunits/finalizers
+  - dpunetworks/finalizers
   - dpuoperatorconfigs/finalizers
   verbs:
   - update
@@ -84,6 +87,7 @@ rules:
   resources:
   - dataprocessingunitconfigs/status
   - dataprocessingunits/status
+  - dpunetworks/status
   - dpuoperatorconfigs/status
   - servicefunctionchains/status
   verbs:

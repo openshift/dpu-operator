@@ -58,7 +58,8 @@ func GetAllVfsNameByDeviceID(deviceID string) ([]string, error) {
 	for _, vfpci := range dpuVfsPCI {
 		vfName, err := GetNameByPCI(vfpci)
 		if err != nil {
-			return nil, err
+			klog.V(4).Infof("Skipping VF %s (likely in pod namespace): %v", vfpci, err)
+			continue
 		}
 		dpuVfsName = append(dpuVfsName, vfName)
 	}

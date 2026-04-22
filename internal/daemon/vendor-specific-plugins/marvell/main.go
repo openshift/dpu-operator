@@ -83,6 +83,7 @@ type mrvlNfPortMap struct {
 type mrvlVspServer struct {
 	pb.UnimplementedLifeCycleServiceServer
 	nfapi.UnimplementedNetworkFunctionServiceServer
+	nfapi.UnimplementedDpuNetworkConfigServiceServer
 	pb.UnimplementedDeviceServiceServer
 	opi.UnimplementedBridgePortServiceServer
 	log           logr.Logger
@@ -94,6 +95,7 @@ type mrvlVspServer struct {
 	pathManager   utils.PathManager
 	version       string
 	isDPUMode     bool
+	isAccelerated bool
 	deviceStore   map[string]mrvlDeviceInfo
 	noOfPortPairs int
 	portType      string
@@ -328,6 +330,13 @@ func (vsp *mrvlVspServer) Init(ctx context.Context, in *pb.InitRequest) (*pb.IpP
 	return result, err
 }
 
+func (vsp *mrvlVspServer) SetDpuNetworkConfig(ctx context.Context, in *nfapi.DpuNetworkConfigRequest) (*nfapi.Empty, error) {
+	klog.Infof("Received SetDpuNetworkConfig() request: IsAccelerated: %v", in.IsAccelerated)
+	vsp.isAccelerated = in.IsAccelerated
+	klog.Infof("SetDpuNetworkConfig() done: isAccelerated set to %v", vsp.isAccelerated)
+	return &nfapi.Empty{}, nil
+}
+
 // getVFName function to get the VF Name of the given BridgePortName on DPU
 func (vsp *mrvlVspServer) getVFDetails(BridgePortName string) (string, string, error) {
 	// regexp to get VFId from BridgePortName ex: host1-0 , vfId=0
@@ -373,6 +382,28 @@ func (vsp *mrvlVspServer) getVFDetails(BridgePortName string) (string, string, e
 func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBridgePortRequest) (*opi.BridgePort, error) {
 	klog.Infof("Received CreateBridgePort() request: BridgePortId: %v, BridgePort: %v", in.BridgePortId, in.BridgePort)
 	portName := in.BridgePort.Name
+
+	nfKey := NfName // Default NF Name is "mrvl-nf1"
+	if len(in.BridgePort.Spec.LogicalBridges) > 0 && in.BridgePort.Spec.LogicalBridges[0] != "" {
+		nfKey = in.BridgePort.Spec.LogicalBridges[0]
+	}
+	klog.Infof("CreateBridgePort using nfKey: %v", nfKey)
+	// VSP in Accelerated mode
+	if vsp.isAccelerated {
+		if _, exists := vsp.networkStore[nfKey]; !exists {
+			klog.Errorf("Accelerated mode: NF not created yet for bridgeID %s, CBP rejected", nfKey)
+			return nil, fmt.Errorf("accelerated mode: NF not created yet for bridgeID %s, CreateBridgePort rejected", nfKey)
+		}
+		// TODO: Check if the port is already in the networkstore
+		klog.Infof("Accelerated mode: NF verified for bridgeID %s — CBP accepted", nfKey)
+		out := &opi.BridgePort{
+			Name:   fmt.Sprintf("bridge_port/%s", portName),
+			Spec:   in.BridgePort.Spec,
+			Status: &opi.BridgePortStatus{},
+		}
+		return out, nil
+	}
+
 	vfName, vfPCIAddress, err := vsp.getVFDetails(portName)
 	if err != nil {
 		klog.Errorf("Error occurred in getting VF Name: %v, BridgePortName: %v", err, portName)
@@ -384,16 +415,16 @@ func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBr
 	}
 	klog.Info("Port Added to Bridge Successfully")
 	// Store port into networkstore
-	if network, exists := vsp.networkStore[NfName]; exists {
+	if network, exists := vsp.networkStore[nfKey]; exists {
 		mac := in.BridgePort.Spec.MacAddress
 		vfport := vfInfo{
 			vfName: vfName,
 			mac:    net.HardwareAddr(mac).String(),
 		}
 		network.vfPort = append(network.vfPort, vfport)
-		vsp.networkStore[NfName] = network
+		vsp.networkStore[nfKey] = network
 	} else {
-		vsp.networkStore[NfName] = mrvlNfPortMap{
+		vsp.networkStore[nfKey] = mrvlNfPortMap{
 			vfPort: []vfInfo{
 				{
 					vfName: vfName,
@@ -409,20 +440,20 @@ func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBr
 	if vsp.isNF {
 		klog.Info("Marvell Store looks like", vsp.networkStore)
 		mac := net.HardwareAddr(in.BridgePort.Spec.MacAddress).String()
-		// Add Flow rule from vfName to inPort (where in_port=vfname action=out_port=vsp.networkStore[NfName].inpPort)
-		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vfName, vsp.networkStore[NfName].inpPort, ""); err != nil {
+		// Add Flow rule from vfName to inPort (where in_port=vfname action=out_port=vsp.networkStore[nfKey].inpPort)
+		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vfName, vsp.networkStore[nfKey].inpPort, ""); err != nil {
 			klog.Errorf("Error occurred in adding Flow Rule: %v", err)
 			return nil, err
 		}
 
-		// Add flow rule from inPort to vfName (where in_port=vsp.networkStore[NfName].inpPort action=out_port=vfName)
+		// Add flow rule from inPort to vfName (where in_port=vsp.networkStore[nfKey].inpPort action=out_port=vfName)
 		// TODO: check if this can be done with Mac Learning?
-		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vsp.networkStore[NfName].inpPort, vfName, mac); err != nil {
+		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vsp.networkStore[nfKey].inpPort, vfName, mac); err != nil {
 			klog.Errorf("Error occurred in adding Flow Rule: %v", err)
 			return nil, err
 		}
 		// Add Hairpinning Flow Rule based on MAC Address
-		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vsp.networkStore[NfName].outPort, vsp.networkStore[NfName].outPort, mac); err != nil {
+		if err := vsp.mrvlDP.AddFlowRuleToDataPlane(vsp.bridgeName, vsp.networkStore[nfKey].outPort, vsp.networkStore[nfKey].outPort, mac); err != nil {
 			klog.Errorf("Error occurred in adding Flow Rule: %v", err)
 			return nil, err
 		}
@@ -451,6 +482,12 @@ func (vsp *mrvlVspServer) CreateBridgePort(ctx context.Context, in *opi.CreateBr
 func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBridgePortRequest) (*emptypb.Empty, error) {
 	klog.Infof("Received DeleteBridgePort() request: Name: %v, AllowMissing: %v", in.Name, in.AllowMissing)
 	portName := in.Name
+
+	if vsp.isAccelerated {
+		klog.Infof("Accelerated mode: DeleteBridgePort for %s — returning success", portName)
+		return &emptypb.Empty{}, nil
+	}
+
 	vfName, _, err := vsp.getVFDetails(portName)
 	klog.Infof("VF Name: %s", vfName)
 	if err != nil {
@@ -514,11 +551,29 @@ func (vsp *mrvlVspServer) DeleteBridgePort(ctx context.Context, in *opi.DeleteBr
 // CreateNetworkFunction function to create a network function with the given context and NFRequest
 // It will return the Empty and error
 func (vsp *mrvlVspServer) CreateNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
-	klog.Infof("Received CreateNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
+	nfKey := in.BridgeId
+	if nfKey == "" {
+		nfKey = NfName
+	}
+	klog.Infof("Received CreateNetworkFunction() request: Input: %v, Output: %v, BridgeId: %v", in.Input, in.Output, nfKey)
 	vsp.isNF = true
+	// Create Network Function in Accelerated mode
+	if vsp.isAccelerated {
+		network, exists := vsp.networkStore[nfKey]
+		if !exists {
+			network = mrvlNfPortMap{}
+		}
+		if in.Input != "" {
+			network.vfPort = append(network.vfPort, vfInfo{vfName: in.Input, mac: in.Input}) // TODO: Add vfName derived from MAC
+		}
+		vsp.networkStore[nfKey] = network
+		klog.Infof("Accelerated mode: NF registered in store for bridgeID %s, vfPort: %v", nfKey, network.vfPort)
+		return &nfapi.Empty{}, nil
+	}
+
 	inpDpInterfaceName := vsp.deviceStore[in.Input].dpInterfaceName
 	outDpInterfaceName := vsp.deviceStore[in.Output].dpInterfaceName
-	out, err := vsp.AddNetworkFunction(inpDpInterfaceName, outDpInterfaceName, NfName)
+	out, err := vsp.AddNetworkFunction(inpDpInterfaceName, outDpInterfaceName, nfKey)
 	return out, err
 }
 
@@ -588,11 +643,43 @@ func (vsp *mrvlVspServer) AddNetworkFunction(inpDpInterfaceName string, outDpInt
 	return out, nil
 }
 func (vsp *mrvlVspServer) DeleteNetworkFunction(ctx context.Context, in *nfapi.NFRequest) (*nfapi.Empty, error) {
-	klog.Infof("Received DeleteNetworkFunction() request: Input: %v, Output: %v", in.Input, in.Output)
+	nfKey := in.BridgeId
+	if nfKey == "" {
+		nfKey = NfName
+	}
+	klog.Infof("Received DeleteNetworkFunction() request: Input: %v, Output: %v, BridgeId: %v", in.Input, in.Output, nfKey)
+
+	if vsp.isAccelerated {
+		network, exists := vsp.networkStore[nfKey]
+		if !exists {
+			klog.Infof("Accelerated mode: no store entry for bridgeID %s, nothing to delete", nfKey)
+			return &nfapi.Empty{}, nil
+		}
+
+		mac := in.Input
+		remaining := make([]vfInfo, 0, len(network.vfPort))
+		for _, vf := range network.vfPort {
+			if vf.mac != mac {
+				remaining = append(remaining, vf)
+			}
+		}
+		klog.Infof("Accelerated mode: removed VF with mac %s from bridgeID %s (%d -> %d)", mac, nfKey, len(network.vfPort), len(remaining))
+
+		if len(remaining) == 0 {
+			delete(vsp.networkStore, nfKey)
+			vsp.isNF = false
+			klog.Infof("Accelerated mode: store empty, deleted entry for bridgeID %s", nfKey)
+		} else {
+			network.vfPort = remaining
+			vsp.networkStore[nfKey] = network
+		}
+		return &nfapi.Empty{}, nil
+	}
+
 	vsp.isNF = false
 	inpDpInterfaceName := vsp.deviceStore[in.Input].dpInterfaceName
 	outDpInterfaceName := vsp.deviceStore[in.Output].dpInterfaceName
-	out, err := vsp.DeleteNetworkFunctionPort(inpDpInterfaceName, outDpInterfaceName, NfName)
+	out, err := vsp.DeleteNetworkFunctionPort(inpDpInterfaceName, outDpInterfaceName, nfKey)
 	return out, err
 }
 
@@ -643,22 +730,68 @@ func (vsp *mrvlVspServer) DeleteNetworkFunctionPort(inpDpInterfaceName string, o
 	return out, nil
 }
 
+func (vsp *mrvlVspServer) getAcceleratedDevices() (map[string]*pb.Device, error) {
+	devices := make(map[string]*pb.Device)
+
+	vfNames, err := mrvlutils.GetAllVfsNameByDeviceID(DPUdeviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate SDP VFs: %w", err)
+	}
+
+	// VF index 0 (enP2p1s0v0) is the management interface used by
+	// configureIP() for the gRPC control channel. The data-path VFs
+	// start at index 1 and map 1:1 to the host-side VFs:
+
+	for _, name := range vfNames[1:] {
+		health := vsp.GetDeviceHealth(name)
+		devices[name] = &pb.Device{
+			ID:     name,
+			Health: health,
+		}
+	}
+
+	rpmNames, err := mrvlutils.GetAllVfsNameByDeviceID(DpuRpmDeviceID)
+	if err != nil {
+		klog.Errorf("Failed to enumerate RPM devices for GetDevices in accelerated mode: %v", err)
+	}
+	for _, ifName := range rpmNames {
+		health := vsp.GetDeviceHealth(ifName)
+		devices["accelerated:"+ifName] = &pb.Device{
+			ID:     "accelerated:" + ifName,
+			Health: health,
+		}
+	}
+
+	return devices, nil
+}
+
 // GetDevices function to get all the devices with the given context and Empty
 // It will return the DeviceListResponse and error
 func (vsp *mrvlVspServer) GetDevices(ctx context.Context, in *emptypb.Empty) (*pb.DeviceListResponse, error) {
 	klog.Info("Received GetDevices() request")
 	devices := make(map[string]*pb.Device)
-	if vsp.deviceStore == nil {
-		return nil, errors.New("device Store is empty")
-	}
 	if vsp.isDPUMode {
-		for _, mrvlDeviceInfo := range vsp.deviceStore {
-			devices[mrvlDeviceInfo.secInterfaceName] = &pb.Device{
-				ID:     mrvlDeviceInfo.secInterfaceName,
-				Health: mrvlDeviceInfo.health,
+		if vsp.isAccelerated {
+			acceleratedDevices, err := vsp.getAcceleratedDevices()
+			if err != nil {
+				return nil, err
+			}
+			devices = acceleratedDevices
+		} else {
+			if vsp.deviceStore == nil {
+				return nil, errors.New("device Store is empty")
+			}
+			for _, mrvlDeviceInfo := range vsp.deviceStore {
+				devices[mrvlDeviceInfo.secInterfaceName] = &pb.Device{
+					ID:     mrvlDeviceInfo.secInterfaceName,
+					Health: mrvlDeviceInfo.health,
+				}
 			}
 		}
 	} else {
+		if vsp.deviceStore == nil {
+			return nil, errors.New("device Store is empty")
+		}
 		for _, mrvlDeviceInfo := range vsp.deviceStore {
 			devices[mrvlDeviceInfo.pciAddress] = &pb.Device{
 				ID:     mrvlDeviceInfo.pciAddress,
@@ -763,6 +896,7 @@ func (vsp *mrvlVspServer) Listen() (net.Listener, error) {
 	}
 	vsp.grpcServer = grpc.NewServer()
 	nfapi.RegisterNetworkFunctionServiceServer(vsp.grpcServer, vsp)
+	nfapi.RegisterDpuNetworkConfigServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterLifeCycleServiceServer(vsp.grpcServer, vsp)
 	pb.RegisterDeviceServiceServer(vsp.grpcServer, vsp)
 	opi.RegisterBridgePortServiceServer(vsp.grpcServer, vsp)
