@@ -20,6 +20,8 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/dpu-operator/api/v1"
@@ -27,9 +29,11 @@ import (
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/render"
 	"github.com/openshift/dpu-operator/pkgs/vars"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -40,6 +44,13 @@ import (
 var binData embed.FS
 
 const dpuOperatorConfigFinalizer = "config.openshift.io/dpuoperatorconfig-finalizer"
+
+const (
+	nriTLSProviderAuto        = "auto"
+	nriTLSProviderOpenShift   = "openshift"
+	nriTLSProviderCertManager = "cert-manager"
+	nriTLSProviderDisabled    = "disabled"
+)
 
 type componentError struct {
 	component string
@@ -90,10 +101,13 @@ func (r *DpuOperatorConfigReconciler) WithImagePullPolicy(policy string) *DpuOpe
 //+kubebuilder:rbac:groups="",resources=services,verbs=*
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=*
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cert-manager.io,resources=issuers;certificates,verbs=*
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=whereabouts.cni.cncf.io,resources=ippools;overlappingrangeipreservations;nodeslicepools,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
@@ -299,6 +313,7 @@ func (r *DpuOperatorConfigReconciler) yamlVars() map[string]string {
 		"ImagePullPolicy": r.imagePullPolicy,
 		"ResourceName":    "openshift.io/dpu", // FIXME: Hardcode for now
 		"CniDir":          p,
+		"ClusterFlavour":  string(flavour),
 	}
 
 	return data
@@ -321,9 +336,78 @@ func (r *DpuOperatorConfigReconciler) ensureDpuDeamonSet(ctx context.Context, cf
 
 func (r *DpuOperatorConfigReconciler) ensureNetworkResourcesInjector(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
+	ce := utils.NewClusterEnvironment(r.Client)
+	flavour, err := ce.Flavour(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to detect cluster flavour for network resources injector: %w", err)
+	}
+
+	provider, err := resolveNriTLSProvider(flavour)
+	if err != nil {
+		return err
+	}
+
+	if provider == nriTLSProviderDisabled {
+		logger.Info("Skipping Network Resources Injector deployment", "flavour", flavour, "provider", provider)
+		return nil
+	}
+
+	binDataPath := "network-resources-injector"
+	if provider == nriTLSProviderCertManager {
+		if err := r.ensureCertManagerInstalled(ctx, flavour); err != nil {
+			return err
+		}
+		binDataPath = "network-resources-injector-certmanager"
+	}
+
 	logger.Info("Create Network Resources Injector")
-	return r.createAndApplyAllFromBinData(logger, "network-resources-injector", cfg)
+	logger.Info("Selected network resources injector manifest set", "flavour", flavour, "provider", provider, "path", binDataPath)
+	return r.createAndApplyAllFromBinData(logger, binDataPath, cfg)
 }
+
+func resolveNriTLSProvider(flavour utils.Flavour) (string, error) {
+	// NRI_TLS_PROVIDER controls which TLS provisioning path to use:
+	// - auto: OpenShift/MicroShift -> openshift, Kubernetes -> disabled
+	// - openshift: OpenShift service-ca/serving-cert annotations
+	// - cert-manager: cert-manager issuer/certificate flow
+	// - disabled: skip NRI webhook deployment
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("NRI_TLS_PROVIDER")))
+	if provider == "" || provider == nriTLSProviderAuto {
+		switch flavour {
+		case utils.OpenShiftFlavour, utils.MicroShiftFlavour:
+			return nriTLSProviderOpenShift, nil
+		default:
+			return nriTLSProviderDisabled, nil
+		}
+	}
+
+	switch provider {
+	case nriTLSProviderOpenShift, nriTLSProviderCertManager, nriTLSProviderDisabled:
+		return provider, nil
+	default:
+		return "", fmt.Errorf("unsupported NRI_TLS_PROVIDER value %q (supported: auto, openshift, cert-manager, disabled)", provider)
+	}
+}
+
+func (r *DpuOperatorConfigReconciler) ensureCertManagerInstalled(ctx context.Context, flavour utils.Flavour) error {
+	requiredCRDs := []string{
+		"certificates.cert-manager.io",
+		"issuers.cert-manager.io",
+	}
+
+	for _, crdName := range requiredCRDs {
+		crd := &apiextensionsv1.CustomResourceDefinition{}
+		if err := r.Get(ctx, types.NamespacedName{Name: crdName}, crd); err != nil {
+			if apierrors.IsNotFound(err) {
+				return fmt.Errorf("cert-manager is required when NRI_TLS_PROVIDER=cert-manager on %s cluster: missing CRD %q", flavour, crdName)
+			}
+			return fmt.Errorf("failed to verify cert-manager CRD %q on %s cluster when NRI_TLS_PROVIDER=cert-manager: %w", crdName, flavour, err)
+		}
+	}
+
+	return nil
+}
+
 func (r *DpuOperatorConfigReconciler) ensureNetworkFunctioNAD(ctx context.Context, cfg *configv1.DpuOperatorConfig) error {
 	logger := log.FromContext(ctx)
 

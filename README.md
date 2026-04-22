@@ -39,6 +39,27 @@ For 1 cluster deployment, you will only need /root/kubeconfig.ocpcluster. 1 clus
 task deploy-1c
 ```
 
+For upstream-style deployment semantics (without OpenShift-specific webhook
+compatibility adjustments), use:
+
+```sh
+task deploy-upstream
+```
+
+To run upstream semantics with cert-manager-backed NRI TLS provisioning, use:
+
+```sh
+task deploy-upstream-certmanager
+```
+
+The manager supports `NRI_TLS_PROVIDER` with the following values:
+
+- `auto` (default): OpenShift/MicroShift uses OpenShift webhook cert path;
+  Kubernetes disables NRI webhook deployment unless explicitly enabled.
+- `openshift`: force OpenShift webhook cert path.
+- `cert-manager`: require cert-manager CRDs and use cert-manager TLS objects.
+- `disabled`: skip NRI webhook deployment.
+
 4. **Undeploy**
 
 Undoes what deploying did:
@@ -114,7 +135,7 @@ kubectl create -f examples/config.yaml
 
 After creating the `DpuOperatorConfig` CR, you should see the following pods:
 ```sh
-oc get pods -n openshift-dpu-operator -o wide
+kubectl get pods -n openshift-dpu-operator -o wide
 NAME                                              READY   STATUS    RESTARTS   AGE   IP                NODE             NOMINATED NODE   READINESS GATES
 dpu-daemon-rn6mc                                  1/1     Running   0          22h   192.168.122.218   worker-229       <none>           <none>
 dpu-daemon-xrrlg                                  1/1     Running   0          22h   192.168.122.90    worker-229-ptl   <none>           <none>

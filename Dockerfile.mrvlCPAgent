@@ -1,0 +1,57 @@
+ARG TARGETARCH
+FROM --platform=linux/${TARGETARCH} docker.io/library/golang:1.24-bookworm@sha256:1a6d4452c65dea36aac2e2d606b01b4a029ec90cc1ae53890540ce6173ea77ac AS stage1
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gawk gcc g++ libconfig-dev make pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY . .
+
+RUN \
+    set -x && \
+    mkdir -p /cpagent-bin/ && \
+    if [ "$TARGETARCH" = "arm64" ] ; then \
+        export OCTEP_PATH="/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target.25.03.0/ /workspace/pcie_ep_octeon_target && \
+        cd "/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        make CFLAGS="-DUSE_PEM_AND_DPI_PF=1" && \
+        cd "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent" && \
+        make CFLAGS="$(pkg-config --cflags libconfig) -I$OCTEP_PATH/include" \
+             LDFLAGS="$(pkg-config --libs libconfig) -L$OCTEP_PATH/bin/lib" && \
+        cp bin/bin/octep_cp_agent /cpagent-bin/octep_cp_agent.25.03.0 && \
+        ln -nfs internal/daemon/vendor-specific-plugins/marvell/vendor/pcie_ep_octeon_target/ /workspace/pcie_ep_octeon_target && \
+        cd "/workspace/pcie_ep_octeon_target/target/libs/octep_cp_lib" && \
+        make CFLAGS="-DUSE_PEM_AND_DPI_PF=1" && \
+        cd "/workspace/pcie_ep_octeon_target/target/apps/octep_cp_agent" && \
+        make CFLAGS="$(pkg-config --cflags libconfig) -I$OCTEP_PATH/include" \
+             LDFLAGS="$(pkg-config --libs libconfig) -L$OCTEP_PATH/bin/lib" && \
+        cp bin/bin/octep_cp_agent /cpagent-bin/ && \
+        cp cn106xx.cfg /cpagent-bin/ && \
+        echo "build completed" ; \
+    fi
+
+# Due to https://github.com/golang/go/issues/70329 cross-compilation hangs at times.
+# As a temporary workaround, we can try specifying GOMAXPROCS=2 to relieve this issue.
+WORKDIR /workspace
+RUN GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -o /cpagent-bin/cp-agent-run internal/daemon/vendor-specific-plugins/marvell/cp-agent/cp-agent-run.go
+
+FROM quay.io/centos/centos:stream9
+COPY --from=stage1 /cpagent-bin/ /usr/bin/
+
+RUN dnf update -y \
+    && dnf install -y \
+       net-tools \
+       kmod \
+       pciutils \
+       iputils \
+       iproute \
+       libconfig \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+USER 0
+ENTRYPOINT ["/usr/bin/cp-agent-run"]

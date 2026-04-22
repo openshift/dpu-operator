@@ -4,7 +4,7 @@ tasks:
   kustomize:
     cmds:
       - mkdir -p {{.BINDIR}}
-      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+      - env -u GOOS -u GOARCH GOBIN={{.BINDIR_ABS}} GOFLAGS='' GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
       - echo "{{.KUSTOMIZE_VERSION}}" > {{.BINDIR}}/kustomize_version
     status:
       - test -d {{.BINDIR}}
@@ -17,7 +17,7 @@ tasks:
       - test -x {{.BINDIR}}/ginkgo
       - ./{{.BINDIR}}/ginkgo version | grep -q "{{.GINKGO_VERSION}}"
     cmds:
-      - GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@v{{.GINKGO_VERSION}}
+      - env -u GOOS -u GOARCH GOBIN={{.BINDIR_ABS}} GOFLAGS='' go install github.com/onsi/ginkgo/v2/ginkgo@v{{.GINKGO_VERSION}}
 
   ## Download operator-sdk locally if necessary.
   operator-sdk:
@@ -52,4 +52,3 @@ tasks:
         else
           ln -sf $(which opm) {{.BINDIR}}/opm
         fi
-

@@ -1,0 +1,7 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: network-resources-injector-selfsigned
+  namespace: {{.Namespace}}
+spec:
+  selfSigned: {}

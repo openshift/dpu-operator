@@ -42,6 +42,19 @@ rules:
   - list
   - watch
 - apiGroups:
+  - cert-manager.io
+  resources:
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - apps
   resources:
   - daemonsets
@@ -102,6 +115,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - whereabouts.cni.cncf.io
+  resources:
+  - ippools
+  - overlappingrangeipreservations
+  - nodeslicepools
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

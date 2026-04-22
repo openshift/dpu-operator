@@ -80,6 +80,8 @@ spec:
           value: quay.io/openshift/dpu-daemon:latest
         - name: NRIWebhookImage
           value: quay.io/openshift/dpu-network-resources-injector:latest
+        - name: NRI_TLS_PROVIDER
+          value: auto
         - name: intel_ipu
           value: quay.io/openshift/dpu-intel-ipu-vsp:latest
         - name: IntelVspP4Image

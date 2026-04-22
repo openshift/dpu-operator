@@ -86,3 +86,29 @@ rules:
   - get
   - update
   - patch
+- apiGroups:
+  - whereabouts.cni.cncf.io
+  resources:
+  - ippools
+  - overlappingrangeipreservations
+  - nodeslicepools
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

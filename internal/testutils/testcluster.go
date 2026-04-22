@@ -861,7 +861,7 @@ func LabelNodesWithDpu(c client.Client) error {
 	switch flavour {
 	case utils.MicroShiftFlavour, utils.KindFlavour:
 		return LabelAllNodesWithDpu(c)
-	case utils.OpenShiftFlavour:
+	case utils.OpenShiftFlavour, utils.KubernetesFlavour:
 		return LabelWorkerNodesWithDpu(c)
 	default:
 		return fmt.Errorf("unsupported cluster flavor %s", flavour)
@@ -925,7 +925,6 @@ func WaitForDPUReady(c client.Client) error {
 
 		return allReady, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("timeout waiting for all DPU CRs to be Ready: %w", err)
 	}
@@ -954,7 +953,6 @@ func WaitForDPUReady(c client.Client) error {
 }
 
 func WaitForDPU(c client.Client) error {
-
 	var dpuName string
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, TestInitialSetupTimeout*3, true, func(ctx context.Context) (bool, error) {
 		dpuList := &configv1.DataProcessingUnitList{}
@@ -970,7 +968,6 @@ func WaitForDPU(c client.Client) error {
 
 		return false, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("timeout waiting for DPU resource: %w", err)
 	}
@@ -990,7 +987,6 @@ func WaitForDPU(c client.Client) error {
 
 		return false, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("timeout waiting for DPU %s to be Ready: %w", dpuName, err)
 	}
@@ -999,7 +995,6 @@ func WaitForDPU(c client.Client) error {
 }
 
 func WaitForAllPodsReady(c client.Client, namespace string) error {
-
 	err := wait.PollImmediate(time.Second, TestInitialSetupTimeout*3, func() (bool, error) {
 		podList := &corev1.PodList{}
 		err := c.List(context.TODO(), podList, client.InNamespace(namespace))
@@ -1026,7 +1021,6 @@ func WaitForAllPodsReady(c client.Client, namespace string) error {
 
 		return true, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("pods not ready after timeout: %w", err)
 	}

@@ -1,0 +1,52 @@
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.24-bookworm@sha256:1a6d4452c65dea36aac2e2d606b01b4a029ec90cc1ae53890540ce6173ea77ac AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+COPY . .
+
+# Build directly to avoid GOARCH leaking into go-run helper tooling during cross builds.
+RUN mkdir -p /workspace/bin && \
+    GOMAXPROCS=2 CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -o /workspace/bin/ipuplugin.${TARGETARCH} ./cmd/intelvsp/intelvsp.go
+
+FROM quay.io/centos/centos:stream9
+ARG TARGETARCH
+ENV PYTHONUNBUFFERED=1
+WORKDIR /
+
+# https://github.com/grpc/grpc/issues/24556
+RUN dnf install -y \
+    centos-release-nfv-openvswitch \
+    && dnf install -y \
+    NetworkManager iproute python3 python3-devel openssh-clients gcc gcc-c++ openvswitch3.4 \
+    && python3 -m ensurepip --upgrade
+
+# By setting WORKDIR, directories are created automatically.
+WORKDIR /opt/p4/p4-cp-nws/bin/
+RUN mkdir -p /opt/p4/p4-cp-nws/bin/p4
+
+COPY ./cmd/intelvsp/fxp-net_linux-networking/fxp-net_linux-networking.pkg /
+COPY ./cmd/intelvsp/p4rt-ctl /opt/p4/p4-cp-nws/bin/
+
+# Add steps for cachito
+ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
+ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
+COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+COPY openshift/install-dpu.sh .
+RUN chmod +x install-dpu.sh \
+    && ./install-dpu.sh
+
+# Remove packages only needed for cachito.
+RUN dnf remove -y gcc gcc-c++ \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/p4 /opt/p4rt_proto
+COPY ./cmd/intelvsp/p4runtime-2023.11.0/copy_p4rt_python_deps.sh /opt/p4rt_proto
+RUN chmod a+x /opt/p4rt_proto/copy_p4rt_python_deps.sh
+RUN /opt/p4rt_proto/copy_p4rt_python_deps.sh
+
+COPY --chmod=755 --from=builder /workspace/bin/ipuplugin.${TARGETARCH} /ipuplugin
+LABEL io.k8s.display-name="IPU OPI Plugin"
+ENTRYPOINT ["/ipuplugin"]

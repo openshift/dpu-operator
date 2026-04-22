@@ -1,0 +1,30 @@
+# Adds namespace to all resources.
+namespace: openshift-dpu-operator
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+namePrefix: dpu-operator-
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+
+# [WEBHOOK] Optional for upstream deployments.
+#- ../webhook
+
+# [CERTMANAGER] Optional for upstream deployments and only required when
+# webhook certificates are managed by cert-manager.
+#- ../certmanager
+
+patches:
+# [WEBHOOK]
+#- path: ../default/manager_webhook_patch.yaml
+
+# [CERTMANAGER]
+#- path: ../default/webhookcainjection_patch.yaml
+
+# [CERTMANAGER] Uncomment replacements if cert-manager webhook CA injection is
+# enabled in this profile.
+#replacements: []
