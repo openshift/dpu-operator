@@ -21,11 +21,13 @@ import (
 	"github.com/openshift/dpu-operator/pkgs/vars"
 	pb "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
 	lifecycleapi "github.com/opiproject/opi-api/v1/gen/go/lifecycle/v1alpha1"
+	"github.com/vishvananda/netlink"
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
@@ -113,7 +115,12 @@ func NewDpuSideManager(vsp plugin.VendorPlugin, config *rest.Config, opts ...fun
 		opt(d)
 	}
 
-	d.dp = deviceplugin.NewDevicePlugin(vsp, true, d.pathManager)
+	if k8sClient, err := client.New(d.config, client.Options{Scheme: scheme.Scheme}); err != nil {
+		d.log.Error(err, "Failed to create Kubernetes client for device plugin; falling back to default-only registration")
+		d.dp = deviceplugin.NewDevicePluginManager(vsp, true, d.pathManager, nil)
+	} else {
+		d.dp = deviceplugin.NewDevicePluginManager(vsp, true, d.pathManager, k8sClient)
+	}
 
 	return d, nil
 }
@@ -149,12 +156,21 @@ func (d *DpuSideManager) cniCmdNfAddHandler(req *cnitypes.PodRequest) (*cni100.R
 		return nil, fmt.Errorf("SRIOV manager failed in add handler: %v", err)
 	}
 
-	d.macStore[req.Netns] = append(d.macStore[req.Netns], req.CNIConf.MAC)
-	if len(d.macStore[req.Netns]) == 2 {
-		d.log.Info("cniCmdNfAddHandler", "req.Netns", req.Netns)
-		macs := d.macStore[req.Netns]
-		d.vsp.CreateNetworkFunction(macs[0], macs[1])
+	bridgeID := req.CNIConf.BridgeID
+
+	if req.CNIConf.IsAccelerated {
+		d.log.Info("cniCmdNfAddHandler accelerated mode: calling CNF per VF", "mac", req.CNIConf.MAC, "bridgeID", bridgeID)
+		d.macStore[req.Netns] = append(d.macStore[req.Netns], req.CNIConf.MAC)
+		d.vsp.CreateNetworkFunction(req.CNIConf.MAC, "", bridgeID)
+	} else {
+		d.macStore[req.Netns] = append(d.macStore[req.Netns], req.CNIConf.MAC)
+		if len(d.macStore[req.Netns]) == 2 {
+			d.log.Info("cniCmdNfAddHandler", "req.Netns", req.Netns, "bridgeID", bridgeID)
+			macs := d.macStore[req.Netns]
+			d.vsp.CreateNetworkFunction(macs[0], macs[1], bridgeID)
+		}
 	}
+
 	d.log.Info("cniCmdNfAddHandler CmdAdd succeeded")
 	return res, nil
 }
@@ -166,17 +182,69 @@ func (d *DpuSideManager) cniCmdNfDelHandler(req *cnitypes.PodRequest) (*cni100.R
 		return nil, errors.New("SRIOV manager failed in del handler")
 	}
 
-	macs := d.macStore[req.Netns]
+	bridgeID := req.CNIConf.BridgeID
 
-	if len(macs) == 2 {
-		d.log.Info("cniCmdNfDelHandler", "req.Netns", req.Netns)
-		d.vsp.DeleteNetworkFunction(macs[0], macs[1])
+	if req.CNIConf.IsAccelerated {
+		macs := d.macStore[req.Netns]
+		mac := ""
+		if len(macs) > 0 {
+			mac = macs[len(macs)-1]
+			d.macStore[req.Netns] = macs[:len(macs)-1]
+		}
+		d.log.Info("cniCmdNfDelHandler accelerated mode: calling DNF per VF", "mac", mac, "bridgeID", bridgeID)
+		d.vsp.DeleteNetworkFunction(mac, "", bridgeID)
+	} else {
+		macs := d.macStore[req.Netns]
+		if len(macs) == 2 {
+			d.log.Info("cniCmdNfDelHandler", "req.Netns", req.Netns, "bridgeID", bridgeID)
+			d.vsp.DeleteNetworkFunction(macs[0], macs[1], bridgeID)
+		}
+		if len(macs) > 0 {
+			d.macStore[req.Netns] = macs[:len(macs)-1]
+		}
 	}
-
-	d.macStore[req.Netns] = macs[:len(macs)-1]
 
 	d.log.Info("cniCmdNfDelHandler CmdDel succeeded")
 	return nil, nil
+}
+
+// releaseNfDevices recovers any devices (VF representors or veths) that are
+// still inside NF pod namespaces during graceful shutdown. This must run
+// before the CNI server and VSP are stopped so the host can safely reset
+// sriov_numvfs without hitting a kernel D-state hang.
+func (d *DpuSideManager) releaseNfDevices() {
+	d.log.Info("releaseNfDevices: checking for devices still in pod namespaces")
+
+	devices, err := d.vsp.GetDevices()
+	if err != nil {
+		d.log.Error(err, "releaseNfDevices: failed to get device list from VSP")
+		return
+	}
+
+	for _, dev := range devices.Devices {
+		devName := dev.ID
+		if _, err := netlink.LinkByName(devName); err == nil {
+			continue
+		}
+
+		links, listErr := netlink.LinkList()
+		if listErr != nil {
+			d.log.Error(listErr, "releaseNfDevices: failed to list links")
+			return
+		}
+		for _, link := range links {
+			if link.Attrs().Alias == devName {
+				d.log.Info("releaseNfDevices: found device under temp name, restoring",
+					"tempName", link.Attrs().Name, "originalName", devName)
+				if err := netlink.LinkSetName(link, devName); err != nil {
+					d.log.Error(err, "releaseNfDevices: failed to rename", "device", devName)
+				} else if err := netlink.LinkSetUp(link); err != nil {
+					d.log.Error(err, "releaseNfDevices: failed to bring up", "device", devName)
+				}
+				break
+			}
+		}
+	}
 }
 
 func (d *DpuSideManager) Listen() (net.Listener, error) {
@@ -225,6 +293,7 @@ func (d *DpuSideManager) Serve(ctx context.Context, listener net.Listener) error
 	go func() {
 		<-ctx.Done()
 		d.log.Info("Context cancelled, shutting down servers")
+		d.releaseNfDevices()
 		d.server.Stop()
 		d.dp.Stop()
 		d.vsp.Close()

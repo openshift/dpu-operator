@@ -130,6 +130,8 @@ type NetConf struct {
 	RuntimeConfig struct {
 		Mac string `json:"mac,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
-	LogLevel string `json:"logLevel,omitempty"`
-	LogFile  string `json:"logFile,omitempty"`
+	LogLevel      string `json:"logLevel,omitempty"`
+	LogFile       string `json:"logFile,omitempty"`
+	BridgeID      string `json:"bridgeID,omitempty"`
+	IsAccelerated bool   `json:"isAccelerated,omitempty"`
 }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type HostSideManager struct {
@@ -51,7 +52,7 @@ type HostSideManager struct {
 	dpListener         net.Listener
 }
 
-func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string) (*pb.BridgePort, error) {
+func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string, bridgeID string) (*pb.BridgePort, error) {
 	err := d.connectWithRetry()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect with retry: %v", err)
@@ -69,8 +70,7 @@ func (d *HostSideManager) CreateBridgePort(pf int, vf int, vlan int, mac string)
 				Ptype:      1,
 				MacAddress: m,
 				LogicalBridges: []string{
-					// TODO: Remove +2
-					fmt.Sprintf("%d", vf+2),
+					bridgeID,
 				},
 			},
 		},
@@ -100,9 +100,15 @@ func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager))
 		opt(h)
 	}
 
-	h.dp = deviceplugin.NewDevicePlugin(vsp, false, h.pathManager)
 	if h.config == nil {
 		h.config = ctrl.GetConfigOrDie()
+	}
+
+	if k8sClient, err := client.New(h.config, client.Options{Scheme: scheme.Scheme}); err != nil {
+		h.log.Error(err, "Failed to create Kubernetes client for device plugin; falling back to default-only registration")
+		h.dp = deviceplugin.NewDevicePluginManager(vsp, false, h.pathManager, nil)
+	} else {
+		h.dp = deviceplugin.NewDevicePluginManager(vsp, false, h.pathManager, k8sClient)
 	}
 	return h, nil
 }
@@ -193,11 +199,12 @@ func (d *HostSideManager) cniCmdAddHandler(req *cnitypes.PodRequest) (*cni100.Re
 	pf := 0
 	vf := req.CNIConf.VFID
 	mac := req.CNIConf.OrigVfState.EffectiveMAC
+	bridgeID := req.CNIConf.BridgeID
 	d.log.Info("addHandler", "CNIConf", req.CNIConf)
 	// TODO: fix setting Vlan based on network definition in CR
 	vlan := 2 // *req.CNIConf.Vlan
-	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan)
-	_, err = d.CreateBridgePort(pf, vf, vlan, mac)
+	d.log.Info("addHandler", "pf", pf, "vf", vf, "mac", mac, "vlan", vlan, "bridgeID", bridgeID)
+	_, err = d.CreateBridgePort(pf, vf, vlan, mac, bridgeID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to call CreateBridgePort: %v", err)
 	}

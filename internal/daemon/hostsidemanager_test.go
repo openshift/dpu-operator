@@ -63,11 +63,15 @@ func (v *DummyPlugin) DeleteBridgePort(deleteRequest *opi.DeleteBridgePortReques
 	return nil
 }
 
-func (g *DummyPlugin) CreateNetworkFunction(input string, output string) error {
+func (g *DummyPlugin) CreateNetworkFunction(input string, output string, bridgeID string) error {
 	return nil
 }
 
-func (g *DummyPlugin) DeleteNetworkFunction(input string, output string) error {
+func (g *DummyPlugin) DeleteNetworkFunction(input string, output string, bridgeID string) error {
+	return nil
+}
+
+func (g *DummyPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
 	return nil
 }
 

@@ -6,6 +6,7 @@ resources:
 - bases/config.openshift.io_servicefunctionchains.yaml
 - bases/config.openshift.io_dataprocessingunits.yaml
 - bases/config.openshift.io_dataprocessingunitconfigs.yaml
+- bases/config.openshift.io_dpunetworks.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
