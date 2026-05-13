@@ -1,0 +1,104 @@
+@startuml pod_creation_nf_disruptive
+
+actor user
+box "Kubernetes Control Plane"
+participant k8s_api
+participant nri as "network-resources-injector (NRI)\nMutating Webhook"
+end box
+
+box "DPU Node"
+participant kubelet
+participant dpu_daemon as "dpu-daemon\n(Device Plugin Manager + Device Plugin)"
+participant vendor_plugin as "vsp (vendor plugin)"
+end box
+
+autonumber
+
+== NF Pod Launch: BridgeID and IsDisruptive via NAD ==
+
+note right of user: **Prerequisites:**\nDpuNetwork CR created and ready\nDevice Plugin registered\nNetwork Resources Injector (NRI) deployed (via DpuOperatorConfig)\nSee: dpunetwork_cr_creation.puml
+
+user -> k8s_api: Create NF Pod with DpuNetwork annotation
+activate k8s_api
+note right: **NF Pod YAML (Disruptive Mode)**\n\napiVersion: v1\nkind: Pod\nmetadata:\n  name: "my-nf"\n  namespace: openshift-dpu-operator\n  annotations:\n    dpu.config.openshift.io/dpu-network: dpu-network-1  # controller fills NAD list\nspec:\n  nodeSelector:\n    dpu.config.openshift.io/dpuside: "dpu"\n  containers:\n    - name: "my-nf"\n      image: "ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest"\n      resources:\n        requests:\n          openshift.io/dpunetwork-dpu-network-1: "7"  # all VF representors from CR\n          openshift.io/rpm-disruptive: "1"            # 1 RPM when IsDisruptive=true\n        limits:\n          openshift.io/dpunetwork-dpu-network-1: "7"\n          openshift.io/rpm-disruptive: "1"\n\n**Only DpuNetwork annotation provided by user**\n**Controller patches k8s.v1.cni.cncf.io/networks**
+
+== Admission (Mutating Webhook) ==
+
+k8s_api -> nri: AdmissionReview (Pod CREATE)\ncheck dpu-network annotation + dpuside nodeSelector
+activate nri
+note right of nri: NRI logic (high-level):\n- Read DpuNetwork CR (dpu-network-1)\n- Determine side from nodeSelector\n  dpuside=dpu → DPU-side injection\n- Determine required VF count (e.g., from resource request)\n- If IsDisruptive=true: inject VF NAD repeated N times + rpm-disruptive NAD\n- Else: inject single non-disruptive NAD
+nri -> k8s_api: Patch Pod annotation\nk8s.v1.cni.cncf.io/networks = [dpunetwork-1-nad x7, rpm-disruptive]
+deactivate nri
+
+note right of k8s_api: After mutation, the stored Pod has a NAD list.\nMultus will call CNI ADD once per NAD entry.\n(Repeating the VF NAD N times yields N CNI cmdADD calls.)
+
+k8s_api -> kubelet: Pod Scheduled to Node
+activate kubelet
+
+kubelet -> kubelet: Check Resource Requests\n"openshift.io/dpunetwork-dpu-network-1": 7 (all VFs from CR)\n"openshift.io/rpm-disruptive": 1 (RPM port)
+
+kubelet -> dpu_daemon: Allocate(AllocateRequest)\nContainerRequests for 7 VF devices + 1 RPM device\nResource: "openshift.io/dpunetwork-dpu-network-1" (x7)\nResource: "openshift.io/rpm-disruptive" (x1)
+activate dpu_daemon
+
+dpu_daemon -> dpu_daemon: Lookup resources in ConfigMap\n"openshift.io/dpunetwork-dpu-network-1"\n"openshift.io/rpm-disruptive"
+
+dpu_daemon -> dpu_daemon: Allocate devices from resource pool\nDevice-1 (VF 1)\nDevice-2 (VF 2)\nDevice-3 (VF 3)\nDevice-4 (VF 4)\nDevice-5 (VF 5)\nDevice-6 (VF 6)\nDevice-7 (VF 7)\nDevice-RPM (RPM interface)
+
+dpu_daemon -> kubelet: AllocateResponse\n(NF-DEV env var for all 8 devices)
+deactivate dpu_daemon
+
+note right of kubelet: **NAD processing order**\n1. VF NAD (`dpunetwork-1`) triggers 7 CNI cmdADD calls (one per VF)\n2. rpm-disruptive NAD triggers 1 CNI cmdADD call for RPM port\n3. Total: 8 CNI cmdADD calls, each triggers a createNetworkFunction call to VSP
+
+== Multiple CNI cmdADD Calls ==
+
+loop for each of 7 VF representors from CR (Device-1 to Device-7)
+kubelet -> dpu_daemon: Execute dpu-cni (cmdADD)\nNAD config: dpunetwork-1\nVF index: 1..7
+activate dpu_daemon
+
+dpu_daemon -> dpu_daemon: cniCmdNfAddHandler\n(PodRequest with VF info)
+
+dpu_daemon -> dpu_daemon: Prepare NFRequest\nExtract BridgeID from DpuNetwork CR\nVF MAC address\nVF device info
+
+dpu_daemon -> vendor_plugin: CreateNetworkFunction(gRPC)\nNFRequest{\n  input: "aa:bb:cc:dd:ee:0X" (VF MAC),\n  output: "",\n  bridge_id: "x1",\n  is_disruptive: true,\n  vf_index: X\n}
+activate vendor_plugin
+
+vendor_plugin -> vendor_plugin: Validate BridgeID="x1"\nEntry in VSP Map:\n  Key: "x1"\n  Value: {\n    pod_name: "my-nf",\n    pod_uid: "abc-123-def-456",\n    entries: [\n      {vf_index: X, input_mac, device, ...}\n    ]\n  }
+
+vendor_plugin -> dpu_daemon: NetworkFunction Created
+deactivate vendor_plugin
+
+dpu_daemon -> kubelet: CNI Success (VF)
+deactivate dpu_daemon
+end
+
+== RPM Port CNI cmdADD Call ==
+
+kubelet -> dpu_daemon: Execute dpu-cni (cmdADD)\nNAD config: rpm-disruptive
+activate dpu_daemon
+
+dpu_daemon -> dpu_daemon: cniCmdNfAddHandler\n(PodRequest with RPM info)
+note right: **PodRequest**\n\nPodRequest:\n  PodName: "my-nf"\n  PodNamespace: "openshift-dpu-operator"\n  PodUID: "abc-123-def-456"\n  Netns: "/proc/1234/ns/net"\n  CNIConf:\n    BridgeID: "x1"\n    IsDisruptive: true\n    MAC: "aa:bb:cc:dd:ee:ff" (RPM MAC)
+
+dpu_daemon -> dpu_daemon: Check IsDisruptive flag\nIsDisruptive = true\nPrepare NFRequest for RPM
+
+dpu_daemon -> vendor_plugin: CreateNetworkFunction(gRPC)\nNFRequest{\n  input: "aa:bb:cc:dd:ee:ff" (RPM MAC),\n  output: "",\n  bridge_id: "x1",\n  is_disruptive: true,\n  is_rpm: true\n}
+activate vendor_plugin
+
+vendor_plugin -> vendor_plugin: Update VSP Map Entry\n  Key: "x1"\n  Value: {\n    pod_name: "my-nf",\n    pod_uid: "abc-123-def-456",\n    entries: [\n      {vf_index: 1, input_mac, device, ...},\n      {vf_index: 2, input_mac, device, ...},\n      ...\n      {vf_index: 7, input_mac, device, ...},\n      {is_rpm: true, input_mac: "aa:bb:cc:dd:ee:ff", ...}\n    ]\n  }
+
+vendor_plugin -> vendor_plugin: Configure Flow Rules for all entries\nBridge: br-x1\nAll VF interfaces + RPM interface\nDisruptive mode: traffic via single RPM
+
+vendor_plugin -> dpu_daemon: NetworkFunction Created
+deactivate vendor_plugin
+
+dpu_daemon -> kubelet: CNI Success (RPM)
+deactivate dpu_daemon
+
+kubelet -> k8s_api: Update Pod Status (Running)
+deactivate kubelet
+deactivate k8s_api
+
+note right of user: **VSP Map Structure (Keyed by BridgeID)**\n\nVSP Maintains:\n  Map<BridgeID, PodNetworkFunctionInfo>\n\n  Key: "x1"\n  Value: PodNetworkFunctionInfo {\n    pod_name: "my-nf"\n    pod_namespace: "openshift-dpu-operator"\n    pod_uid: "abc-123-def-456"\n    bridge_id: "x1"\n    is_disruptive: true\n    entries: [\n      {\n        type: "VF",\n        vf_index: 1,\n        input_mac: "aa:bb:cc:dd:ee:01",\n        input_device: "0000:00:07.1",\n        netns: "/proc/1234/ns/net"\n      },\n      ... (6 more VF entries) ...\n      {\n        type: "VF",\n        vf_index: 7,\n        input_mac: "aa:bb:cc:dd:ee:07",\n        input_device: "0000:00:07.7",\n        netns: "/proc/1234/ns/net"\n      },\n      {\n        type: "RPM",\n        input_mac: "aa:bb:cc:dd:ee:ff",\n        input_device: "rpm-0\",\n        netns: "/proc/1234/ns/net"\n      }\n    ]\n  }\n\n**Summary:**\n- 8 total CNI cmdADD calls (7 VFs + 1 RPM)\n- 8 createNetworkFunction calls to VSP\n- 1 VSP map entry per pod, keyed by BridgeID\n- All NF interfaces (VFs + RPM) tracked in single entry\n\n**Related Diagrams:**\n- pod_creation_regular.puml for regular pods\n- dpunetwork_cr_creation.puml for CR setup
+
+@enduml
+

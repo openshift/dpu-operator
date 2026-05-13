@@ -1,0 +1,165 @@
+@startuml pod_creation_regular
+
+actor user
+box "Kubernetes Control Plane"
+participant k8s_api
+participant nri as "network-resources-injector (NRI)\nMutating Webhook"
+end box
+
+box "Host Node"
+participant kubelet
+participant device_plugin as "device_plugin"
+participant cni_plugin
+participant cni_server
+participant host_side_manager
+end box
+
+box "DPU Node"
+participant dpu_side_manager
+participant vendor_plugin
+end box
+
+autonumber
+
+== Pod Creation Using Different DpuNetworks ==
+
+note right of user: **Prerequisites:**\nDpuNetwork CR created and ready\nDevice Plugin registered\nNetwork Resources Injector (NRI) deployed (via DpuOperatorConfig)\nSee: dpunetwork_cr_creation.puml
+
+user -> k8s_api: Create Pod 1 with DpuNetwork annotation
+activate k8s_api
+note right: **Pod 1 → DpuNetwork 1**\nannotations:\n  dpu.config.openshift.io/dpu-network: dpu-network-1\n\nresources:\n  requests:\n    openshift.io/dpunetwork-dpu-network-1: "1"\n\n**User references DpuNetwork; NRI injects Multus NAD annotation**
+
+== Admission (Mutating Webhook) ==
+
+k8s_api -> nri: AdmissionReview (Pod CREATE)\ncheck dpu-network annotation
+activate nri
+nri -> k8s_api: Patch Pod annotation\nk8s.v1.cni.cncf.io/networks = default/dpunetwork-1-nad
+deactivate nri
+
+note right of k8s_api: After mutation, the stored Pod has\nk8s.v1.cni.cncf.io/networks pointing to the NAD\nso Multus will act on it.
+
+k8s_api -> kubelet: Pod Scheduled to Node
+activate kubelet
+
+kubelet -> kubelet: Check Resource Request\n"openshift.io/dpunetwork-dpu-network-1": 1
+
+kubelet -> device_plugin: Allocate(AllocateRequest)\nResource: "openshift.io/dpunetwork-dpu-network-1"
+activate device_plugin
+note right: ContainerRequests:\n  DevicesIDs: ["device-2"]\n  (Kubelet selects from\n  available devices in pool)
+
+device_plugin -> device_plugin: Lookup resource in ConfigMap\n"openshift.io/dpunetwork-dpu-network-1"
+
+device_plugin -> device_plugin: Validate DeviceID\n(device-2 maps to VF 2)
+
+device_plugin -> device_plugin: Check VF in allowed range\n(VF 2 is in [0,1,2,3,5,6,7] ✓)\n(from ConfigMap resource definition)
+
+device_plugin -> device_plugin: Allocate device\nSet NF-DEV env var\nNF-DEV="0000:00:07.2"
+device_plugin -> kubelet: AllocateResponse\n(NF-DEV env var)
+deactivate device_plugin
+
+kubelet -> cni_plugin: Execute dpu-cni\n(NAD config with BridgeID & IsDisruptive)
+activate cni_plugin
+
+cni_plugin -> cni_server: POST /cni\n(NAD config)
+activate cni_server
+
+cni_server -> host_side_manager: cniCmdAddHandler\n(PodRequest with BridgeID & IsDisruptive)
+activate host_side_manager
+
+== Bridge Port Creation ==
+
+host_side_manager -> dpu_side_manager: CreateBridgePort(gRPC{BridgePortID,IsDisruptive,Bridge})
+activate dpu_side_manager
+note right: CreateBridgePortRequest:\n  BridgePortID: "x1"\n  IsDisruptive:true BridgePort:\n    Name: "host0-1"\n    Spec:\n      MacAddress: "..."\n  
+
+dpu_side_manager -> vendor_plugin: CreateBridgePort(OPI API)
+activate vendor_plugin
+
+vendor_plugin -> vendor_plugin: Check IsDisruptive flag\nfrom CreateBridgePortRequest
+
+alt IsDisruptive = true
+  vendor_plugin -> vendor_plugin: Lookup NF in local registry\nby BridgeID (BridgePortID="x1")
+  
+  alt NF not found in registry
+    vendor_plugin -> dpu_side_manager: Error: NF not created yet\nPlease use non-Disruptive mode to Host
+    deactivate vendor_plugin
+    dpu_side_manager -> host_side_manager: Error Response
+    deactivate dpu_side_manager
+    host_side_manager -> cni_server: CNI Error
+    deactivate host_side_manager
+    cni_server -> cni_plugin: HTTP Error Response
+    deactivate cni_server
+    cni_plugin -> kubelet: CNI Error
+    deactivate cni_plugin
+    kubelet -> k8s_api: Update Pod Status (Failed)
+    deactivate kubelet
+    deactivate k8s_api
+    note right: **Error Flow:**\nNF must be created first\nusing CreateNetworkFunction\nbefore host side can connect\nin disruptive mode
+  else NF found in registry
+    vendor_plugin -> vendor_plugin: Fetch PodNetworkFunctionInfo from VSP map\nKey = BridgePortID "x1"
+    note right: **VSP Map Structure (Keyed by BridgeID)**\n\nVSP Maintains:\nMap<BridgeID, PodNetworkFunctionInfo>\n\nKey: "x1"\nValue: PodNetworkFunctionInfo {\n  pod_name: "my-nf"\n  pod_namespace: "openshift-dpu-operator"\n  pod_uid: "abc-123-def-456"\n  bridge_id: "x1"\n  is_disruptive: true\n  entries: [\n    {type: "VF", vf_index: 1, input_mac: "aa:bb:cc:dd:ee:01", input_device: "0000:00:07.1", netns: "/proc/1234/ns/net"},\n    ...\n    {type: "VF", vf_index: 7, input_mac: "aa:bb:cc:dd:ee:07", input_device: "0000:00:07.7", netns: "/proc/1234/ns/net"},\n    {type: "RPM", input_mac: "aa:bb:cc:dd:ee:ff", input_device: "rpm-0", netns: "/proc/1234/ns/net"}\n  ]\n}
+    vendor_plugin -> vendor_plugin: Determine vf_index from host VF\n(using NF-DEV mapping)
+    vendor_plugin -> vendor_plugin: Check VF entry exists in NF map\n(BridgeID "x1", vf_index)
+    alt VF entry exists in NF map
+      vendor_plugin -> dpu_side_manager: BridgePort Verified\n(VF already part of NF map)
+      deactivate vendor_plugin
+      
+      dpu_side_manager -> host_side_manager: BridgePort Response
+      deactivate dpu_side_manager
+      
+      host_side_manager -> cni_server: CNI Result
+      deactivate host_side_manager
+      
+      cni_server -> cni_plugin: HTTP Response
+      deactivate cni_server
+      
+      cni_plugin -> kubelet: CNI Success
+      deactivate cni_plugin
+    else VF entry missing in NF map
+      vendor_plugin -> dpu_side_manager: Error: Device not added to NF (Disruptive)
+      deactivate vendor_plugin
+      dpu_side_manager -> host_side_manager: Error Response
+      deactivate dpu_side_manager
+      host_side_manager -> cni_server: CNI Error
+      deactivate host_side_manager
+      cni_server -> cni_plugin: HTTP Error Response
+      deactivate cni_server
+      cni_plugin -> kubelet: CNI Error
+      deactivate cni_plugin
+      kubelet -> k8s_api: Update Pod Status (Failed)
+      deactivate kubelet
+      deactivate k8s_api
+      note right: **Error Flow:**\nHost VF must match an entry\ncreated during NF registration
+    end
+  end
+else IsDisruptive = false (Non-Disruptive Mode)
+  vendor_plugin -> vendor_plugin: Select/Create bridge\nbr-x1 (from bridge_id)
+  
+  vendor_plugin -> vendor_plugin: AddPortToDataPlane\n(bridge=br-x1, vfName)
+  
+  vendor_plugin -> vendor_plugin: AddFlowRuleToDataPlane\n(bridge=br-x1, ...)
+  
+  vendor_plugin -> dpu_side_manager: BridgePort Created
+  deactivate vendor_plugin
+  
+  dpu_side_manager -> host_side_manager: BridgePort Response
+  deactivate dpu_side_manager
+  
+  host_side_manager -> cni_server: CNI Result
+  deactivate host_side_manager
+  
+  cni_server -> cni_plugin: HTTP Response
+  deactivate cni_server
+  
+  cni_plugin -> kubelet: CNI Success
+  deactivate cni_plugin
+end
+
+kubelet -> k8s_api: Update Pod 1 Status (Running)
+deactivate kubelet
+deactivate k8s_api
+
+note right of user: **Related Diagrams:**\n- pod_creation_nf_disruptive.puml for NF pods\n- dpunetwork_cr_creation.puml for CR setup
+
+@enduml
+
