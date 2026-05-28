@@ -17,6 +17,14 @@ service NetworkFunctionService {
   rpc DeleteNetworkFunction(NFRequest) returns (Empty);
 }
 
+service DataProcessingUnitManagementService {
+  // Reboot the DPU managed by this VSP. The VSP already knows its own
+  // PCIe address from Init(), so the request carries no device identifiers.
+  rpc DpuRebootFunction(DPURebootRequest) returns (DPUManagementResponse);
+  // Upgrade firmware on the DPU managed by this VSP.
+  rpc DpuFirmwareUpgradeFunction(DPUFirmwareUpgradeRequest) returns (DPUManagementResponse);
+}
+
 message InitRequest {
   bool dpu_mode = 1;
   string dpu_identifier = 2;
@@ -75,4 +83,30 @@ message PingResponse {
   int64 timestamp = 1;
   string responder_id = 2;
   bool healthy = 3;
+}
+
+// DPURebootRequest is intentionally empty. The gRPC connection is per-VSP,
+// so the VSP already knows which DPU it manages (PCIe address, etc.).
+// Adding optional fields for future extensibility (e.g. force flag).
+message DPURebootRequest {
+  // If true, perform a hard/forced reboot instead of a graceful one.
+  bool force = 1;
+}
+
+// DPUFirmwareUpgradeRequest carries only the firmware-specific parameters.
+// Device identification is implicit — the VSP knows its DPU from Init().
+message DPUFirmwareUpgradeRequest {
+  // Firmware type (e.g. "OAM", "SDK").
+  string firmware_type = 1;
+  // Path or URI of the firmware image (e.g. "quay.io/openshift/firmware/dpu:v1.0.8").
+  string firmware_image_path = 2;
+}
+
+message DPUManagementResponse {
+  // Whether the operation was accepted / succeeded.
+  bool success = 1;
+  // Human-readable status string (e.g. "Rebooting", "UpgradeStarted").
+  string status = 2;
+  // Additional detail or error message.
+  string message = 3;
 }

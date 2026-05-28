@@ -365,6 +365,153 @@ var NetworkFunctionService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	DataProcessingUnitManagementService_DpuRebootFunction_FullMethodName          = "/Vendor.DataProcessingUnitManagementService/DpuRebootFunction"
+	DataProcessingUnitManagementService_DpuFirmwareUpgradeFunction_FullMethodName = "/Vendor.DataProcessingUnitManagementService/DpuFirmwareUpgradeFunction"
+)
+
+// DataProcessingUnitManagementServiceClient is the client API for DataProcessingUnitManagementService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type DataProcessingUnitManagementServiceClient interface {
+	// Reboot the DPU managed by this VSP. The VSP already knows its own
+	// PCIe address from Init(), so the request carries no device identifiers.
+	DpuRebootFunction(ctx context.Context, in *DPURebootRequest, opts ...grpc.CallOption) (*DPUManagementResponse, error)
+	// Upgrade firmware on the DPU managed by this VSP.
+	DpuFirmwareUpgradeFunction(ctx context.Context, in *DPUFirmwareUpgradeRequest, opts ...grpc.CallOption) (*DPUManagementResponse, error)
+}
+
+type dataProcessingUnitManagementServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewDataProcessingUnitManagementServiceClient(cc grpc.ClientConnInterface) DataProcessingUnitManagementServiceClient {
+	return &dataProcessingUnitManagementServiceClient{cc}
+}
+
+func (c *dataProcessingUnitManagementServiceClient) DpuRebootFunction(ctx context.Context, in *DPURebootRequest, opts ...grpc.CallOption) (*DPUManagementResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DPUManagementResponse)
+	err := c.cc.Invoke(ctx, DataProcessingUnitManagementService_DpuRebootFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataProcessingUnitManagementServiceClient) DpuFirmwareUpgradeFunction(ctx context.Context, in *DPUFirmwareUpgradeRequest, opts ...grpc.CallOption) (*DPUManagementResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DPUManagementResponse)
+	err := c.cc.Invoke(ctx, DataProcessingUnitManagementService_DpuFirmwareUpgradeFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DataProcessingUnitManagementServiceServer is the server API for DataProcessingUnitManagementService service.
+// All implementations must embed UnimplementedDataProcessingUnitManagementServiceServer
+// for forward compatibility.
+type DataProcessingUnitManagementServiceServer interface {
+	// Reboot the DPU managed by this VSP. The VSP already knows its own
+	// PCIe address from Init(), so the request carries no device identifiers.
+	DpuRebootFunction(context.Context, *DPURebootRequest) (*DPUManagementResponse, error)
+	// Upgrade firmware on the DPU managed by this VSP.
+	DpuFirmwareUpgradeFunction(context.Context, *DPUFirmwareUpgradeRequest) (*DPUManagementResponse, error)
+	mustEmbedUnimplementedDataProcessingUnitManagementServiceServer()
+}
+
+// UnimplementedDataProcessingUnitManagementServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedDataProcessingUnitManagementServiceServer struct{}
+
+func (UnimplementedDataProcessingUnitManagementServiceServer) DpuRebootFunction(context.Context, *DPURebootRequest) (*DPUManagementResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DpuRebootFunction not implemented")
+}
+func (UnimplementedDataProcessingUnitManagementServiceServer) DpuFirmwareUpgradeFunction(context.Context, *DPUFirmwareUpgradeRequest) (*DPUManagementResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DpuFirmwareUpgradeFunction not implemented")
+}
+func (UnimplementedDataProcessingUnitManagementServiceServer) mustEmbedUnimplementedDataProcessingUnitManagementServiceServer() {
+}
+func (UnimplementedDataProcessingUnitManagementServiceServer) testEmbeddedByValue() {}
+
+// UnsafeDataProcessingUnitManagementServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to DataProcessingUnitManagementServiceServer will
+// result in compilation errors.
+type UnsafeDataProcessingUnitManagementServiceServer interface {
+	mustEmbedUnimplementedDataProcessingUnitManagementServiceServer()
+}
+
+func RegisterDataProcessingUnitManagementServiceServer(s grpc.ServiceRegistrar, srv DataProcessingUnitManagementServiceServer) {
+	// If the following call panics, it indicates UnimplementedDataProcessingUnitManagementServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&DataProcessingUnitManagementService_ServiceDesc, srv)
+}
+
+func _DataProcessingUnitManagementService_DpuRebootFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DPURebootRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataProcessingUnitManagementServiceServer).DpuRebootFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataProcessingUnitManagementService_DpuRebootFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataProcessingUnitManagementServiceServer).DpuRebootFunction(ctx, req.(*DPURebootRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataProcessingUnitManagementService_DpuFirmwareUpgradeFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DPUFirmwareUpgradeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataProcessingUnitManagementServiceServer).DpuFirmwareUpgradeFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataProcessingUnitManagementService_DpuFirmwareUpgradeFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataProcessingUnitManagementServiceServer).DpuFirmwareUpgradeFunction(ctx, req.(*DPUFirmwareUpgradeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// DataProcessingUnitManagementService_ServiceDesc is the grpc.ServiceDesc for DataProcessingUnitManagementService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var DataProcessingUnitManagementService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "Vendor.DataProcessingUnitManagementService",
+	HandlerType: (*DataProcessingUnitManagementServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "DpuRebootFunction",
+			Handler:    _DataProcessingUnitManagementService_DpuRebootFunction_Handler,
+		},
+		{
+			MethodName: "DpuFirmwareUpgradeFunction",
+			Handler:    _DataProcessingUnitManagementService_DpuFirmwareUpgradeFunction_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "api.proto",
+}
+
+const (
 	DeviceService_GetDevices_FullMethodName = "/Vendor.DeviceService/GetDevices"
 	DeviceService_SetNumVfs_FullMethodName  = "/Vendor.DeviceService/SetNumVfs"
 )

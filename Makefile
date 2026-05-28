@@ -152,7 +152,7 @@ fast-test:
 
 
 .PHONY: build
-build: manifests generate fmt vet build-manager build-daemon build-intel-vsp build-marvell-vsp build-intel-netsec-vsp build-network-resources-injector
+build: manifests generate fmt vet build-manager build-daemon build-intel-vsp build-marvell-vsp build-intel-netsec-vsp build-synaxg-vsp build-network-resources-injector
 	@echo "Built all components"
 
 .PHONY: build-manager
@@ -174,6 +174,10 @@ build-marvell-vsp:
 .PHONY: build-intel-netsec-vsp
 build-intel-netsec-vsp:
 	go run tools/task/task.go build-bin-intel-netsec-vsp
+
+.PHONY: build-synaxg-vsp
+build-synaxg-vsp:
+	go run tools/task/task.go build-bin-synaxg-vsp
 
 .PHONY: build-network-resources-injector
 build-network-resources-injector:

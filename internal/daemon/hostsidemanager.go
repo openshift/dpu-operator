@@ -13,9 +13,11 @@ import (
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cniserver"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/cnitypes"
 	"github.com/openshift/dpu-operator/dpu-cni/pkgs/sriov"
+	"github.com/openshift/dpu-operator/internal/controller"
 	deviceplugin "github.com/openshift/dpu-operator/internal/daemon/device-plugin"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
 	sfcreconciler "github.com/openshift/dpu-operator/internal/daemon/sfc-reconciler"
+	"github.com/openshift/dpu-operator/internal/dpuprovider"
 	"github.com/openshift/dpu-operator/internal/scheme"
 	"github.com/openshift/dpu-operator/internal/utils"
 	"github.com/openshift/dpu-operator/pkgs/vars"
@@ -40,6 +42,7 @@ type HostSideManager struct {
 	pingMutex          sync.RWMutex
 	config             *rest.Config
 	vsp                plugin.VendorPlugin
+	dpuProvider        dpuprovider.DpuProvider
 	dp                 deviceplugin.DevicePlugin
 	addr               string
 	port               int32
@@ -87,9 +90,10 @@ func (d *HostSideManager) DeleteBridgePort(pf int, vf int, vlan int, mac string)
 	return err
 }
 
-func NewHostSideManager(vsp plugin.VendorPlugin, opts ...func(*HostSideManager)) (*HostSideManager, error) {
+func NewHostSideManager(vsp plugin.VendorPlugin, dpuProvider dpuprovider.DpuProvider, opts ...func(*HostSideManager)) (*HostSideManager, error) {
 	h := &HostSideManager{
 		vsp:           vsp,
+		dpuProvider:   dpuProvider,
 		log:           ctrl.Log.WithName("HostDaemon"),
 		sm:            sriov.NewSriovManager(),
 		pathManager:   *utils.NewPathManager("/"),
@@ -441,6 +445,15 @@ func (d *HostSideManager) setupReconcilers() {
 		if err = sfcReconciler.SetupWithManager(mgr); err != nil {
 			d.log.Error(err, "unable to create controller", "controller", "ServiceFunctionChain")
 		}
+
+		//set dataprocessingUnitConfig reconciler
+		//inject dpuProvider to implement DPU management (reboot, firmware upgrade)
+		dpuConfigReconciler := controller.NewDataProcessingUnitConfigReconciler(mgr.GetClient(), mgr.GetScheme(), d.dpuProvider)
+
+		if err = dpuConfigReconciler.SetupWithManager(mgr); err != nil {
+			d.log.Error(err, "unable to create controller", "controller", "DataProcessingUnitConfig_controller")
+		}
+
 		d.manager = mgr
 	}
 }

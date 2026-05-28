@@ -23,8 +23,7 @@ tasks:
   build-bin-marvell-vsp:
     vars:
       GOARCH: '{{.GOARCH}}'
-    cmds:
-      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-mrvl.{{.GOARCH}} internal/daemon/vendor-specific-plugins/marvell/main.go
+    cmds:      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-mrvl.{{.GOARCH}} internal/daemon/vendor-specific-plugins/marvell/main.go
 
   build-bin-intel-netsec-vsp:
     vars:
@@ -32,11 +31,16 @@ tasks:
     cmds:
       - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-intel-netsec.{{.GOARCH}} internal/daemon/vendor-specific-plugins/intel-netsec/main.go
 
-  build-bin-network-resources-injector:
+  build-bin-synaxg-vsp:
     vars:
       GOARCH: '{{.GOARCH}}'
     cmds:
-      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/nri.{{.GOARCH}} cmd/nri/networkresourcesinjector.go
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/vsp-synaxg.{{.GOARCH}} internal/daemon/vendor-specific-plugins/synaxg/main.go
+
+  build-bin-network-resources-injector:
+    vars:
+      GOARCH: '{{.GOARCH}}'
+    cmds:      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o {{.BINDIR}}/nri.{{.GOARCH}} cmd/nri/networkresourcesinjector.go
 
   build-bin-all:
     deps:
@@ -45,4 +49,5 @@ tasks:
       - build-bin-intel-vsp
       - build-bin-marvell-vsp
       - build-bin-intel-netsec-vsp
+      - build-bin-synaxg-vsp
       - build-bin-network-resources-injector

@@ -11,6 +11,7 @@ import (
 
 	configv1 "github.com/openshift/dpu-operator/api/v1"
 	"github.com/openshift/dpu-operator/internal/daemon/plugin"
+	"github.com/openshift/dpu-operator/internal/dpuprovider"
 	"github.com/openshift/dpu-operator/internal/images"
 	"github.com/openshift/dpu-operator/internal/platform"
 	"github.com/openshift/dpu-operator/internal/scheme"
@@ -61,6 +62,7 @@ type Daemon struct {
 	// Readiness state tracking
 	readyMutex sync.RWMutex
 	isReady    bool
+	mu         sync.RWMutex
 }
 
 func NewDaemon(fs afero.Fs, p platform.Platform, config *rest.Config, imageManager images.ImageManager, pathManager *utils.PathManager, nodeName string) Daemon {
@@ -324,7 +326,7 @@ func (d *Daemon) createSideManager(dpuCR *configv1.DataProcessingUnit, dpuPlugin
 		}
 		return dsm, nil
 	} else {
-		hsm, err := NewHostSideManager(dpuPlugin, WithPathManager2(d.pm))
+		hsm, err := NewHostSideManager(dpuPlugin, d, WithPathManager2(d.pm))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create HostSideManager: %v", err)
 		}
@@ -623,4 +625,39 @@ func (d *Daemon) setOwnerReference(dpuCR *configv1.DataProcessingUnit) error {
 	}
 
 	return nil
+}
+
+// get
+func (d *Daemon) GetSpecificDpuPlugin(name string) dpuprovider.DpuVSP {
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if mDpu, ok := d.managedDpus[name]; ok {
+		return mDpu.Plugin
+	}
+
+	return nil
+}
+
+func (d *Daemon) GetManagedDpus() map[string]dpuprovider.ManagedDpuInfo {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	res := make(map[string]dpuprovider.ManagedDpuInfo, len(d.managedDpus))
+	for key, value := range d.managedDpus {
+		var lbls map[string]string
+		if value.DpuCR != nil {
+			lbls = value.DpuCR.Labels
+		}
+		res[key] = dpuprovider.ManagedDpuInfo{Labels: lbls}
+	}
+
+	return res
+}
+
+func (d *Daemon) GetManagedDpusByIdentifier(identifier string) *ManagedDpu {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.managedDpus[identifier]
 }

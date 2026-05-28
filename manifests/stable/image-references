@@ -35,3 +35,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/dpu-intel-netsec-vsp:latest
+  - name: dpu-synaxg-vsp
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/dpu-synaxg-vsp:latest

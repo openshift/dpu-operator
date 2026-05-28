@@ -75,6 +75,10 @@ func (g *DummyPlugin) SetDpuNetworkConfig(isAccelerated bool) error {
 	return nil
 }
 
+func (v *DummyPlugin) Ping(ctx context.Context) (*lifecyclev1alpha1.PingResponse, error) {
+	return &lifecyclev1alpha1.PingResponse{}, nil
+}
+
 type SriovManagerStub struct{}
 
 func (m SriovManagerStub) SetupVF(conf *cnitypes.NetConf, podifName string, netns ns.NetNS) error {
@@ -217,7 +221,7 @@ var _ = g.Describe("Host Daemon", func() {
 		fakeDpuDaemon = &DummyDpuDaemon{}
 		dummyPluginHost := NewDummyPlugin()
 		m := SriovManagerStub{}
-		hostDaemon, err = NewHostSideManager(dummyPluginHost, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
+		hostDaemon, err = NewHostSideManager(dummyPluginHost, nil, WithPathManager2(pathManager), WithSriovManager(m), WithClient(client))
 		Expect(err).NotTo(HaveOccurred())
 		err = hostDaemon.StartVsp(context.Background())
 		Expect(err).NotTo(HaveOccurred())

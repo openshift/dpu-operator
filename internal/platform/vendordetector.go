@@ -66,6 +66,7 @@ func NewDpuDetectorManager(platform Platform) *DpuDetectorManager {
 			NewIntelDetector(),
 			NewMarvellDetector(),
 			NewNetsecAcceleratorDetector(),
+			NewSynaXGDetector(),
 			// add more detectors here
 		},
 	}
