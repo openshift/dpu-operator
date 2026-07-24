@@ -1,4 +1,4 @@
 packageName: dpu-operator
 channels:
 - name: "stable"
-  currentCSV: dpu-operator.v4.21.0
+  currentCSV: dpu-operator.v4.22.0

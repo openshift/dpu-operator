@@ -86,7 +86,7 @@ metadata:
     operatorframework.io/suggested-namespace: openshift-dpu-operator
     operators.operatorframework.io/builder: operator-sdk-v1.41.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: dpu-operator.v4.21.0
+  name: dpu-operator.v4.22.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -423,7 +423,7 @@ spec:
   provider:
     name: Red Hat
     url: www.redhat.com
-  version: 4.21.0
+  version: 4.22.0
   webhookdefinitions:
   - admissionReviewVersions:
     - v1
