@@ -7,9 +7,13 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - '*'
   - configmaps
+  - persistentvolumeclaims
+  - persistentvolumes
+  - pods
+  - secrets
   - serviceaccounts
+  - services
   verbs:
   - create
   - delete
@@ -21,19 +25,32 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - persistentvolumeclaims
-  - persistentvolumes
-  - pods
-  - secrets
-  - services
+  - events
   verbs:
-  - '*'
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
   verbs:
-  - '*'
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - apiextensions.k8s.io
   resources:
