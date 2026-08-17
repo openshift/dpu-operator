@@ -45,14 +45,36 @@ spec:
               networkFunctions:
                 items:
                   properties:
+                    chart:
+                      description: Chart defines a Helm chart for complex vendor deployments
+                      properties:
+                        name:
+                          description: Name of the requested chart
+                          type: string
+                        repository:
+                          description: Repository URL where to locate the requested
+                            chart
+                          type: string
+                        version:
+                          description: Version of the chart
+                          type: string
+                      required:
+                      - name
+                      - repository
+                      - version
+                      type: object
                     image:
+                      description: Image is the raw container image (legacy/simple
+                        deployment)
                       type: string
                     name:
                       type: string
                   required:
-                  - image
                   - name
                   type: object
+                  x-kubernetes-validations:
+                  - message: exactly one of image or chart must be set
+                    rule: has(self.image) != has(self.chart)
                 type: array
               nodeSelector:
                 additionalProperties:

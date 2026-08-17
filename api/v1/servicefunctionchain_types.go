@@ -33,9 +33,25 @@ type ServiceFunctionChainSpec struct {
 	NetworkFunctions []NetworkFunction `json:"networkFunctions"`
 }
 
+// +kubebuilder:validation:XValidation:rule="has(self.image) != has(self.chart)",message="exactly one of image or chart must be set"
 type NetworkFunction struct {
-	Name  string `json:"name"`
-	Image string `json:"image"`
+	Name string `json:"name"`
+
+	// Image is the raw container image (legacy/simple deployment)
+	Image string `json:"image,omitempty"`
+
+	// Chart defines a Helm chart for complex vendor deployments
+	Chart *HelmChartSource `json:"chart,omitempty"`
+}
+
+// HelmChartSource defines the location and version of a Helm chart
+type HelmChartSource struct {
+	// Repository URL where to locate the requested chart
+	Repository string `json:"repository"`
+	// Name of the requested chart
+	Name string `json:"name"`
+	// Version of the chart
+	Version string `json:"version"`
 }
 
 //+kubebuilder:object:root=true
