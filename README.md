@@ -1,5 +1,8 @@
 # DPU Operator
 
+> [!IMPORTANT]
+> **Project status (September 2026): This project is paused.** There has been no active customer adoption for the past several years, and development has moved upstream to the [OPI DPU Operator](https://github.com/opiproject/dpu-operator/). The project may be re-engaged if customer interest resurfaces.
+
 This operator will manage and configure data processing unit (DPUs) to be used in accelerating/offloading k8s networking functions.
 
 ## Description
